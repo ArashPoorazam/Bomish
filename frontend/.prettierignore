@@ -1,0 +1,6 @@
+.next
+node_modules
+src/lib/api-types.ts
+public
+test-results
+package-lock.json

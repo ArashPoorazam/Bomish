@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.env
+.env.local
+.data/
+coverage/
+test-results/
+playwright-report/
+backend/bin/
+*.tsbuildinfo
