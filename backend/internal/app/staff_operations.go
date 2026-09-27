@@ -26,11 +26,12 @@ func (a *App) updateOrder(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if in.Status != "packing" && in.Status != "shipped" {
+	if in.Status != "packing" && in.Status != "shipped" && in.Status != "received" {
 		fail(w, 400, "وضعیت مجاز نیست")
 		return
 	}
-	if in.Status == "shipped" && strings.TrimSpace(in.Tracking) == "" {
+	in.Tracking = domain.Normalize(strings.TrimSpace(in.Tracking))
+	if in.Status == "shipped" && !validTracking(in.Tracking) {
 		fail(w, 400, "کد رهگیری لازم است")
 		return
 	}
@@ -44,9 +45,16 @@ func (a *App) updateOrder(w http.ResponseWriter, r *http.Request) {
 	if in.Status == "shipped" {
 		previous = "packing"
 	}
-	tag, e := tx.Exec(r.Context(), "UPDATE orders SET status=$1,tracking=$2 WHERE id=$3 AND status=$4", in.Status, in.Tracking, r.PathValue("id"), previous)
+	if in.Status == "received" {
+		previous = "shipped"
+	}
+	tag, e := tx.Exec(r.Context(), "UPDATE orders SET status=$1,tracking=CASE WHEN $1='shipped' THEN $2 ELSE tracking END WHERE id=$3 AND status=$4", in.Status, in.Tracking, r.PathValue("id"), previous)
 	if e != nil || tag.RowsAffected() == 0 {
 		fail(w, 409, "تغییر وضعیت سفارش مجاز نیست")
+		return
+	}
+	if e = queueOrderSMS(r.Context(), tx, r.PathValue("id"), in.Status); e != nil {
+		a.dbError(w, e)
 		return
 	}
 	if e = audit(r, tx, "order."+in.Status, r.PathValue("id")); e == nil {
@@ -66,13 +74,15 @@ type shippingRule struct {
 	FeeRials int64  `json:"feeRials"`
 }
 type shippingConfig struct {
-	PackagingGrams int64          `json:"packagingGrams"`
-	Rules          []shippingRule `json:"rules"`
+	FreeShippingRials int64          `json:"freeShippingRials"`
+	SupportURL        string         `json:"supportUrl"`
+	PackagingGrams    int64          `json:"packagingGrams"`
+	Rules             []shippingRule `json:"rules"`
 }
 
 func (a *App) shippingSettings(w http.ResponseWriter, r *http.Request) {
 	v := shippingConfig{Rules: []shippingRule{}}
-	e := a.Pool.QueryRow(r.Context(), "SELECT packaging_grams FROM settings WHERE id=true").Scan(&v.PackagingGrams)
+	e := a.Pool.QueryRow(r.Context(), "SELECT packaging_grams,free_shipping_rials,support_url FROM settings WHERE id=true").Scan(&v.PackagingGrams, &v.FreeShippingRials, &v.SupportURL)
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -98,7 +108,7 @@ func (a *App) saveShipping(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &v) {
 		return
 	}
-	if v.PackagingGrams < 0 || v.PackagingGrams > 10000 || len(v.Rules) > 500 {
+	if v.FreeShippingRials < 0 || v.FreeShippingRials > 100000000000 || !validSupportURL(v.SupportURL) || v.PackagingGrams < 0 || v.PackagingGrams > 10000 || len(v.Rules) > 500 {
 		fail(w, 400, "تنظیمات ارسال معتبر نیست")
 		return
 	}
@@ -121,7 +131,7 @@ func (a *App) saveShipping(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 	_, e = tx.Exec(r.Context(), "DELETE FROM shipping_rules")
 	if e == nil {
-		_, e = tx.Exec(r.Context(), "UPDATE settings SET packaging_grams=$1 WHERE id=true", v.PackagingGrams)
+		_, e = tx.Exec(r.Context(), "UPDATE settings SET packaging_grams=$1,free_shipping_rials=$2,support_url=$3 WHERE id=true", v.PackagingGrams, v.FreeShippingRials, v.SupportURL)
 	}
 	for _, x := range v.Rules {
 		if e == nil {

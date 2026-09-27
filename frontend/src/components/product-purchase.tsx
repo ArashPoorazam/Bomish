@@ -1,37 +1,44 @@
 "use client";
 import { useState } from "react";
 import type { Product } from "@/lib/types";
-import { parseGrams, weight, money, total } from "@/lib/format";
+import {
+  fa,
+  money,
+  packageLabel,
+  packagePrice,
+  packageWeight,
+  priceRange,
+} from "@/lib/format";
 import { useStore } from "./store-provider";
-import { ShoppingBag, Check, Scale } from "lucide-react";
+import { ShoppingBag } from "lucide-react";
 export function ProductPurchase({ product: p }: { product: Product }) {
-  const [g, setG] = useState(
-      String(
-        Math.max(
-          p.minGrams,
-          (500 - p.minGrams) % p.stepGrams === 0 && p.maxGrams >= 500
-            ? 500
-            : p.minGrams,
-        ),
-      ),
-    ),
-    [unit, setUnit] = useState("g"),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+  const [id, setID] = useState(p.packages?.[0]?.id || ""),
+    [quantity, setQuantity] = useState(1),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
   const { cart, setItem, openCart } = useStore();
-  const grams = parseGrams(g, unit as "g" | "kg");
-  const valid =
-    Number.isFinite(grams) &&
-    grams >= p.minGrams &&
-    grams <= Math.min(p.maxGrams, p.availableGrams) &&
-    (grams - p.minGrams) % p.stepGrams === 0;
+  const pack = p.packages?.find((x) => x.id === id);
+  const existing =
+    cart.items.find((x) => x.product.id === p.id && x.package.id === id)
+      ?.quantity || 0;
+  const otherWeight = cart.items
+    .filter((x) => x.product.id === p.id && x.package.id !== id)
+    .reduce((n, x) => n + x.grams, 0);
+  const max = pack
+    ? Math.max(
+        0,
+        Math.min(
+          pack.maxQuantity,
+          Math.floor((p.availableGrams - otherWeight) / packageWeight(pack)),
+        ) - existing,
+      )
+    : 0;
   async function add(trigger: HTMLButtonElement) {
+    if (!pack) return;
     setBusy(true);
     setError("");
     try {
-      const existing =
-        cart.items.find((item) => item.product.id === p.id)?.grams || 0;
-      await setItem(p, existing + grams);
+      await setItem(p, pack.id, existing + quantity);
       openCart(trigger);
     } catch (e) {
       setError((e as Error).message);
@@ -41,104 +48,96 @@ export function ProductPurchase({ product: p }: { product: Product }) {
   }
   return (
     <div className="purchase-panel">
-      <div className="between">
-        <div className="product-price">
-          <strong>{money(p.priceRials)}</strong> تومان{" "}
-          <small>برای هر کیلوگرم</small>
-        </div>
-        <span className="stock-label">
-          {p.availableGrams >= p.minGrams ? (
-            <>
-              <Check size={15} />
-              موجود
-            </>
-          ) : (
-            "ناموجود"
-          )}
-        </span>
+      <div className="product-price">
+        <strong>{priceRange(p)}</strong> <small>تومان</small>
       </div>
+      {p.discountPercent > 0 && (
+        <span className="badge">{fa(p.discountPercent)}٪ تخفیف</span>
+      )}
       <hr />
-      <label className="field-title">چقدر نیاز دارید؟</label>
-      <div className="weight-presets">
-        {[250, 500, 1000, 10000]
-          .filter(
-            (n) =>
-              n >= p.minGrams &&
-              n <= p.maxGrams &&
-              (n - p.minGrams) % p.stepGrams === 0,
-          )
-          .map((n) => (
+      <fieldset className="package-picker">
+        <legend>اندازه بسته را انتخاب کنید</legend>
+        <div className="package-options">
+          {p.packages?.map((x) => (
             <button
-              key={n}
-              disabled={n > p.availableGrams}
-              className={grams === n ? "selected" : ""}
+              type="button"
+              key={x.id}
+              aria-pressed={id === x.id}
+              className={id === x.id ? "selected" : ""}
+              disabled={packageWeight(x) > p.availableGrams}
               onClick={() => {
-                setUnit("g");
-                setG(String(n));
+                setID(x.id);
+                setQuantity(1);
+                setError("");
               }}
             >
-              {weight(n)}
+              <strong>{packageLabel(x)}</strong>
+              <span>{money(packagePrice(p, x))} تومان</span>
             </button>
           ))}
-      </div>
-      <div className="custom-weight">
-        <label>
-          وزن دلخواه
-          <input
-            aria-label="وزن دلخواه"
-            inputMode="decimal"
-            value={g}
-            onChange={(e) => setG(e.target.value)}
-          />
-        </label>
-        <label>
-          واحد
-          <select
-            aria-label="واحد"
-            value={unit}
-            onChange={(e) => {
-              const next = e.target.value;
-              setG(String(next === "kg" ? grams / 1000 : grams));
-              setUnit(next);
-            }}
-          >
-            <option value="g">گرم</option>
-            <option value="kg">کیلوگرم</option>
-          </select>
-        </label>
-      </div>
-      <p className="muted small">
-        <Scale size={15} />
-        حداقل {weight(p.minGrams)}، گام {weight(p.stepGrams)}، حداکثر{" "}
-        {weight(p.maxGrams)}
-      </p>
-      <div className="purchase-bottom">
-        <div>
-          <small>قیمت وزن انتخابی</small>
-          <strong>
-            {valid ? money(total(p.priceRials, grams)) : "—"}{" "}
-            <small>تومان</small>
-          </strong>
         </div>
-        <button
-          disabled={!valid || busy}
-          className="button"
-          onClick={(e) => add(e.currentTarget)}
-        >
-          <ShoppingBag size={19} />
-          {busy ? "در حال افزودن…" : "افزودن به سبد"}
-        </button>
-      </div>
-      {!valid ? (
-        <p className="muted small">
-          وزن را مطابق محدوده مجاز و موجودی انتخاب کنید.
-        </p>
-      ) : null}
-      {error ? (
+      </fieldset>
+      {pack && (
+        <>
+          <div className="between">
+            <label htmlFor="package-count">تعداد بسته</label>
+            <div className="stepper">
+              <button
+                aria-label="کاهش تعداد"
+                disabled={quantity <= 1}
+                onClick={() => setQuantity(quantity - 1)}
+              >
+                −
+              </button>
+              <input
+                id="package-count"
+                type="number"
+                min={1}
+                max={Math.max(1, max)}
+                value={quantity}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+              />
+              <button
+                aria-label="افزایش تعداد"
+                disabled={quantity >= max}
+                onClick={() => setQuantity(quantity + 1)}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <p className="muted">
+            حداکثر {fa(pack.maxQuantity)} بسته از این اندازه در هر سفارش
+            {existing > 0 ? ` · ${fa(existing)} بسته در سبد شما` : ""}
+          </p>
+          <div className="purchase-bottom">
+            <strong>
+              {money(packagePrice(p, pack) * quantity)} <small>تومان</small>
+            </strong>
+            <button
+              className="button"
+              disabled={
+                busy ||
+                !Number.isInteger(quantity) ||
+                quantity < 1 ||
+                quantity > max
+              }
+              onClick={(e) => add(e.currentTarget)}
+            >
+              <ShoppingBag size={19} />
+              {busy ? "در حال افزودن…" : "افزودن به سبد"}
+            </button>
+          </div>
+          {max === 0 && (
+            <p className="muted">موجودی یا سقف خرید این بسته تکمیل شده است.</p>
+          )}
+        </>
+      )}
+      {error && (
         <p role="alert" className="error">
           {error}
         </p>
-      ) : null}
+      )}
     </div>
   );
 }

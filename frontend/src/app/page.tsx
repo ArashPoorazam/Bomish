@@ -51,7 +51,7 @@ export default async function Home() {
           </div>
           <div className="hero-caption">
             <Leaf size={18} />
-            <span>از خرید روزمره تا سفارش‌های چندکیلویی</span>
+            <span>بسته‌های متنوع برای خرید روزمره</span>
           </div>
         </div>
         <div className="hero-art">
@@ -137,7 +137,7 @@ export default async function Home() {
             <span className="eyebrow">برای قفسه آشپزخانه شما</span>
             <h2>انتخاب‌های بومیش</h2>
           </div>
-          <span className="muted">وزن دلخواه، قیمت روشن</span>
+          <span className="muted">بسته‌های متنوع، قیمت روشن</span>
         </div>
         <div className="product-grid">
           {selected.map((p) => (
@@ -148,13 +148,13 @@ export default async function Home() {
       <section className="editorial-banner container">
         <span className="eyebrow">به اندازه خودتان</span>
         <h2>
-          یک قاشق برای طعم،
+          بسته‌ای به اندازه نیاز،
           <br />
-          چند کیلو برای یک سفره بزرگ.
+          طعمی برای هر روز.
         </h2>
         <p>
-          از آشپزی در خانه تا آشپزخانه کسب‌وکارتان، وزن مورد نیاز را خودتان
-          انتخاب کنید.
+          اندازه بسته و تعداد مورد نیازتان را انتخاب کنید و قیمت هر بسته را پیش
+          از افزودن به سبد ببینید.
         </p>
         <Link href="/products" className="button light">
           انتخاب محصول <ArrowLeft size={18} />

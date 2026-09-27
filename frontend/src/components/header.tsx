@@ -1,11 +1,13 @@
 "use client";
 import Link from "next/link";
+import { api } from "@/lib/api";
+import Image from "next/image";
 import { useEffect, useState, useRef } from "react";
 import { Search, ShoppingBag, UserRound, Leaf, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useStore } from "./store-provider";
 import type { Product } from "@/lib/types";
-import { fa, money } from "@/lib/format";
+import { fa, priceRange } from "@/lib/format";
 export function Header() {
   const { cart, user, openCart } = useStore();
   const [q, setQ] = useState(""),
@@ -43,9 +45,15 @@ export function Header() {
       <header className="site-header">
         <div className="header-main container">
           <Link href="/" className="brand" aria-label="بومیش، صفحه نخست">
-            <Leaf size={34} strokeWidth={1.5} />
+            <Image
+              src="/images/bomish-logo.png"
+              alt=""
+              width={64}
+              height={64}
+              priority
+            />
             <span>
-              بومیش<small>طعمِ خوبِ طبیعت</small>
+              بومیش<small>BOMISH · طعمِ خوبِ طبیعت</small>
             </span>
           </Link>
           <form
@@ -57,6 +65,10 @@ export function Header() {
             }}
             onSubmit={(e) => {
               e.preventDefault();
+              if (q.trim())
+                void api("/events", "POST", { kind: "search", query: q }).catch(
+                  () => {},
+                );
               setFocused(false);
               router.push(
                 active >= 0 && hits[active]
@@ -111,10 +123,17 @@ export function Header() {
                     className={i === active ? "active" : ""}
                     key={p.id}
                     href={"/products/" + p.slug}
-                    onClick={() => setFocused(false)}
+                    onClick={() => {
+                      if (q.trim())
+                        void api("/events", "POST", {
+                          kind: "search",
+                          query: q,
+                        }).catch(() => {});
+                      setFocused(false);
+                    }}
                   >
                     <span>{p.name}</span>
-                    <small>{money(p.priceRials)} تومان / کیلو</small>
+                    <small>{priceRange(p)} تومان</small>
                   </Link>
                 ))}
                 <button role="option" aria-selected={false} type="submit">

@@ -1,6 +1,6 @@
 # Bomish · بومیش
 
-Persian, right-to-left food store built with **Go + Next.js/TypeScript + PostgreSQL**. This is a working **development release**, with simulated SMS and payments. Production startup is deliberately disabled until real providers are integrated and verified.
+Persian, right-to-left food store built with **Go + Next.js/TypeScript + PostgreSQL**. This is a working **development release**, with configurable Kavenegar SMS and simulated payments. Production startup is deliberately disabled until real payments and production providers are verified.
 
 ## Run locally
 
@@ -63,7 +63,7 @@ cd backend
 go run ./cmd/server totp
 ```
 
-A TOTP cannot be reused for the same account. Customer login instead displays a newly generated development SMS code in the login form. Codes expire after five minutes and are single-use. No text messages or money are sent.
+A TOTP cannot be reused for the same account. Customer login instead displays a newly generated development SMS code in the login form. Codes expire after five minutes and are single-use. With the default `SMS_ENABLED=false`, no text messages or money are sent.
 
 **Never use fixture credentials, the fixture authenticator secret, or seeded inventory for live sales.**
 
@@ -71,8 +71,8 @@ A TOTP cannot be reused for the same account. Customer login instead displays a 
 
 - Responsive Persian storefront, local Vazirmatn font, specified cream/green palette, product guides and blog.
 - Category filtering, normalized Persian search, typo similarity, aliases and related products.
-- Custom gram/kilogram quantities, exact integer-rial pricing, persistent anonymous cart and accessible left drawer.
-- SMS-code account creation, cart preservation across login, saved addresses and order history.
+- Product-specific gram/kilogram/milliliter/liter packages, per-package prices and purchase limits, separate cart lines, and price ranges.
+- Kavenegar-ready SMS account verification, map-assisted saved addresses, and four-stage order tracking with queued notifications.
 - Regional/weight-based delivery, server-authoritative checkout, 15-minute reservations, repeat-safe simulated payments and late-payment review.
 - Separate password/TOTP staff login, backend-enforced roles, draft preview, uploads, owner publication, stock adjustments, delivery editing and audit records.
 - OpenAPI contract, generated TypeScript types, sqlc queries, migrations, containers, CI, and backup/restore helpers.
@@ -101,6 +101,12 @@ npm run test:e2e
 Browser tests require both local servers and development fixtures. To use an installed Chromium: `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`. Browser tests create demo orders and a demo product; run them against a disposable development database.
 
 Regenerate database access after changing queries: `cd backend && sqlc generate`. Regenerate the frontend contract after editing `api/openapi.json`: `cd frontend && npm run api:generate`.
+
+## Store management
+
+The staff panel includes searchable products, flexible package and Markdown section editors, category and fulfillment workflows, owner price/discount controls, free-shipping settings, and a dedicated business analytics page.
+
+Fill private service keys and support details in the root `.env`; see [integration settings and operations](docs/integrations.md). The local file already contains the supplied Neshan key. SMS remains simulated until `SMS_ENABLED=true` and Kavenegar settings are complete.
 
 ## Deployment and operations
 

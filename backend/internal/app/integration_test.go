@@ -102,12 +102,29 @@ func setup(t *testing.T) *App {
 		t.Fatal(e)
 	}
 	t.Cleanup(func() { pool.Close(); _, _ = base.Exec(ctx, "DROP SCHEMA "+schema+" CASCADE"); base.Close() })
-	sql, _ := migrations.Files.ReadFile("001_initial.sql")
-	if _, e = pool.Exec(ctx, string(sql)); e != nil {
-		t.Fatal(e)
+	entries, _ := migrations.Files.ReadDir(".")
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".sql") {
+			sql, _ := migrations.Files.ReadFile(entry.Name())
+			if _, e = pool.Exec(ctx, string(sql)); e != nil {
+				t.Fatal(e)
+			}
+		}
 	}
 	a := &App{Pool: pool, Queries: db.New(pool), Dev: true, Origin: "http://bomish.test", Uploads: storage.Local{Root: t.TempDir()}}
 	if e = a.Seed(ctx); e != nil {
+		t.Fatal(e)
+	}
+	// A 500g package preserves the existing stock/reservation scenarios.
+	var raw []byte
+	if e = a.Pool.QueryRow(ctx, "SELECT content FROM products WHERE id='turmeric'").Scan(&raw); e != nil {
+		t.Fatal(e)
+	}
+	var p domain.Product
+	_ = json.Unmarshal(raw, &p)
+	p.Packages = []domain.Package{{ID: "test500", Amount: 500, Unit: "g", PriceRials: domain.Total(p.PriceRials, 500), MaxQuantity: 5}}
+	raw, _ = json.Marshal(p)
+	if _, e = a.Pool.Exec(ctx, "UPDATE products SET content=$1 WHERE id='turmeric'", raw); e != nil {
 		t.Fatal(e)
 	}
 	return a
@@ -149,6 +166,7 @@ func TestStoreIntegration(t *testing.T) {
 			t.Fatal("draft exposed", code)
 		}
 		p.PriceRials = 1200000
+		p.Packages = []domain.Package{{ID: "small", Amount: 100, Unit: "g", PriceRials: 120000, MaxQuantity: 5}}
 		if code, _ := editor.call("PUT", "/staff/products/test-spice", p); code != 403 {
 			t.Fatal("editor set price", code)
 		}
@@ -206,7 +224,7 @@ func TestStoreIntegration(t *testing.T) {
 	})
 	address := domain.Address{Recipient: "تست", Phone: "09120000004", Province: "تهران", City: "تهران", Street: "خیابان نمونه پلاک ۱۲ واحد ۱", PostalCode: "1234567890"}
 	create := func(c *client, g int, id string) string {
-		c.ok(t, "PUT", "/cart/items/turmeric", map[string]int{"grams": g}, nil)
+		c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "test500", "quantity": g / 500}, nil)
 		var q quoteResult
 		c.ok(t, "POST", "/checkout/quote", map[string]string{"province": "تهران"}, &q)
 		var result map[string]string
@@ -215,7 +233,7 @@ func TestStoreIntegration(t *testing.T) {
 	}
 	t.Run("cart survives auth and payment is idempotent", func(t *testing.T) {
 		c := newClient(t, h)
-		c.ok(t, "PUT", "/cart/items/turmeric", map[string]int{"grams": 1500}, nil)
+		c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "test500", "quantity": 3}, nil)
 		c.login(t, "09120000004")
 		var cart domain.Cart
 		c.ok(t, "GET", "/cart", nil, &cart)
@@ -259,7 +277,7 @@ func TestStoreIntegration(t *testing.T) {
 			t.Fatal("other customer's payment accessible")
 		}
 		operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "packing", "tracking": ""}, nil)
-		operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped", "tracking": "TEST123"}, nil)
+		operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped", "tracking": "123456789012345678901234"}, nil)
 	})
 	t.Run("failure expiry and late settlement", func(t *testing.T) {
 		c := newClient(t, h)
@@ -301,7 +319,7 @@ func TestStoreIntegration(t *testing.T) {
 		bodies := make([]map[string]any, 2)
 		for i, c := range customers {
 			c.login(t, fmt.Sprintf("0912000001%d", i))
-			c.ok(t, "PUT", "/cart/items/turmeric", map[string]int{"grams": 1000}, nil)
+			c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "test500", "quantity": 2}, nil)
 			var q quoteResult
 			c.ok(t, "POST", "/checkout/quote", map[string]string{"province": "تهران"}, &q)
 			bodies[i] = map[string]any{"address": address, "expectedTotalRials": q.TotalRials, "idempotencyKey": fmt.Sprintf("concurrent-key-%016d", i)}
@@ -341,7 +359,7 @@ func TestStoreIntegration(t *testing.T) {
 	})
 	t.Run("delivery weight boundaries", func(t *testing.T) {
 		for _, c := range []struct{ grams, fee int64 }{{2000, 650000}, {2001, 950000}, {5000, 950000}, {5001, 1800000}, {25000, 1800000}} {
-			cart := domain.Cart{Items: []domain.CartItem{{Product: domain.Product{Status: "published", MinGrams: 1, StepGrams: 1, MaxGrams: 100000, AvailableGrams: 100000}, Grams: c.grams}}, SubtotalRials: 1000}
+			cart := domain.Cart{Items: []domain.CartItem{{Product: domain.Product{Status: "published", MinGrams: 1, StepGrams: 1, MaxGrams: 100000, AvailableGrams: 100000}, Grams: c.grams, Quantity: 1, Package: domain.Package{MaxQuantity: 5}}}, SubtotalRials: 1000}
 			q, e := calculateQuote(ctx, a.Pool, cart, "تهران")
 			if e != nil || q.ShippingRials != c.fee || q.WeightGrams != c.grams+200 {
 				t.Fatalf("%+v %+v %v", c, q, e)

@@ -26,7 +26,7 @@ export function ArticleEditor({
   onSaved: () => Promise<void>;
 }) {
   const [a, setA] = useState(article),
-    [preview, setPreview] = useState(false),
+    [preview, setPreview] = useState(true),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
@@ -79,7 +79,7 @@ export function ArticleEditor({
         />
       </label>
       <label>
-        متن مقاله · برای تیتر از ## استفاده کنید
+        متن مقاله · Markdown با پیش‌نمایش زنده
         <textarea
           style={{ minHeight: 300 }}
           value={a.body}

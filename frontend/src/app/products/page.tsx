@@ -1,8 +1,9 @@
+import { ProductEvent } from "@/components/product-event";
 import Link from "next/link";
 import { serverApi } from "@/lib/api";
 import type { Product, Category } from "@/lib/types";
 import { ProductCard } from "@/components/product-card";
-import { fa, digits } from "@/lib/format";
+import { fa, digits, priceBounds, inStock } from "@/lib/format";
 export const metadata = { title: "همه محصولات" };
 export default async function Products({
   searchParams,
@@ -19,21 +20,29 @@ export default async function Products({
   ]);
   let products = all.filter(
     (p) =>
-      (q.available !== "true" || p.availableGrams >= p.minGrams) &&
-      (!q.max || p.priceRials <= Number(digits(q.max)) * 10),
+      (q.available !== "true" || inStock(p)) &&
+      (!q.max || priceBounds(p)[0] <= Number(digits(q.max)) * 10),
   );
   if (q.sort === "price-asc")
-    products = products.toSorted((a, b) => a.priceRials - b.priceRials);
+    products = products.toSorted(
+      (a, b) => priceBounds(a)[0] - priceBounds(b)[0],
+    );
   if (q.sort === "price-desc")
-    products = products.toSorted((a, b) => b.priceRials - a.priceRials);
+    products = products.toSorted(
+      (a, b) => priceBounds(b)[0] - priceBounds(a)[0],
+    );
   const title =
     categories.find((c) => c.id === q.category)?.name || "همه محصولات";
   return (
     <div className="container section">
+      <ProductEvent query={q.q} />
       <div className="page-heading">
         <span className="eyebrow">از طبیعت، برای آشپزخانه شما</span>
         <h1>{q.q ? `نتایج جستجو برای «${q.q}»` : title}</h1>
-        <p>عطر دلخواه را پیدا کنید، وزن مورد نیاز را خودتان انتخاب کنید.</p>
+        <p>
+          طعم مورد علاقه‌تان را پیدا کنید و اندازه و تعداد بسته‌ها را انتخاب
+          کنید.
+        </p>
       </div>
       <div className="catalog-layout">
         <form className="filter-panel">
@@ -51,7 +60,7 @@ export default async function Products({
             </select>
           </label>
           <label>
-            حداکثر قیمت هر کیلو (تومان)
+            حداکثر قیمت بسته (تومان)
             <input
               name="max"
               inputMode="numeric"
@@ -85,7 +94,7 @@ export default async function Products({
         <div>
           <div className="between catalog-count">
             <span>{fa(products.length)} محصول</span>
-            <span className="muted">قیمت‌ها برای هر کیلوگرم است</span>
+            <span className="muted">بازه قیمت بسته‌های هر محصول</span>
           </div>
           {products.length ? (
             <div className="product-grid catalog-grid">

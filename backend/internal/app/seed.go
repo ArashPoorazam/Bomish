@@ -40,13 +40,14 @@ func (a *App) Seed(ctx context.Context) error {
 		{"sesame", "کنجد سفید", "seeds", "یک همراه خوش‌طعم برای نان و سالاد", "برای روی نان، سالاد، شیرینی و تهیه سس کنجد کاربرد دارد.", "در تابه خشک و روی حرارت ملایم هم بزنید تا کمی طلایی شود.", 3500000},
 	}
 	for _, s := range samples {
-		p := domain.Product{ID: s.id, Slug: s.id, Name: s.name, CategoryID: s.cat, Status: "published", PriceRials: s.price, MinGrams: 100, StepGrams: 50, MaxGrams: 25000, Summary: s.summary, Description: s.summary + ". با انتخاب وزن دلخواه، به اندازه نیاز آشپزخانه یا کسب‌وکارتان سفارش دهید. این محصول و قیمت آن نمونه نمایشی هستند.", Uses: s.uses, Preparation: s.preparation, Storage: "در ظرف دربسته، جای خشک و خنک و دور از نور مستقیم نگهداری کنید.", Ingredients: s.name, Images: []string{"/images/spices.png"}, Tags: []string{"آشپزی", "خوراکی"}, RelatedIDs: []string{}, Aliases: []string{}, Nutrients: []domain.Nutrient{}}
+		p := domain.Product{ID: s.id, Slug: s.id, Name: s.name, CategoryID: s.cat, Status: "published", PriceRials: s.price, MinGrams: 100, StepGrams: 50, MaxGrams: 25000, Summary: s.summary, Description: s.summary + ". بسته و تعداد مورد نیازتان را انتخاب کنید. این محصول و قیمت آن نمونه نمایشی هستند.", Uses: s.uses, Preparation: s.preparation, Storage: "در ظرف دربسته، جای خشک و خنک و دور از نور مستقیم نگهداری کنید.", Ingredients: s.name, Images: []string{"/images/spices.png"}, Tags: []string{"آشپزی", "خوراکی"}, RelatedIDs: []string{}, Aliases: []string{}, Nutrients: []domain.Nutrient{}}
 		if s.id == "turmeric" {
 			p.Aliases = []string{"زرچوبه", "زرد چوبه"}
 		}
 		if s.id == "sesame" {
 			p.Allergens = "حاوی کنجد است."
 		}
+		p.EnsurePackages()
 		raw, _ := json.Marshal(p)
 		_, e = tx.Exec(ctx, "INSERT INTO products(id,slug,name,category_id,status,price_rials,min_grams,step_grams,max_grams,search_text,content) VALUES($1,$2,$3,$4,'published',$5,$6,$7,$8,$9,$10)", p.ID, p.Slug, p.Name, p.CategoryID, p.PriceRials, p.MinGrams, p.StepGrams, p.MaxGrams, searchText(p), raw)
 		if e != nil {

@@ -1,4 +1,10 @@
 "use client";
+import {
+  CatalogManager,
+  CategoryManager,
+  PriceManager,
+} from "./catalog-manager";
+import { Analytics } from "./analytics";
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import type {
@@ -10,7 +16,6 @@ import type {
   Member,
 } from "@/lib/types";
 import { useStore } from "@/components/store-provider";
-import { newProduct, ProductEditor } from "./product-editor";
 import { newArticle, ArticleEditor } from "./article-editor";
 import { OrderManager, ShippingEditor, Members } from "./operations";
 import { date, digits, statuses } from "@/lib/format";
@@ -25,9 +30,7 @@ export function Dashboard() {
     [shipping, setShipping] = useState<ShippingConfig | null>(null),
     [members, setMembers] = useState<Member[]>([]),
     [events, setEvents] = useState<Record<string, string>[]>([]),
-    [selected, setSelected] = useState<Product | null>(null),
-    [selectedArticle, setSelectedArticle] = useState<Article | null>(null),
-    [catName, setCatName] = useState("");
+    [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const role = user?.role || "";
   const reload = useCallback(async () => {
     if (!role) return;
@@ -39,9 +42,6 @@ export function Dashboard() {
         api<Article[]>("/staff/articles"),
       ]);
       setProducts(p);
-      setSelected((current) =>
-        current ? p.find((item) => item.id === current.id) || current : null,
-      );
       setCategories(c);
       setArticles(a);
       setSelectedArticle((current) =>
@@ -77,6 +77,8 @@ export function Dashboard() {
           ...(role === "owner"
             ? [
                 ["orders", "سفارش‌ها"],
+                ["pricing", "قیمت و تخفیف"],
+                ["analytics", "تحلیل داده‌ها"],
                 ["shipping", "ارسال"],
                 ["members", "همکاران"],
                 ["audit", "رویدادها"],
@@ -131,40 +133,12 @@ export function Dashboard() {
         </p>
       ) : null}
       {tab === "products" ? (
-        <div className="dashboard-grid">
-          <aside className="dashboard-list">
-            <button
-              className="button"
-              onClick={() => setSelected(newProduct())}
-            >
-              + محصول جدید
-            </button>
-            {products.map((p) => (
-              <button
-                className={selected?.id === p.id ? "selected" : ""}
-                key={p.id}
-                onClick={() => setSelected(p)}
-              >
-                {p.name}
-                <small>{statuses[p.status]}</small>
-              </button>
-            ))}
-          </aside>
-          {selected ? (
-            <ProductEditor
-              product={selected}
-              products={products}
-              categories={categories}
-              owner={role === "owner"}
-              onSaved={reload}
-            />
-          ) : (
-            <div className="empty-state">
-              <h2>از یک محصول شروع کنید</h2>
-              <p>یک محصول را انتخاب کنید یا محصول تازه‌ای بسازید.</p>
-            </div>
-          )}
-        </div>
+        <CatalogManager
+          products={products}
+          categories={categories}
+          owner={role === "owner"}
+          reload={reload}
+        />
       ) : null}
       {tab === "articles" ? (
         <div className="dashboard-grid">
@@ -196,42 +170,16 @@ export function Dashboard() {
         </div>
       ) : null}
       {tab === "categories" ? (
-        <div className="form-card stack">
-          <h2>دسته‌بندی محصولات</h2>
-          {categories.map((c) => (
-            <div key={c.id} className="between">
-              <strong>{c.name}</strong>
-              <CategoryEdit category={c} reload={reload} />
-            </div>
-          ))}
-          <form
-            className="inline-actions"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              try {
-                await api("/staff/categories/" + crypto.randomUUID(), "PUT", {
-                  name: catName,
-                  description: "",
-                });
-                setCatName("");
-                await reload();
-              } catch (e) {
-                setError((e as Error).message);
-              }
-            }}
-          >
-            <label>
-              دسته جدید
-              <input
-                required
-                value={catName}
-                onChange={(e) => setCatName(e.target.value)}
-              />
-            </label>
-            <button className="button">افزودن دسته</button>
-          </form>
-        </div>
+        <CategoryManager
+          categories={categories}
+          products={products}
+          reload={reload}
+        />
       ) : null}
+      {tab === "pricing" && role === "owner" ? (
+        <PriceManager products={products} reload={reload} />
+      ) : null}
+      {tab === "analytics" && role === "owner" ? <Analytics /> : null}
       {tab === "orders" ? (
         <OrderManager orders={orders} reload={reload} />
       ) : null}
@@ -353,45 +301,5 @@ function StaffLogin() {
         </form>
       </div>
     </div>
-  );
-}
-function CategoryEdit({
-  category,
-  reload,
-}: {
-  category: Category;
-  reload: () => Promise<void>;
-}) {
-  const [name, setName] = useState(category.name),
-    [error, setError] = useState("");
-  return (
-    <form
-      className="inline-actions"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        try {
-          await api("/staff/categories/" + category.id, "PUT", {
-            name,
-            description: category.description,
-          });
-          await reload();
-        } catch (e) {
-          setError((e as Error).message);
-        }
-      }}
-    >
-      <input
-        aria-label={"نام دسته " + category.name}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-      />
-      <button className="button secondary">ذخیره</button>
-      {error ? (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      ) : null}
-    </form>
   );
 }

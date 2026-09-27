@@ -61,17 +61,16 @@ test("Persian discovery, live search, article and responsive layout", async ({
   });
   expect(errors).toEqual([]);
 });
-test("mobile weight entry and accessible left cart survive refresh", async ({
+test("mobile package quantities and accessible left cart survive refresh", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/products/turmeric");
-  await page.getByLabel("واحد", { exact: true }).selectOption("kg");
-  await page.getByLabel("وزن دلخواه", { exact: true }).fill("۱٫۵");
+  await page.getByLabel("تعداد بسته", { exact: true }).fill("3");
   await page.getByRole("button", { name: "افزودن به سبد" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("۱٫۵ کیلوگرم");
+  await expect(dialog).toContainText("۳ بسته");
   expect((await dialog.boundingBox())!.x).toBe(0);
   for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
   expect(
@@ -86,9 +85,9 @@ test("mobile weight entry and accessible left cart survive refresh", async ({
   ).toBeFocused();
   await page.reload();
   await page.getByRole("button", { name: "باز کردن سبد خرید" }).click();
-  await expect(dialog).toContainText("۱٫۵ کیلوگرم");
-  await dialog.getByRole("button", { name: "افزایش وزن زردچوبه" }).click();
-  await expect(dialog).toContainText("۱٫۵۵ کیلوگرم");
+  await expect(dialog).toContainText("۳ بسته");
+  await dialog.getByRole("button", { name: "افزایش تعداد زردچوبه" }).click();
+  await expect(dialog).toContainText("۴ بسته");
   await dialog.getByRole("button", { name: "حذف زردچوبه" }).click();
   await expect(dialog).toContainText("سبد شما هنوز خالی است");
 });
@@ -96,7 +95,7 @@ test("SMS login, shipping quote, payment and order history", async ({
   page,
 }) => {
   await page.goto("/products/turmeric");
-  await page.getByRole("button", { name: "۱ کیلوگرم", exact: true }).click();
+  await page.getByLabel("تعداد بسته", { exact: true }).fill("2");
   await page.getByRole("button", { name: "افزودن به سبد" }).click();
   await page.getByRole("link", { name: "ادامه خرید" }).click();
   await loginCustomer(page);
@@ -114,11 +113,12 @@ test("SMS login, shipping quote, payment and order history", async ({
     page.getByRole("heading", { name: "درگاه پرداخت آزمایشی" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "شبیه‌سازی پرداخت موفق" }).click();
-  await expect(
-    page.getByRole("heading", { name: "سفارش شما ثبت شد" }),
-  ).toBeVisible();
-  await page.getByRole("link", { name: "دیدن سفارش‌ها" }).click();
-  await expect(page.locator(".order-card").first()).toContainText("پرداخت‌شده");
+  await expect(page).toHaveURL(/account\/orders\//);
+  await expect(page.locator(".order-timeline")).toContainText("خرید ثبت شد");
+  await page.getByRole("link", { name: "← حساب من", exact: true }).click();
+  await expect(page.locator(".order-card").first()).toContainText(
+    "خرید ثبت شد",
+  );
   await expect(
     page.getByText("تهران، تهران، خیابان نمونه پلاک ۱۲ واحد ۲"),
   ).toBeVisible();
@@ -135,19 +135,25 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
   await editor.getByLabel("کد برنامه رمزساز", { exact: true }).fill(totp());
   await editor.getByRole("button", { name: "ورود به فضای کار" }).click();
   await editor
-    .getByRole("button", { name: "+ محصول جدید", exact: true })
+    .getByRole("button", { name: "+ افزودن محصول", exact: true })
     .click();
   await editor
     .getByLabel("نام محصول", { exact: true })
     .fill("ادویه آزمایش مرورگر");
   await editor.getByLabel("نشانی صفحه", { exact: true }).fill(slug);
-  await editor.getByLabel("دسته‌بندی", { exact: true }).selectOption("spices");
+  await editor
+    .locator(".staff-main")
+    .getByLabel("دسته‌بندی", { exact: true })
+    .selectOption("spices");
   await editor
     .getByLabel("خلاصه محصول")
     .fill("یک محصول برای بررسی جریان انتشار");
   await editor
-    .getByLabel("معرفی و توضیحات")
+    .getByLabel("معرفی کوتاه")
     .fill("توضیحات محصول آزمایشی برای بررسی رابط کاربری فروشگاه.");
+  await editor
+    .getByRole("button", { name: "+ افزودن بسته", exact: true })
+    .click();
   await editor
     .getByLabel("بارگذاری تصویر")
     .setInputFiles("public/images/spices.png");
@@ -156,7 +162,7 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
     .getByRole("button", { name: "ذخیره پیش‌نویس", exact: true })
     .click();
   await expect(editor.getByRole("status")).toContainText("پیش‌نویس ذخیره شد");
-  await expect(editor.getByLabel("قیمت هر کیلو (تومان)")).toHaveCount(0);
+  await expect(editor.getByLabel("قیمت بسته (تومان)")).toHaveCount(0);
   const publicResponse = await editor.request.get("/api/v1/products/" + slug);
   expect(publicResponse.status()).toBe(404);
   const forbidden = await editor.request.get("/api/v1/staff/orders");
@@ -169,10 +175,12 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
   await owner.getByLabel("کد برنامه رمزساز", { exact: true }).fill(totp());
   await owner.getByRole("button", { name: "ورود به فضای کار" }).click();
   await owner
-    .getByRole("button", { name: /ادویه آزمایش مرورگر/ })
+    .getByRole("row")
+    .filter({ hasText: "ادویه آزمایش مرورگر" })
     .first()
+    .getByRole("button", { name: "ویرایش" })
     .click();
-  await owner.getByLabel("قیمت هر کیلو (تومان)").fill("180000");
+  await owner.getByLabel("قیمت بسته (تومان)").fill("180000");
   await owner
     .getByRole("button", { name: "ذخیره و انتشار", exact: true })
     .click();

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -47,17 +48,24 @@ func main() {
 	if _, e = tx.Exec(ctx, "CREATE TABLE IF NOT EXISTS schema_migrations(version text PRIMARY KEY)"); e != nil {
 		panic(e)
 	}
-	var exists bool
-	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version='001')").Scan(&exists); e != nil {
-		panic(e)
-	}
-	if !exists {
-		sql, _ := migrations.Files.ReadFile("001_initial.sql")
-		if _, e = tx.Exec(ctx, string(sql)); e != nil {
+	entries, _ := migrations.Files.ReadDir(".")
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+		version := strings.SplitN(entry.Name(), "_", 2)[0]
+		var exists bool
+		if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)", version).Scan(&exists); e != nil {
 			panic(e)
 		}
-		if _, e = tx.Exec(ctx, "INSERT INTO schema_migrations VALUES('001')"); e != nil {
-			panic(e)
+		if !exists {
+			sql, _ := migrations.Files.ReadFile(entry.Name())
+			if _, e = tx.Exec(ctx, string(sql)); e != nil {
+				panic(e)
+			}
+			if _, e = tx.Exec(ctx, "INSERT INTO schema_migrations VALUES($1)", version); e != nil {
+				panic(e)
+			}
 		}
 	}
 	if e = tx.Commit(ctx); e != nil {
@@ -78,6 +86,13 @@ func main() {
 			panic(e)
 		}
 	}
+	if len(os.Args) > 1 && os.Args[1] == "refresh-demo-catalog" {
+		if e = a.RefreshDemoCatalog(ctx); e != nil {
+			panic(e)
+		}
+		fmt.Println("Demo catalog refreshed: six package-based products; old fixtures archived.")
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "totp" {
 		if !dev {
 			os.Exit(1)
@@ -93,6 +108,9 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				if e := a.ProcessSMS(ctx); e != nil {
+					slog.Error("SMS processing failed")
+				}
 				if e := a.ExpireReservations(ctx); e != nil {
 					slog.Error("reservation expiry failed", "error", e)
 				}

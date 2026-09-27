@@ -23,14 +23,16 @@ func calculateQuote(ctx context.Context, q querier, c domain.Cart, province stri
 	if len(c.Items) == 0 {
 		return v, errors.New("سبد خرید خالی است")
 	}
+	totals := map[string]int64{}
 	for _, item := range c.Items {
-		if domain.ValidateWeight(item.Product, item.Grams) != nil || item.Product.Status != "published" || item.Product.AvailableGrams < item.Grams {
+		totals[item.Product.ID] += item.Grams
+		if item.Quantity < 1 || item.Quantity > item.Package.MaxQuantity || item.Grams <= 0 || item.Product.Status != "published" || item.Product.AvailableGrams < totals[item.Product.ID] {
 			return v, errUnavailable
 		}
 		v.WeightGrams += item.Grams
 	}
-	var packaging int64
-	e := q.QueryRow(ctx, "SELECT packaging_grams FROM settings WHERE id=true").Scan(&packaging)
+	var packaging, threshold int64
+	e := q.QueryRow(ctx, "SELECT packaging_grams,free_shipping_rials FROM settings WHERE id=true").Scan(&packaging, &threshold)
 	if e != nil {
 		return v, e
 	}
@@ -38,6 +40,9 @@ func calculateQuote(ctx context.Context, q querier, c domain.Cart, province stri
 	e = q.QueryRow(ctx, "SELECT fee_rials FROM shipping_rules WHERE province=$1 AND max_grams >= $2 ORDER BY max_grams LIMIT 1", province, v.WeightGrams).Scan(&v.ShippingRials)
 	if e != nil {
 		return v, errors.New("برای این استان یا وزن، روش ارسال تعریف نشده است")
+	}
+	if threshold > 0 && v.SubtotalRials >= threshold {
+		v.ShippingRials = 0
 	}
 	v.TotalRials = v.SubtotalRials + v.ShippingRials
 	return v, nil
@@ -151,7 +156,7 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 	for _, item := range c.Items {
 		_, e = tx.Exec(r.Context(), "UPDATE inventory SET reserved_grams=reserved_grams+$1 WHERE product_id=$2", item.Grams, item.Product.ID)
 		if e == nil {
-			_, e = tx.Exec(r.Context(), "INSERT INTO order_items(order_id,product_id,name,grams,price_rials,total_rials) VALUES($1,$2,$3,$4,$5,$6)", id, item.Product.ID, item.Product.Name, item.Grams, item.Product.PriceRials, item.TotalRials)
+			_, e = tx.Exec(r.Context(), "INSERT INTO order_items(order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)", id, item.Product.ID, item.Product.Name, item.Grams, item.Product.PackagePrice(item.Package), item.TotalRials, item.Package.ID, item.Package.Label(), item.Quantity)
 		}
 		if e != nil {
 			a.dbError(w, e)
@@ -168,8 +173,12 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 	}
 	write(w, 201, map[string]string{"orderId": id})
 }
-func loadOrders(ctx context.Context, q querier, user string) ([]domain.Order, error) {
-	rows, e := q.Query(ctx, "SELECT id,status,address,subtotal_rials,shipping_rials,total_rials,tracking,created_at FROM orders WHERE ($1='' OR user_id=$1) ORDER BY created_at DESC LIMIT 100", user)
+func loadOrders(ctx context.Context, q querier, user string, ids ...string) ([]domain.Order, error) {
+	id := ""
+	if len(ids) > 0 {
+		id = ids[0]
+	}
+	rows, e := q.Query(ctx, "SELECT id,status,address,subtotal_rials,shipping_rials,total_rials,tracking,created_at FROM orders WHERE ($1='' OR user_id=$1) AND ($2='' OR id=$2) ORDER BY created_at DESC LIMIT 100", user, id)
 	if e != nil {
 		return nil, e
 	}
@@ -193,13 +202,13 @@ func loadOrders(ctx context.Context, q querier, user string) ([]domain.Order, er
 		return nil, e
 	}
 	for i := range out {
-		items, e := q.Query(ctx, "SELECT product_id,name,grams,price_rials,total_rials FROM order_items WHERE order_id=$1 ORDER BY product_id", out[i].ID)
+		items, e := q.Query(ctx, "SELECT product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity FROM order_items WHERE order_id=$1 ORDER BY product_id", out[i].ID)
 		if e != nil {
 			return nil, e
 		}
 		for items.Next() {
 			var it domain.OrderItem
-			if e = items.Scan(&it.ProductID, &it.Name, &it.Grams, &it.PriceRials, &it.TotalRials); e != nil {
+			if e = items.Scan(&it.ProductID, &it.Name, &it.Grams, &it.PriceRials, &it.TotalRials, &it.PackageID, &it.PackageLabel, &it.Quantity); e != nil {
 				items.Close()
 				return nil, e
 			}
@@ -207,6 +216,28 @@ func loadOrders(ctx context.Context, q querier, user string) ([]domain.Order, er
 		}
 		e = items.Err()
 		items.Close()
+		if e != nil {
+			return nil, e
+		}
+	}
+	for i := range out {
+		out[i].Events = []domain.OrderEvent{}
+		rows, e := q.Query(ctx, "SELECT status,created_at FROM order_events WHERE order_id=$1 ORDER BY created_at", out[i].ID)
+		if e != nil {
+			return nil, e
+		}
+		for rows.Next() {
+			var v domain.OrderEvent
+			var t time.Time
+			if e = rows.Scan(&v.Status, &t); e != nil {
+				rows.Close()
+				return nil, e
+			}
+			v.CreatedAt = t.Format(time.RFC3339)
+			out[i].Events = append(out[i].Events, v)
+		}
+		e = rows.Err()
+		rows.Close()
 		if e != nil {
 			return nil, e
 		}
@@ -268,7 +299,7 @@ func (a *App) settle(ctx context.Context, id, user string, success bool) (string
 	if paymentStatus != "pending" {
 		return status, nil
 	}
-	rows, e := tx.Query(ctx, "SELECT product_id,grams FROM order_items WHERE order_id=$1 ORDER BY product_id", id)
+	rows, e := tx.Query(ctx, "SELECT product_id,sum(grams) FROM order_items WHERE order_id=$1 GROUP BY product_id ORDER BY product_id", id)
 	if e != nil {
 		return "", e
 	}
@@ -325,11 +356,16 @@ func (a *App) settle(ctx context.Context, id, user string, success bool) (string
 			if e != nil {
 				return "", e
 			}
-			// Only remove a cart line if it still exactly matches the purchased quantity.
-			_, e = tx.Exec(ctx, "DELETE FROM carts WHERE product_id=$1 AND grams=$2 AND session_hash IN(SELECT token_hash FROM sessions WHERE user_id=$3)", it.id, it.g, user)
-			if e != nil {
-				return "", e
-			}
+
+		}
+	}
+	if final == "paid" {
+		_, e = tx.Exec(ctx, `DELETE FROM carts c USING order_items oi,sessions s WHERE oi.order_id=$1 AND c.product_id=oi.product_id AND c.package_id=oi.package_id AND c.quantity=oi.quantity AND c.session_hash=s.token_hash AND s.user_id=$2`, id, user)
+		if e != nil {
+			return "", e
+		}
+		if e = queueOrderSMS(ctx, tx, id, final); e != nil {
+			return "", e
 		}
 	}
 	_, e = tx.Exec(ctx, "UPDATE orders SET status=$1 WHERE id=$2", final, id)
@@ -370,7 +406,7 @@ func (a *App) ExpireReservations(ctx context.Context) error {
 		return e
 	}
 	for _, id := range ids {
-		_, e = tx.Exec(ctx, `UPDATE inventory i SET reserved_grams=i.reserved_grams-oi.grams FROM order_items oi WHERE oi.order_id=$1 AND oi.product_id=i.product_id`, id)
+		_, e = tx.Exec(ctx, `UPDATE inventory i SET reserved_grams=i.reserved_grams-oi.grams FROM (SELECT product_id,sum(grams) grams FROM order_items WHERE order_id=$1 GROUP BY product_id) oi WHERE oi.product_id=i.product_id`, id)
 		if e != nil {
 			return e
 		}

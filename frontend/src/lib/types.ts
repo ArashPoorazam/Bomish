@@ -9,3 +9,5 @@ export type Session = components["schemas"]["Session"];
 export type Quote = components["schemas"]["Quote"];
 export type ShippingConfig = components["schemas"]["ShippingConfig"];
 export type Member = components["schemas"]["Member"];
+
+export type Package = components["schemas"]["Package"];

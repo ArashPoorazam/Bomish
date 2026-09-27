@@ -20,6 +20,13 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
       DATABASE_URL: postgres://bomish:${POSTGRES_PASSWORD:-bomish-local-only}@db:5432/bomish?sslmode=disable
       SEED_DEMO: "true"
+      NESHAN_API_KEY: ${NESHAN_API_KEY:-}
+      SMS_ENABLED: ${SMS_ENABLED:-false}
+      KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY:-}
+      KAVENEGAR_SENDER: ${KAVENEGAR_SENDER:-}
+      KAVENEGAR_VERIFY_TEMPLATE: ${KAVENEGAR_VERIFY_TEMPLATE:-}
+      SUPPORT_URL: ${SUPPORT_URL:-}
+      POST_TRACKING_URL_TEMPLATE: ${POST_TRACKING_URL_TEMPLATE:-}
     depends_on:
       db:
         condition: service_healthy

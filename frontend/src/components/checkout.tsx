@@ -1,4 +1,9 @@
 "use client";
+import { AddressBook } from "./address-book";
+import { AddressMap } from "./address-map";
+import { OrderProgress } from "./order-progress";
+import { useRouter } from "next/navigation";
+import { packageLabel, fa } from "@/lib/format";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -50,6 +55,7 @@ const provinces = [
   "یزد",
 ];
 export function Checkout() {
+  const router = useRouter();
   const { cart, user, refresh } = useStore();
   const [address, setAddress] = useState<Address>(blank),
     [saved, setSaved] = useState<Address[]>([]),
@@ -129,6 +135,7 @@ export function Checkout() {
         { success },
       );
       setOutcome(r.status);
+      if (r.status === "paid") router.push("/account/orders/" + orderId);
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -235,6 +242,14 @@ export function Checkout() {
                   </select>
                 </label>
               ) : null}
+              <AddressMap
+                key={address.id || "new"}
+                address={address}
+                onChange={(v) => {
+                  setAddress(v);
+                  setQuote(null);
+                }}
+              />
               <div className="form-grid">
                 <label>
                   نام گیرنده
@@ -320,10 +335,12 @@ export function Checkout() {
         <aside className="form-card checkout-summary">
           <h2>خلاصه سفارش</h2>
           {cart.items.map((it) => (
-            <div className="summary-line" key={it.product.id}>
+            <div className="summary-line" key={it.product.id + it.package.id}>
               <strong>
                 {it.product.name}
-                <small>{weight(it.grams)}</small>
+                <small>
+                  {packageLabel(it.package)} · {fa(it.quantity)} بسته
+                </small>
               </strong>
               <span>{money(it.totalRials)} تومان</span>
             </div>
@@ -336,7 +353,9 @@ export function Checkout() {
             <span>هزینه ارسال</span>
             <span>
               {quote
-                ? money(quote.shippingRials) + " تومان"
+                ? quote.shippingRials === 0
+                  ? "رایگان"
+                  : money(quote.shippingRials) + " تومان"
                 : "پس از انتخاب نشانی"}
             </span>
           </div>
@@ -359,7 +378,7 @@ export function Checkout() {
             </>
           ) : null}
           <p className="muted" style={{ marginTop: 20 }}>
-            قیمت محصولات بر اساس وزن انتخابی شما محاسبه شده است.
+            قیمت‌ها برای بسته‌ها و تعداد انتخابی شما محاسبه شده است.
           </p>
         </aside>
       </div>
@@ -449,6 +468,7 @@ export function Account() {
         </div>
       )}
       <h2 style={{ margin: "32px 0 20px" }}>نشانی‌های ذخیره‌شده</h2>
+      <AddressBook onSaved={load} />
       {addresses.length ? (
         addresses.map((a) => (
           <div className="order-card" key={a.id}>
@@ -460,7 +480,7 @@ export function Account() {
           </div>
         ))
       ) : (
-        <p>نشانی را هنگام خرید می‌توانید ذخیره کنید.</p>
+        <p>نشانی خانه را برای خرید سریع‌تر ذخیره کنید.</p>
       )}
     </div>
   );
@@ -469,8 +489,10 @@ import { date, statuses } from "@/lib/format";
 export function OrderView({
   order: o,
   children,
+  trackingUrl,
 }: {
   order: Order;
+  trackingUrl?: string;
   children?: React.ReactNode;
 }) {
   return (
@@ -480,11 +502,16 @@ export function OrderView({
         <span className="badge">{statuses[o.status] || o.status}</span>
       </div>
       <p className="muted">{date(o.createdAt)}</p>
+      <OrderProgress order={o} trackingUrl={trackingUrl} />
+      <Link className="text-link" href={"/account/orders/" + o.id}>
+        صفحه پیگیری سفارش ←
+      </Link>
       <ul>
         {o.items.map((i) => (
-          <li key={i.productId}>
+          <li key={i.productId + i.packageId}>
             <span>
-              {i.name} · {weight(i.grams)}
+              {i.name} · {i.packageLabel || weight(i.grams)} · {fa(i.quantity)}{" "}
+              بسته
             </span>
             <span>{money(i.totalRials)} تومان</span>
           </li>

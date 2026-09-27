@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Leaf, ArrowUpLeft } from "lucide-react";
 export function Footer() {
@@ -6,7 +7,12 @@ export function Footer() {
       <div className="container footer-grid">
         <div>
           <Link className="brand" href="/">
-            <Leaf size={32} />
+            <Image
+              src="/images/bomish-logo.png"
+              alt=""
+              width={64}
+              height={64}
+            />
             <span>بومیش</span>
           </Link>
           <p>
@@ -32,11 +38,11 @@ export function Footer() {
         <div className="footer-note">
           <span className="eyebrow">خرید به اندازه شما</span>
           <h3>
-            یک شیشه برای خانه،
+            اندازه مناسب شما،
             <br />
-            چند کیلو برای آشپزخانه.
+            برای هر روز آشپزی.
           </h3>
-          <p>وزن دلخواهتان را انتخاب کنید.</p>
+          <p>بسته و تعداد مورد نیازتان را انتخاب کنید.</p>
         </div>
       </div>
       <div className="container footer-bottom">

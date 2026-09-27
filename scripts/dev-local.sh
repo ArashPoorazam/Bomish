@@ -2,6 +2,11 @@
 # Native development, with durable demo data under the ignored .data directory.
 set -euo pipefail
 bomish_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -f "$bomish_root/.env" ]; then
+  set -a
+  source "$bomish_root/.env"
+  set +a
+fi
 bomish_data="$bomish_root/.data"
 mkdir -p "$bomish_data"
 for dependency in go node npm initdb pg_ctl psql createdb setsid; do

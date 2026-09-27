@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { StoreProvider } from "@/components/store-provider";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import "leaflet/dist/leaflet.css";
 import "./globals.css";
 const vazir = localFont({
   src: "../../public/fonts/Vazirmatn.woff2",
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
       ? { index: true, follow: true }
       : { index: false, follow: false },
   description:
-    "خرید ادویه، سبزی خشک و دانه‌های خوراکی با وزن دلخواه. راهنمای استفاده و آشپزی در بومیش.",
+    "خرید ادویه، سبزی خشک و دانه‌های خوراکی در بسته‌های متنوع. راهنمای استفاده و آشپزی در بومیش.",
 };
 export default function RootLayout({
   children,

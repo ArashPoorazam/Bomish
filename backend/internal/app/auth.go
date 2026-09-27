@@ -37,7 +37,7 @@ func (a *App) requestOTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "شماره همراه معتبر وارد کنید")
 		return
 	}
-	if !a.Dev {
+	if !a.Dev && !smsEnabled() {
 		fail(w, 503, "سرویس پیامک هنوز فعال نشده است")
 		return
 	}
@@ -58,6 +58,15 @@ func (a *App) requestOTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if tag.RowsAffected() == 0 {
 		fail(w, 429, "برای ارسال دوباره یک دقیقه صبر کنید")
+		return
+	}
+	if smsEnabled() {
+		if e := sendSMS(r.Context(), in.Phone, "", code); e != nil {
+			a.Pool.Exec(r.Context(), "DELETE FROM otp_challenges WHERE phone=$1 AND code_hash=$2", in.Phone, hash(in.Phone+code))
+			fail(w, 502, "ارسال پیامک انجام نشد؛ دوباره تلاش کنید")
+			return
+		}
+		write(w, 200, map[string]any{"ok": true, "expiresIn": 300, "resendAfter": 60})
 		return
 	}
 	write(w, 200, map[string]any{"ok": true, "devCode": code, "expiresIn": 300, "resendAfter": 60})

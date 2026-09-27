@@ -1067,8 +1067,9 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        packageId: string;
                         /** Format: int64 */
-                        grams: number;
+                        quantity: number;
                     };
                 };
             };
@@ -1124,7 +1125,9 @@ export interface paths {
         post?: never;
         delete: {
             parameters: {
-                query?: never;
+                query: {
+                    packageId: string;
+                };
                 header: {
                     "X-CSRF-Token": string;
                 };
@@ -2189,7 +2192,67 @@ export interface paths {
             };
         };
         post?: never;
-        delete?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header: {
+                    "X-CSRF-Token": string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OK"];
+                    };
+                };
+                /** @description Invalid input */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Login required */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not allowed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description State changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rate limited */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -2302,7 +2365,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        status: string;
+                        /** @enum {string} */
+                        status: "packing" | "shipped" | "received";
                         tracking: string;
                     };
                 };
@@ -2726,6 +2790,481 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PublicSettings"];
+                    };
+                };
+                /** @description Invalid input */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Login required */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not allowed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description State changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rate limited */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/addresses/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    lat: number;
+                    lng: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            street: string;
+                            city: string;
+                            province: string;
+                            latitude: number;
+                            longitude: number;
+                        };
+                    };
+                };
+                /** @description Invalid input */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Login required */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not allowed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description State changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rate limited */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            order: components["schemas"]["Order"];
+                            trackingUrl: string;
+                        };
+                    };
+                };
+                /** @description Invalid input */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Login required */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not allowed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description State changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rate limited */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    "X-CSRF-Token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        kind: "view" | "search";
+                        productId?: string;
+                        query?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OK"];
+                    };
+                };
+                /** @description Invalid input */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Login required */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not allowed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description State changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rate limited */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/pricing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    "X-CSRF-Token": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        productId?: string;
+                        /** @enum {string} */
+                        mode: "discount" | "adjust";
+                        /** Format: int64 */
+                        amount: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ok: boolean;
+                            /** Format: int64 */
+                            count: number;
+                        };
+                    };
+                };
+                /** @description Invalid input */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Login required */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not allowed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description State changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rate limited */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    days?: 7 | 30 | 90 | 365;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Analytics"];
+                    };
+                };
+                /** @description Invalid input */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Login required */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not allowed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description State changed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rate limited */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2762,6 +3301,12 @@ export interface components {
                 name: string;
                 value: string;
             }[];
+            packages: components["schemas"]["Package"][];
+            sections: components["schemas"]["Section"][];
+            /** Format: int64 */
+            discountPercent: number;
+            /** Format: int64 */
+            popularity: number;
         };
         Category: {
             id: string;
@@ -2787,6 +3332,8 @@ export interface components {
             city: string;
             street: string;
             postalCode: string;
+            latitude?: number;
+            longitude?: number;
         };
         CartItem: {
             product: components["schemas"]["Product"];
@@ -2794,6 +3341,9 @@ export interface components {
             grams: number;
             /** Format: int64 */
             totalRials: number;
+            package: components["schemas"]["Package"];
+            /** Format: int64 */
+            quantity: number;
         };
         Cart: {
             items: components["schemas"]["CartItem"][];
@@ -2809,6 +3359,10 @@ export interface components {
             priceRials: number;
             /** Format: int64 */
             totalRials: number;
+            packageId: string;
+            packageLabel: string;
+            /** Format: int64 */
+            quantity: number;
         };
         Order: {
             id: string;
@@ -2823,6 +3377,7 @@ export interface components {
             totalRials: number;
             tracking: string;
             createdAt: string;
+            events: components["schemas"]["OrderEvent"][];
         };
         Session: {
             csrf: string;
@@ -2852,6 +3407,9 @@ export interface components {
             /** Format: int64 */
             packagingGrams: number;
             rules: components["schemas"]["ShippingRule"][];
+            /** Format: int64 */
+            freeShippingRials: number;
+            supportUrl: string;
         };
         Member: {
             id: string;
@@ -2864,6 +3422,91 @@ export interface components {
         };
         OK: {
             ok: boolean;
+        };
+        Package: {
+            id: string;
+            amount: number;
+            /** @enum {string} */
+            unit: "g" | "kg" | "ml" | "l";
+            /** Format: int64 */
+            priceRials: number;
+            /** Format: int64 */
+            maxQuantity: number;
+            /** Format: int64 */
+            shippingGrams: number;
+        };
+        Section: {
+            title: string;
+            body: string;
+        };
+        OrderEvent: {
+            status: string;
+            createdAt: string;
+        };
+        PublicSettings: {
+            /** Format: int64 */
+            freeShippingRials: number;
+            supportUrl: string;
+            mapEnabled: boolean;
+        };
+        Analytics: {
+            summary: {
+                /** Format: int64 */
+                orders: number;
+                /** Format: int64 */
+                revenue: number;
+                /** Format: int64 */
+                average: number;
+                /** Format: int64 */
+                abandoned: number;
+            }[];
+            sales: {
+                day: string;
+                /** Format: int64 */
+                revenue: number;
+                /** Format: int64 */
+                orders: number;
+            }[];
+            products: {
+                id: string;
+                name: string;
+                /** Format: int64 */
+                views: number;
+                /** Format: int64 */
+                quantity: number;
+                /** Format: int64 */
+                revenue: number;
+            }[];
+            searches: {
+                query: string;
+                /** Format: int64 */
+                searches: number;
+            }[];
+            categories: {
+                name: string;
+                /** Format: int64 */
+                revenue: number;
+            }[];
+            customers: {
+                phone: string;
+                name: string;
+                /** Format: int64 */
+                orders: number;
+                /** Format: int64 */
+                revenue: number;
+            }[];
+            fulfillment: {
+                status: string;
+                /** Format: int64 */
+                orders: number;
+            }[];
+            notifications: {
+                status: string;
+                /** Format: int64 */
+                messages: number;
+            }[];
+            /** Format: int64 */
+            days: number;
         };
     };
     responses: never;

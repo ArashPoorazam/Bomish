@@ -37,6 +37,10 @@ func productFrom(p db.Product, available int64) domain.Product {
 	if out.Nutrients == nil {
 		out.Nutrients = []domain.Nutrient{}
 	}
+	if out.Sections == nil {
+		out.Sections = []domain.Section{}
+	}
+	out.EnsurePackages()
 	return out
 }
 func (a *App) categories(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +68,32 @@ func (a *App) products(w http.ResponseWriter, r *http.Request) {
 	out := []domain.Product{}
 	for _, p := range rows {
 		out = append(out, productFrom(db.Product{ID: p.ID, Slug: p.Slug, Name: p.Name, CategoryID: p.CategoryID, Status: p.Status, PriceRials: p.PriceRials, MinGrams: p.MinGrams, StepGrams: p.StepGrams, MaxGrams: p.MaxGrams, Content: p.Content}, p.AvailableGrams))
+	}
+	// Paid package quantities dominate popularity; recorded detail visits break ties.
+	popularity, e := a.Pool.Query(r.Context(), `SELECT p.id,coalesce((SELECT sum(oi.quantity)*10 FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE oi.product_id=p.id AND o.status IN ('paid','packing','shipped','received')),0)+(SELECT count(*) FROM analytics_events ev WHERE ev.product_id=p.id AND ev.kind='view') FROM products p WHERE p.status='published'`)
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+	scores := map[string]int64{}
+	for popularity.Next() {
+		var id string
+		var n int64
+		if e = popularity.Scan(&id, &n); e != nil {
+			popularity.Close()
+			a.dbError(w, e)
+			return
+		}
+		scores[id] = n
+	}
+	e = popularity.Err()
+	popularity.Close()
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+	for i := range out {
+		out[i].Popularity = scores[out[i].ID]
 	}
 	write(w, 200, out)
 }

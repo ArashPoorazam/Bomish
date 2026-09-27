@@ -1,3 +1,5 @@
+import { ProductEvent } from "@/components/product-event";
+import { inStock } from "@/lib/format";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { serverApi } from "@/lib/api";
@@ -35,24 +37,20 @@ export default async function Detail({
     serverApi<Product[]>("/products"),
     serverApi<Article[]>("/articles"),
   ]);
-  const available = products.filter(
-    (x) => x.id !== p.id && x.availableGrams >= x.minGrams,
-  );
+  const available = products.filter((x) => x.id !== p.id && inStock(x));
   const related = available
-    .map((x) => ({
-      p: x,
-      score: p.relatedIds.includes(x.id)
-        ? 100 - p.relatedIds.indexOf(x.id)
-        : (x.categoryId === p.categoryId ? 10 : 0) +
-          x.tags.filter((t) => p.tags.includes(t)).length,
-    }))
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 4)
-    .map((x) => x.p);
+    .toSorted(
+      (a, b) =>
+        Number(b.categoryId === p.categoryId) -
+          Number(a.categoryId === p.categoryId) ||
+        b.popularity - a.popularity ||
+        a.name.localeCompare(b.name, "fa"),
+    )
+    .slice(0, 4);
   const guides = articles.filter((a) => a.productIds.includes(p.id));
   return (
     <div className="container section">
+      <ProductEvent productId={p.id} />
       <nav className="breadcrumbs">
         <Link href="/">خانه</Link>
         <span>/</span>
@@ -108,6 +106,12 @@ export default async function Detail({
                 <RichText text={text} />
               </section>
             ))}
+          {(p.sections || []).map((section, i) => (
+            <section key={i}>
+              <h2>{section.title}</h2>
+              <RichText text={section.body} />
+            </section>
+          ))}
           {p.nutrients.length > 0 ? (
             <section>
               <h2>ارزش غذایی در ۱۰۰ گرم</h2>

@@ -64,6 +64,13 @@ func (a *App) Handler() http.Handler {
 		}
 		write(w, 200, map[string]string{"status": "ok"})
 	})
+	m.HandleFunc("GET /api/v1/settings", a.publicSettings)
+	m.HandleFunc("GET /api/v1/addresses/reverse", a.reverseAddress)
+	m.HandleFunc("GET /api/v1/orders/{id}", a.getOrder)
+	m.HandleFunc("POST /api/v1/events", a.recordEvent)
+	m.HandleFunc("GET /api/v1/staff/analytics", a.allow(a.analytics, "owner"))
+	m.HandleFunc("POST /api/v1/staff/pricing", a.allow(a.adjustPrices, "owner"))
+	m.HandleFunc("DELETE /api/v1/staff/categories/{id}", a.allow(a.deleteCategory, "owner", "editor"))
 	m.HandleFunc("GET /api/v1/session", a.sessionInfo)
 	m.HandleFunc("POST /api/v1/logout", a.logout)
 	m.HandleFunc("POST /api/v1/auth/request", a.requestOTP)
@@ -191,4 +198,4 @@ func requireCustomer(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-var errUnavailable = errors.New("موجودی یا وزن محصول تغییر کرده است؛ سبد را بررسی کنید")
+var errUnavailable = errors.New("موجودی، بسته یا سقف خرید تغییر کرده است؛ سبد را بررسی کنید")

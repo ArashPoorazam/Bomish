@@ -45,6 +45,7 @@ func TestPublishRequirements(t *testing.T) {
 		t.Fatal("incomplete published")
 	}
 	p.PriceRials = 1000
+	p.Packages = []Package{{ID: "small", Amount: 100, Unit: "g", PriceRials: 100, MaxQuantity: 5}}
 	p.Description = "شرح"
 	p.Summary = "خلاصه"
 	p.Images = []string{"/images/spices.png"}

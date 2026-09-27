@@ -46,9 +46,16 @@ func (a *App) staffProducts(w http.ResponseWriter, r *http.Request) {
 		} else {
 			p.Status = "draft"
 		}
+
 		if current(r).Role == "editor" {
 			p.PriceRials = 0
 			p.AvailableGrams = 0
+		}
+		p.EnsurePackages()
+		if current(r).Role == "editor" {
+			for i := range p.Packages {
+				p.Packages[i].PriceRials = 0
+			}
 		}
 		out = append(out, p)
 	}
@@ -61,6 +68,15 @@ func (a *App) saveProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	p.ID = r.PathValue("id")
 	p.Status = "draft"
+	for i := range p.Packages {
+		if p.Packages[i].MaxQuantity == 0 {
+			p.Packages[i].MaxQuantity = 5
+		}
+	}
+	p.MinGrams = 1
+	p.StepGrams = 1
+	p.MaxGrams = 1000000
+
 	if e := p.Validate(false); e != nil {
 		fail(w, 400, e.Error())
 		return
@@ -90,6 +106,24 @@ func (a *App) saveProduct(w http.ResponseWriter, r *http.Request) {
 			var previous domain.Product
 			_ = json.Unmarshal(draft, &previous)
 			p.PriceRials = previous.PriceRials
+		}
+	}
+	if current(r).Role == "editor" {
+		var previous domain.Product
+		_ = json.Unmarshal(oldRaw, &previous)
+		var draft []byte
+		if tx.QueryRow(r.Context(), "SELECT content FROM product_drafts WHERE product_id=$1", p.ID).Scan(&draft) == nil {
+			_ = json.Unmarshal(draft, &previous)
+		}
+		previous.EnsurePackages()
+		p.DiscountPercent = previous.DiscountPercent
+		for i := range p.Packages {
+			old, ok := previous.Package(p.Packages[i].ID)
+			if ok {
+				p.Packages[i].PriceRials = old.PriceRials
+			} else {
+				p.Packages[i].PriceRials = 0
+			}
 		}
 	}
 	raw, _ := json.Marshal(p)

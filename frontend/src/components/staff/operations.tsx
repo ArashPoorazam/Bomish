@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import type { Order, ShippingConfig, Member } from "@/lib/types";
-import { digits } from "@/lib/format";
+import { digits, statuses, fa } from "@/lib/format";
 import { OrderView } from "@/components/checkout";
 
 export function OrderManager({
@@ -12,6 +12,8 @@ export function OrderManager({
   orders: Order[];
   reload: () => Promise<void>;
 }) {
+  const [q, setQ] = useState(""),
+    [filter, setFilter] = useState("active");
   const [tracking, setTracking] = useState<Record<string, string>>({}),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -20,7 +22,12 @@ export function OrderManager({
     setError("");
     try {
       await api("/staff/orders/" + o.id, "PATCH", {
-        status: o.status === "paid" ? "packing" : "shipped",
+        status:
+          o.status === "paid"
+            ? "packing"
+            : o.status === "packing"
+              ? "shipped"
+              : "received",
         tracking: tracking[o.id] || "",
       });
       await reload();
@@ -37,46 +44,113 @@ export function OrderManager({
           {error}
         </p>
       ) : null}
+      <div className="order-filters">
+        <label>
+          جستجوی سفارش
+          <input
+            type="search"
+            placeholder="نام، همراه، کد سفارش یا رهگیری"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </label>
+        <label>
+          وضعیت
+          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="active">نیازمند اقدام</option>
+            <option value="">همه سفارش‌ها</option>
+            {[
+              "paid",
+              "packing",
+              "shipped",
+              "received",
+              "pending",
+              "review",
+              "cancelled",
+              "expired",
+            ].map((x) => (
+              <option key={x} value={x}>
+                {statuses[x]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          className="button secondary"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await reload();
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          به‌روزرسانی
+        </button>
+      </div>
       {!orders.length ? <p>هنوز سفارشی ثبت نشده است.</p> : null}
-      {orders.map((o) => (
-        <OrderView order={o} key={o.id}>
-          <div className="stack">
-            <p>
-              {o.address.recipient} · {o.address.phone}
-              <br />
-              {o.address.province}، {o.address.city}، {o.address.street}
-              <br />
-              کد پستی: {o.address.postalCode}
-            </p>
-            {o.status === "packing" ? (
-              <label>
-                کد رهگیری
-                <input
-                  value={tracking[o.id] || ""}
-                  onChange={(e) =>
-                    setTracking({ ...tracking, [o.id]: e.target.value })
-                  }
-                />
-              </label>
-            ) : null}
-            {["paid", "packing"].includes(o.status) ? (
-              <button
-                className="button"
-                disabled={busy}
-                onClick={() => move(o)}
-              >
-                {o.status === "paid" ? "شروع آماده‌سازی" : "ثبت ارسال"}
-              </button>
-            ) : null}
-            {o.status === "review" ? (
-              <p className="error">
-                پرداخت تأیید شده اما موجودی کافی نیست. مالک باید تأمین کالا یا
-                بازپرداخت را پیگیری کند.
+      {orders
+        .filter(
+          (o) =>
+            (!filter ||
+              (filter === "active"
+                ? ["paid", "packing", "shipped", "review"].includes(o.status)
+                : o.status === filter)) &&
+            `${o.id} ${o.address.recipient} ${o.address.phone} ${o.tracking}`.includes(
+              q,
+            ),
+        )
+        .map((o) => (
+          <OrderView order={o} key={o.id}>
+            <div className="stack">
+              <p>
+                {o.address.recipient} · {o.address.phone}
+                <br />
+                {o.address.province}، {o.address.city}، {o.address.street}
+                <br />
+                کد پستی: {o.address.postalCode}
               </p>
-            ) : null}
-          </div>
-        </OrderView>
-      ))}
+              {o.status === "packing" ? (
+                <label>
+                  کد رهگیری
+                  <input
+                    value={tracking[o.id] || ""}
+                    onChange={(e) =>
+                      setTracking({ ...tracking, [o.id]: e.target.value })
+                    }
+                  />
+                </label>
+              ) : null}
+              {["paid", "packing", "shipped"].includes(o.status) ? (
+                <button
+                  className="button"
+                  disabled={
+                    busy ||
+                    (o.status === "packing" &&
+                      !/^[0-9]{10,30}$/.test(digits(tracking[o.id] || "")))
+                  }
+                  onClick={() => move(o)}
+                >
+                  {o.status === "paid"
+                    ? "تأیید بسته‌بندی"
+                    : o.status === "packing"
+                      ? "ثبت ارسال و اطلاع‌رسانی"
+                      : "تأیید تحویل به مشتری"}
+                </button>
+              ) : null}
+              {o.status === "review" ? (
+                <p className="error">
+                  پرداخت تأیید شده اما موجودی کافی نیست. مالک باید تأمین کالا یا
+                  بازپرداخت را پیگیری کند.
+                </p>
+              ) : null}
+            </div>
+          </OrderView>
+        ))}
     </div>
   );
 }
@@ -88,6 +162,27 @@ export function ShippingEditor({ initial }: { initial: ShippingConfig }) {
   return (
     <div className="form-card stack">
       <h2>هزینه و محدوده ارسال</h2>
+      <label>
+        ارسال رایگان از مبلغ (تومان؛ صفر برای غیرفعال)
+        <input
+          type="number"
+          min="0"
+          value={v.freeShippingRials / 10}
+          onChange={(e) =>
+            setV({ ...v, freeShippingRials: Number(e.target.value) * 10 })
+          }
+        />
+      </label>
+      <label>
+        لینک پشتیبانی واتساپ یا تلگرام
+        <input
+          type="url"
+          dir="ltr"
+          placeholder="https://wa.me/989..."
+          value={v.supportUrl}
+          onChange={(e) => setV({ ...v, supportUrl: e.target.value })}
+        />
+      </label>
       <label>
         وزن بسته‌بندی (گرم)
         <input

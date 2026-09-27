@@ -2,6 +2,8 @@ package domain
 
 import (
 	"errors"
+	"fmt"
+	"math"
 	"strings"
 )
 
@@ -9,7 +11,56 @@ type Nutrient struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
+type Package struct {
+	ID            string  `json:"id"`
+	Amount        float64 `json:"amount"`
+	Unit          string  `json:"unit"`
+	PriceRials    int64   `json:"priceRials"`
+	MaxQuantity   int64   `json:"maxQuantity"`
+	ShippingGrams int64   `json:"shippingGrams"`
+}
+type Section struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
+}
+
+func (p Package) Weight() int64 {
+	if p.Unit == "g" {
+		return int64(math.Round(p.Amount))
+	}
+	if p.Unit == "kg" {
+		return int64(math.Round(p.Amount * 1000))
+	}
+	return p.ShippingGrams
+}
+func (p Package) Label() string {
+	return fmt.Sprintf("%g %s", p.Amount, map[string]string{"g": "گرم", "kg": "کیلوگرم", "ml": "میلی‌لیتر", "l": "لیتر"}[p.Unit])
+}
+func (p Product) Package(id string) (Package, bool) {
+	for _, v := range p.Packages {
+		if v.ID == id {
+			return v, true
+		}
+	}
+	return Package{}, false
+}
+func (p Product) PackagePrice(v Package) int64 {
+	return ((v.PriceRials*(100-p.DiscountPercent) + 500) / 1000) * 10
+}
+
+// Existing catalogs receive one explicit package based on their previous minimum, never a global list.
+func (p *Product) EnsurePackages() {
+	if p.Packages == nil {
+		p.Packages = []Package{{ID: "legacy", Amount: float64(p.MinGrams), Unit: "g", PriceRials: Total(p.PriceRials, p.MinGrams), MaxQuantity: 5}}
+	}
+}
+
 type Product struct {
+	Packages        []Package `json:"packages"`
+	Sections        []Section `json:"sections"`
+	DiscountPercent int64     `json:"discountPercent"`
+	Popularity      int64     `json:"popularity"`
+
 	ID             string     `json:"id"`
 	Slug           string     `json:"slug"`
 	Name           string     `json:"name"`
@@ -46,15 +97,19 @@ type Article struct {
 	UpdatedAt  string   `json:"updatedAt"`
 }
 type Address struct {
-	ID         string `json:"id"`
-	Recipient  string `json:"recipient"`
-	Phone      string `json:"phone"`
-	Province   string `json:"province"`
-	City       string `json:"city"`
-	Street     string `json:"street"`
-	PostalCode string `json:"postalCode"`
+	Latitude   *float64 `json:"latitude,omitempty"`
+	Longitude  *float64 `json:"longitude,omitempty"`
+	ID         string   `json:"id"`
+	Recipient  string   `json:"recipient"`
+	Phone      string   `json:"phone"`
+	Province   string   `json:"province"`
+	City       string   `json:"city"`
+	Street     string   `json:"street"`
+	PostalCode string   `json:"postalCode"`
 }
 type CartItem struct {
+	Package    Package `json:"package"`
+	Quantity   int64   `json:"quantity"`
 	Product    Product `json:"product"`
 	Grams      int64   `json:"grams"`
 	TotalRials int64   `json:"totalRials"`
@@ -64,13 +119,18 @@ type Cart struct {
 	SubtotalRials int64      `json:"subtotalRials"`
 }
 type OrderItem struct {
-	ProductID  string `json:"productId"`
-	Name       string `json:"name"`
-	Grams      int64  `json:"grams"`
-	PriceRials int64  `json:"priceRials"`
-	TotalRials int64  `json:"totalRials"`
+	PackageID    string `json:"packageId"`
+	PackageLabel string `json:"packageLabel"`
+	Quantity     int64  `json:"quantity"`
+	ProductID    string `json:"productId"`
+	Name         string `json:"name"`
+	Grams        int64  `json:"grams"`
+	PriceRials   int64  `json:"priceRials"`
+	TotalRials   int64  `json:"totalRials"`
 }
 type Order struct {
+	Events []OrderEvent `json:"events"`
+
 	ID            string      `json:"id"`
 	Status        string      `json:"status"`
 	Address       Address     `json:"address"`
@@ -80,6 +140,11 @@ type Order struct {
 	TotalRials    int64       `json:"totalRials"`
 	Tracking      string      `json:"tracking"`
 	CreatedAt     string      `json:"createdAt"`
+}
+
+type OrderEvent struct {
+	Status    string `json:"status"`
+	CreatedAt string `json:"createdAt"`
 }
 
 func Normalize(s string) string {
@@ -128,12 +193,27 @@ func (p Product) Validate(publish bool) error {
 	if p.MinGrams < 1 || p.StepGrams < 1 || p.MaxGrams < p.MinGrams || p.MaxGrams > 1000000 || p.PriceRials < 0 || p.PriceRials > 100000000000 {
 		return errors.New("قیمت یا محدوده وزن معتبر نیست")
 	}
+	if p.DiscountPercent < 0 || p.DiscountPercent > 90 || len(p.Packages) > 50 || len(p.Sections) > 30 {
+		return errors.New("تخفیف یا تعداد بسته‌ها معتبر نیست")
+	}
+	seen := map[string]bool{}
+	for _, v := range p.Packages {
+		if v.ID == "" || len(v.ID) > 100 || seen[v.ID] || math.IsNaN(v.Amount) || math.IsInf(v.Amount, 0) || v.Amount <= 0 || v.Amount > 1000000 || v.MaxQuantity < 1 || v.MaxQuantity > 1000 || v.PriceRials < 0 || v.PriceRials > 100000000000 || v.PriceRials%10 != 0 || (publish && v.PriceRials == 0) || (v.Unit != "g" && v.Unit != "kg" && v.Unit != "ml" && v.Unit != "l") || v.Weight() < 1 || v.Weight() > 1000000 {
+			return errors.New("مقدار، واحد، قیمت، وزن ارسال و سقف خرید بسته را بررسی کنید")
+		}
+		seen[v.ID] = true
+	}
+	for _, v := range p.Sections {
+		if strings.TrimSpace(v.Title) == "" || len(v.Body) > 100000 {
+			return errors.New("عنوان و متن بخش را بررسی کنید")
+		}
+	}
 	for _, im := range p.Images {
 		if !ValidImage(im) {
 			return errors.New("تصویر باید از کتابخانه بارگذاری شود")
 		}
 	}
-	if publish && (p.Description == "" || p.Summary == "" || len(p.Images) == 0 || p.PriceRials <= 0) {
+	if publish && (p.Summary == "" || len(p.Images) == 0 || len(p.Packages) == 0) {
 		return errors.New("برای انتشار، توضیحات، خلاصه، تصویر و قیمت را کامل کنید")
 	}
 	if len(p.Nutrients) > 0 && strings.TrimSpace(p.NutrientSource) == "" {
@@ -142,6 +222,13 @@ func (p Product) Validate(publish bool) error {
 	return nil
 }
 func (a Address) Validate() error {
+	if (a.Latitude == nil) != (a.Longitude == nil) {
+		return errors.New("مختصات ناقص است")
+	}
+	if a.Latitude != nil && (math.IsNaN(*a.Latitude) || math.IsNaN(*a.Longitude) || *a.Latitude < -90 || *a.Latitude > 90 || *a.Longitude < -180 || *a.Longitude > 180) {
+		return errors.New("مختصات معتبر نیست")
+	}
+
 	if a.Recipient == "" || !ValidPhone(Phone(a.Phone)) || a.Province == "" || a.City == "" || len([]rune(a.Street)) < 10 || len(Normalize(a.PostalCode)) != 10 {
 		return errors.New("نام، شماره همراه، نشانی کامل و کد پستی ده‌رقمی لازم است")
 	}

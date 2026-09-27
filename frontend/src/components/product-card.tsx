@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpLeft } from "lucide-react";
 import type { Product } from "@/lib/types";
-import { money } from "@/lib/format";
+import { priceRange, inStock, fa } from "@/lib/format";
 export function ProductImage({
   product,
   priority = false,
@@ -34,22 +34,24 @@ export function ProductCard({ product }: { product: Product }) {
             ? "سبزی‌های خشک"
             : product.categoryId === "seeds"
               ? "دانه‌های خوراکی"
-              : "ادویه‌ها"}
+              : product.categoryId === "spices"
+                ? "ادویه‌ها"
+                : "محصولات بومیش"}
         </span>
         <h3>{product.name}</h3>
+        {product.discountPercent > 0 && (
+          <span className="badge">{fa(product.discountPercent)}٪ تخفیف</span>
+        )}
         <p>{product.summary}</p>
         <div className="product-card-bottom">
           <div>
-            <strong>{money(product.priceRials)}</strong>{" "}
-            <span>تومان / کیلوگرم</span>
+            <strong>{priceRange(product)}</strong> <span>تومان</span>
           </div>
           <span className="round-arrow">
             <ArrowUpLeft size={18} />
           </span>
         </div>
-        {product.availableGrams < product.minGrams ? (
-          <span className="muted">ناموجود</span>
-        ) : null}
+        {!inStock(product) ? <span className="muted">ناموجود</span> : null}
       </div>
     </Link>
   );

@@ -12,6 +12,10 @@ export function newProduct(): Product {
     name: "",
     categoryId: "",
     status: "draft",
+    packages: [],
+    sections: [],
+    discountPercent: 0,
+    popularity: 0,
     priceRials: 0,
     minGrams: 100,
     stepGrams: 100,
@@ -60,6 +64,8 @@ export function ProductEditor({
       aliases: product.aliases || [],
       relatedIds: product.relatedIds || [],
       nutrients: product.nutrients || [],
+      packages: product.packages || [],
+      sections: product.sections || [],
     });
   }, [product]);
   useEffect(() => {
@@ -168,19 +174,6 @@ export function ProductEditor({
               ))}
             </select>
           </label>
-          {owner ? (
-            <label>
-              قیمت هر کیلو (تومان)
-              <input
-                inputMode="numeric"
-                required
-                value={p.priceRials / 10}
-                onChange={(e) =>
-                  field("priceRials", Number(digits(e.target.value)) * 10)
-                }
-              />
-            </label>
-          ) : null}
           <label className="span-2">
             خلاصه محصول
             <input
@@ -189,80 +182,286 @@ export function ProductEditor({
               onChange={(e) => field("summary", e.target.value)}
             />
           </label>
-          {(
-            [
-              "description",
-              "uses",
-              "preparation",
-              "storage",
-              "ingredients",
-              "allergens",
-            ] as const
-          ).map((k, i) => (
-            <label key={k} className="span-2">
-              {
-                [
-                  "معرفی و توضیحات",
-                  "کاربردهای آشپزی",
-                  "روش استفاده",
-                  "روش نگهداری",
-                  "ترکیبات",
-                  "اطلاعات حساسیت‌زا",
-                ][i]
-              }
-              <textarea
-                value={p[k]}
-                onChange={(e) => field(k, e.target.value)}
-                placeholder={
-                  k === "description"
-                    ? "برای عنوان بخش از ## و برای پاراگراف جدید از یک خط خالی استفاده کنید."
-                    : undefined
-                }
-              />
-            </label>
-          ))}
-          {(["minGrams", "stepGrams", "maxGrams"] as const).map((k, i) => (
-            <label key={k}>
-              {["حداقل وزن (گرم)", "گام وزن (گرم)", "حداکثر وزن (گرم)"][i]}
-              <input
-                inputMode="numeric"
-                required
-                value={p[k]}
-                onChange={(e) => field(k, Number(digits(e.target.value)))}
-              />
-            </label>
-          ))}
-          <label>
-            نام‌های جایگزین (با ویرگول جدا کنید)
-            <input
-              value={p.aliases.join("، ")}
-              onChange={(e) =>
-                field(
-                  "aliases",
-                  e.target.value
-                    .split(/[,،]/)
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                )
-              }
-            />
-          </label>
-          <label>
-            برچسب‌ها (با ویرگول جدا کنید)
-            <input
-              value={p.tags.join("، ")}
-              onChange={(e) =>
-                field(
-                  "tags",
-                  e.target.value
-                    .split(/[,،]/)
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                )
-              }
+          <label className="span-2">
+            معرفی کوتاه
+            <textarea
+              value={p.description}
+              onChange={(e) => field("description", e.target.value)}
             />
           </label>
         </div>
+        {p.description && (
+          <details>
+            <summary>پیش‌نمایش زنده معرفی</summary>
+            <RichText text={p.description} />
+          </details>
+        )}
+        <fieldset className="stack">
+          <legend>بسته‌های قابل خرید</legend>
+          {p.packages.map((pack, i) => (
+            <div className="package-editor" key={pack.id}>
+              <label>
+                مقدار
+                <input
+                  type="number"
+                  min="0.001"
+                  step="any"
+                  required
+                  value={pack.amount}
+                  onChange={(e) =>
+                    field(
+                      "packages",
+                      p.packages.map((x, j) =>
+                        i === j ? { ...x, amount: Number(e.target.value) } : x,
+                      ),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                واحد
+                <select
+                  value={pack.unit}
+                  onChange={(e) =>
+                    field(
+                      "packages",
+                      p.packages.map((x, j) =>
+                        i === j
+                          ? { ...x, unit: e.target.value as typeof pack.unit }
+                          : x,
+                      ),
+                    )
+                  }
+                >
+                  <option value="g">گرم</option>
+                  <option value="kg">کیلوگرم</option>
+                  <option value="ml">میلی‌لیتر</option>
+                  <option value="l">لیتر</option>
+                </select>
+              </label>
+              {owner && (
+                <label>
+                  قیمت بسته (تومان)
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={pack.priceRials / 10}
+                    onChange={(e) =>
+                      field(
+                        "packages",
+                        p.packages.map((x, j) =>
+                          i === j
+                            ? { ...x, priceRials: Number(e.target.value) * 10 }
+                            : x,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+              )}
+              <label>
+                سقف خرید
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  required
+                  value={pack.maxQuantity}
+                  onChange={(e) =>
+                    field(
+                      "packages",
+                      p.packages.map((x, j) =>
+                        i === j
+                          ? { ...x, maxQuantity: Number(e.target.value) }
+                          : x,
+                      ),
+                    )
+                  }
+                />
+              </label>
+              {(pack.unit === "l" || pack.unit === "ml") && (
+                <label>
+                  وزن ارسال (گرم)
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={pack.shippingGrams}
+                    onChange={(e) =>
+                      field(
+                        "packages",
+                        p.packages.map((x, j) =>
+                          i === j
+                            ? { ...x, shippingGrams: Number(e.target.value) }
+                            : x,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+              )}
+              <button
+                type="button"
+                className="text-link"
+                onClick={() =>
+                  field(
+                    "packages",
+                    p.packages.filter((_, j) => i !== j),
+                  )
+                }
+              >
+                حذف بسته
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() =>
+              field("packages", [
+                ...p.packages,
+                {
+                  id: crypto.randomUUID(),
+                  amount: 100,
+                  unit: "g",
+                  priceRials: 0,
+                  maxQuantity: 5,
+                  shippingGrams: 0,
+                },
+              ])
+            }
+          >
+            + افزودن بسته
+          </button>
+        </fieldset>
+        <details>
+          <summary>اطلاعات تکمیلی محصول · اختیاری</summary>
+          <div className="stack">
+            <datalist id="section-titles">
+              {[
+                "برای چه غذاهایی مناسب است؟",
+                "چطور استفاده کنیم؟",
+                "چطور نگهداری کنیم؟",
+                "ترکیبات",
+                "اطلاعات حساسیت‌زا",
+              ].map((x) => (
+                <option key={x} value={x} />
+              ))}
+            </datalist>
+            {p.sections.map((section, i) => (
+              <div className="stack form-card" key={i}>
+                <label>
+                  عنوان بخش · انتخاب یا عنوان دلخواه
+                  <input
+                    list="section-titles"
+                    required
+                    value={section.title}
+                    onChange={(e) =>
+                      field(
+                        "sections",
+                        p.sections.map((x, j) =>
+                          i === j ? { ...x, title: e.target.value } : x,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  متن بخش
+                  <textarea
+                    value={section.body}
+                    onChange={(e) =>
+                      field(
+                        "sections",
+                        p.sections.map((x, j) =>
+                          i === j ? { ...x, body: e.target.value } : x,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <RichText text={section.body} />
+                <button
+                  type="button"
+                  className="text-link"
+                  onClick={() =>
+                    field(
+                      "sections",
+                      p.sections.filter((_, j) => i !== j),
+                    )
+                  }
+                >
+                  حذف بخش
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() =>
+                field("sections", [...p.sections, { title: "", body: "" }])
+              }
+            >
+              + افزودن بخش توضیحات
+            </button>
+            {(
+              [
+                "uses",
+                "preparation",
+                "storage",
+                "ingredients",
+                "allergens",
+              ] as const
+            )
+              .filter((k) => p[k])
+              .map((k) => (
+                <label key={k}>
+                  اطلاعات قبلی محصول
+                  <textarea
+                    value={p[k]}
+                    onChange={(e) => field(k, e.target.value)}
+                  />
+                  <RichText text={p[k]} />
+                </label>
+              ))}
+          </div>
+        </details>
+        <details>
+          <summary>برچسب‌ها و نام‌های جستجو</summary>
+          <div className="form-grid">
+            <label>
+              نام‌های جایگزین (با ویرگول جدا کنید)
+              <input
+                value={p.aliases.join("، ")}
+                onChange={(e) =>
+                  field(
+                    "aliases",
+                    e.target.value
+                      .split(/[,،]/)
+                      .map((s) => s.trim())
+                      .filter(Boolean),
+                  )
+                }
+              />
+            </label>
+            <label>
+              برچسب‌ها (با ویرگول جدا کنید)
+              <input
+                value={p.tags.join("، ")}
+                onChange={(e) =>
+                  field(
+                    "tags",
+                    e.target.value
+                      .split(/[,،]/)
+                      .map((s) => s.trim())
+                      .filter(Boolean),
+                  )
+                }
+              />
+            </label>
+          </div>
+        </details>
         <fieldset>
           <legend>تصاویر محصول · تصویر اول، تصویر اصلی است</legend>
           <div className="image-editor">
@@ -311,91 +510,76 @@ export function ProductEditor({
             />
           </label>
         </fieldset>
-        <fieldset>
-          <legend>محصولات پیشنهادی</legend>
-          {products
-            .filter((x) => x.id !== p.id)
-            .map((x) => (
-              <label key={x.id} className="check-label">
-                <input
-                  type="checkbox"
-                  checked={p.relatedIds.includes(x.id)}
-                  onChange={(e) =>
+        <p className="muted">
+          پیشنهاد محصولات به‌صورت خودکار بر اساس دسته‌بندی و محبوبیت انجام
+          می‌شود.
+        </p>
+        <details>
+          <summary>ارزش غذایی · اختیاری</summary>
+          <fieldset>
+            <legend>ارزش غذایی در ۱۰۰ گرم · اختیاری</legend>
+            {p.nutrients.map((n, i) => (
+              <div className="form-grid" key={i}>
+                <label>
+                  نام ماده
+                  <input
+                    value={n.name}
+                    onChange={(e) =>
+                      field(
+                        "nutrients",
+                        p.nutrients.map((v, j) =>
+                          j === i ? { ...v, name: e.target.value } : v,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  مقدار با واحد
+                  <input
+                    value={n.value}
+                    onChange={(e) =>
+                      field(
+                        "nutrients",
+                        p.nutrients.map((v, j) =>
+                          j === i ? { ...v, value: e.target.value } : v,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="text-link icon-button"
+                  onClick={() =>
                     field(
-                      "relatedIds",
-                      e.target.checked
-                        ? [...p.relatedIds, x.id]
-                        : p.relatedIds.filter((id) => id !== x.id),
+                      "nutrients",
+                      p.nutrients.filter((_, j) => j !== i),
                     )
                   }
-                />
-                {x.name}
-              </label>
+                >
+                  حذف ردیف
+                </button>
+              </div>
             ))}
-        </fieldset>
-        <fieldset>
-          <legend>ارزش غذایی در ۱۰۰ گرم · اختیاری</legend>
-          {p.nutrients.map((n, i) => (
-            <div className="form-grid" key={i}>
-              <label>
-                نام ماده
-                <input
-                  value={n.name}
-                  onChange={(e) =>
-                    field(
-                      "nutrients",
-                      p.nutrients.map((v, j) =>
-                        j === i ? { ...v, name: e.target.value } : v,
-                      ),
-                    )
-                  }
-                />
-              </label>
-              <label>
-                مقدار با واحد
-                <input
-                  value={n.value}
-                  onChange={(e) =>
-                    field(
-                      "nutrients",
-                      p.nutrients.map((v, j) =>
-                        j === i ? { ...v, value: e.target.value } : v,
-                      ),
-                    )
-                  }
-                />
-              </label>
-              <button
-                type="button"
-                className="text-link icon-button"
-                onClick={() =>
-                  field(
-                    "nutrients",
-                    p.nutrients.filter((_, j) => j !== i),
-                  )
-                }
-              >
-                حذف ردیف
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            className="button secondary"
-            onClick={() =>
-              field("nutrients", [...p.nutrients, { name: "", value: "" }])
-            }
-          >
-            افزودن ماده غذایی
-          </button>
-          <label style={{ marginTop: 12 }}>
-            منبع اطلاعات تغذیه‌ای
-            <input
-              value={p.nutrientSource}
-              onChange={(e) => field("nutrientSource", e.target.value)}
-            />
-          </label>
-        </fieldset>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() =>
+                field("nutrients", [...p.nutrients, { name: "", value: "" }])
+              }
+            >
+              افزودن ماده غذایی
+            </button>
+            <label style={{ marginTop: 12 }}>
+              منبع اطلاعات تغذیه‌ای
+              <input
+                value={p.nutrientSource}
+                onChange={(e) => field("nutrientSource", e.target.value)}
+              />
+            </label>
+          </fieldset>
+        </details>
         <div className="editor-actions">
           <button className="button" disabled={busy}>
             ذخیره پیش‌نویس

@@ -805,13 +805,17 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "grams": {
+                  "packageId": {
+                    "type": "string"
+                  },
+                  "quantity": {
                     "type": "integer",
                     "format": "int64"
                   }
                 },
                 "required": [
-                  "grams"
+                  "packageId",
+                  "quantity"
                 ],
                 "additionalProperties": false
               }
@@ -866,6 +870,14 @@
           {
             "name": "X-CSRF-Token",
             "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "packageId",
+            "in": "query",
             "required": true,
             "schema": {
               "type": "string"
@@ -1703,6 +1715,60 @@
             }
           }
         }
+      },
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OK"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/staff/articles/{id}": {
@@ -1833,7 +1899,12 @@
                 "type": "object",
                 "properties": {
                   "status": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                      "packing",
+                      "shipped",
+                      "received"
+                    ]
                   },
                   "tracking": {
                     "type": "string"
@@ -2129,6 +2200,410 @@
           }
         }
       }
+    },
+    "/settings": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/addresses/reverse": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "street": {
+                      "type": "string"
+                    },
+                    "city": {
+                      "type": "string"
+                    },
+                    "province": {
+                      "type": "string"
+                    },
+                    "latitude": {
+                      "type": "number"
+                    },
+                    "longitude": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "street",
+                    "city",
+                    "province",
+                    "latitude",
+                    "longitude"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        },
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          }
+        ]
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "$ref": "#/components/schemas/Order"
+                    },
+                    "trackingUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "order",
+                    "trackingUrl"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/events": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OK"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "view",
+                      "search"
+                    ]
+                  },
+                  "productId": {
+                    "type": "string"
+                  },
+                  "query": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/pricing": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "productId": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "discount",
+                      "adjust"
+                    ]
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "amount"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/analytics": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Analytics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        },
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "enum": [
+                7,
+                30,
+                90,
+                365
+              ]
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2237,6 +2712,26 @@
               ],
               "additionalProperties": false
             }
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Package"
+            }
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Section"
+            }
+          },
+          "discountPercent": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "popularity": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "required": [
@@ -2262,7 +2757,11 @@
           "tags",
           "aliases",
           "relatedIds",
-          "nutrients"
+          "nutrients",
+          "packages",
+          "sections",
+          "discountPercent",
+          "popularity"
         ],
         "additionalProperties": false
       },
@@ -2356,6 +2855,12 @@
           },
           "postalCode": {
             "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
           }
         },
         "required": [
@@ -2382,12 +2887,21 @@
           "totalRials": {
             "type": "integer",
             "format": "int64"
+          },
+          "package": {
+            "$ref": "#/components/schemas/Package"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "required": [
           "product",
           "grams",
-          "totalRials"
+          "totalRials",
+          "package",
+          "quantity"
         ],
         "additionalProperties": false
       },
@@ -2431,6 +2945,16 @@
           "totalRials": {
             "type": "integer",
             "format": "int64"
+          },
+          "packageId": {
+            "type": "string"
+          },
+          "packageLabel": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "required": [
@@ -2438,7 +2962,10 @@
           "name",
           "grams",
           "priceRials",
-          "totalRials"
+          "totalRials",
+          "packageId",
+          "packageLabel",
+          "quantity"
         ],
         "additionalProperties": false
       },
@@ -2477,6 +3004,12 @@
           },
           "createdAt": {
             "type": "string"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderEvent"
+            }
           }
         },
         "required": [
@@ -2488,7 +3021,8 @@
           "shippingRials",
           "totalRials",
           "tracking",
-          "createdAt"
+          "createdAt",
+          "events"
         ],
         "additionalProperties": false
       },
@@ -2582,11 +3116,20 @@
             "items": {
               "$ref": "#/components/schemas/ShippingRule"
             }
+          },
+          "freeShippingRials": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "supportUrl": {
+            "type": "string"
           }
         },
         "required": [
           "packagingGrams",
-          "rules"
+          "rules",
+          "freeShippingRials",
+          "supportUrl"
         ],
         "additionalProperties": false
       },
@@ -2635,6 +3178,320 @@
         },
         "required": [
           "ok"
+        ],
+        "additionalProperties": false
+      },
+      "Package": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "g",
+              "kg",
+              "ml",
+              "l"
+            ]
+          },
+          "priceRials": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxQuantity": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "shippingGrams": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "unit",
+          "priceRials",
+          "maxQuantity",
+          "shippingGrams"
+        ],
+        "additionalProperties": false
+      },
+      "Section": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "OrderEvent": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "PublicSettings": {
+        "type": "object",
+        "properties": {
+          "freeShippingRials": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "supportUrl": {
+            "type": "string"
+          },
+          "mapEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "freeShippingRials",
+          "supportUrl",
+          "mapEnabled"
+        ],
+        "additionalProperties": false
+      },
+      "Analytics": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "orders": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "revenue": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "average": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "abandoned": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "required": [
+                "orders",
+                "revenue",
+                "average",
+                "abandoned"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "sales": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string"
+                },
+                "revenue": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "orders": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "required": [
+                "day",
+                "revenue",
+                "orders"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "views": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "revenue": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "views",
+                "quantity",
+                "revenue"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "searches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "searches": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "required": [
+                "query",
+                "searches"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "revenue": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "required": [
+                "name",
+                "revenue"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "customers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "phone": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "orders": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "revenue": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "required": [
+                "phone",
+                "name",
+                "orders",
+                "revenue"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "fulfillment": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "orders": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "required": [
+                "status",
+                "orders"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "messages": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "required": [
+                "status",
+                "messages"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "days": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "summary",
+          "sales",
+          "products",
+          "searches",
+          "categories",
+          "customers",
+          "fulfillment",
+          "notifications",
+          "days"
         ],
         "additionalProperties": false
       }
