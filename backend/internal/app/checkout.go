@@ -12,10 +12,12 @@ import (
 )
 
 type quoteResult struct {
-	SubtotalRials int64 `json:"subtotalRials"`
-	ShippingRials int64 `json:"shippingRials"`
-	TotalRials    int64 `json:"totalRials"`
-	WeightGrams   int64 `json:"weightGrams"`
+	DiscountCode  string `json:"discountCode"`
+	DiscountRials int64  `json:"discountRials"`
+	SubtotalRials int64  `json:"subtotalRials"`
+	ShippingRials int64  `json:"shippingRials"`
+	TotalRials    int64  `json:"totalRials"`
+	WeightGrams   int64  `json:"weightGrams"`
 }
 
 func calculateQuote(ctx context.Context, q querier, c domain.Cart, province string) (quoteResult, error) {
@@ -52,7 +54,8 @@ func (a *App) quote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Province string `json:"province"`
+		Province     string `json:"province"`
+		DiscountCode string `json:"discountCode"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -63,6 +66,9 @@ func (a *App) quote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, e := calculateQuote(r.Context(), a.Pool, c, in.Province)
+	if e == nil {
+		e = applyDiscount(r.Context(), a.Pool, &v, in.DiscountCode, false)
+	}
 	if e != nil {
 		fail(w, 400, e.Error())
 		return
@@ -75,6 +81,7 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 	}
 	var in struct {
 		Address            domain.Address `json:"address"`
+		DiscountCode       string         `json:"discountCode"`
 		ExpectedTotalRials int64          `json:"expectedTotalRials"`
 		IdempotencyKey     string         `json:"idempotencyKey"`
 	}
@@ -138,6 +145,9 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, e := calculateQuote(r.Context(), tx, c, in.Address.Province)
+	if e == nil {
+		e = applyDiscount(r.Context(), tx, &v, in.DiscountCode, true)
+	}
 	if e != nil {
 		fail(w, 409, e.Error())
 		return
@@ -148,7 +158,7 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 	}
 	id := token()
 	address, _ := json.Marshal(in.Address)
-	_, e = tx.Exec(r.Context(), `INSERT INTO orders(id,user_id,idempotency_key,status,address,subtotal_rials,shipping_rials,total_rials,reservation_expires_at) VALUES($1,$2,$3,'pending',$4,$5,$6,$7,now()+interval '15 minutes')`, id, s.UserID, in.IdempotencyKey, address, v.SubtotalRials, v.ShippingRials, v.TotalRials)
+	_, e = tx.Exec(r.Context(), `INSERT INTO orders(id,user_id,idempotency_key,status,address,subtotal_rials,shipping_rials,total_rials,reservation_expires_at,discount_code,discount_rials) VALUES($1,$2,$3,'pending',$4,$5,$6,$7,now()+interval '15 minutes',nullif($8,''),$9)`, id, s.UserID, in.IdempotencyKey, address, v.SubtotalRials, v.ShippingRials, v.TotalRials, v.DiscountCode, v.DiscountRials)
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -178,7 +188,7 @@ func loadOrders(ctx context.Context, q querier, user string, ids ...string) ([]d
 	if len(ids) > 0 {
 		id = ids[0]
 	}
-	rows, e := q.Query(ctx, "SELECT id,status,address,subtotal_rials,shipping_rials,total_rials,tracking,created_at FROM orders WHERE ($1='' OR user_id=$1) AND ($2='' OR id=$2) ORDER BY created_at DESC LIMIT 100", user, id)
+	rows, e := q.Query(ctx, "SELECT id,status,address,subtotal_rials,shipping_rials,total_rials,tracking,created_at,coalesce(discount_code,''),discount_rials FROM orders WHERE ($1='' OR user_id=$1) AND ($2='' OR id=$2) ORDER BY created_at DESC LIMIT 100", user, id)
 	if e != nil {
 		return nil, e
 	}
@@ -187,7 +197,7 @@ func loadOrders(ctx context.Context, q querier, user string, ids ...string) ([]d
 		var v domain.Order
 		var raw []byte
 		var date time.Time
-		if e = rows.Scan(&v.ID, &v.Status, &raw, &v.SubtotalRials, &v.ShippingRials, &v.TotalRials, &v.Tracking, &date); e != nil {
+		if e = rows.Scan(&v.ID, &v.Status, &raw, &v.SubtotalRials, &v.ShippingRials, &v.TotalRials, &v.Tracking, &date, &v.DiscountCode, &v.DiscountRials); e != nil {
 			rows.Close()
 			return nil, e
 		}
@@ -282,9 +292,9 @@ func (a *App) settle(ctx context.Context, id, user string, success bool) (string
 		return "", e
 	}
 	defer tx.Rollback(ctx)
-	var status string
+	var status, discountCode string
 	var expires time.Time
-	e = tx.QueryRow(ctx, "SELECT status,reservation_expires_at FROM orders WHERE id=$1 AND user_id=$2 FOR UPDATE", id, user).Scan(&status, &expires)
+	e = tx.QueryRow(ctx, "SELECT status,reservation_expires_at,coalesce(discount_code,'') FROM orders WHERE id=$1 AND user_id=$2 FOR UPDATE", id, user).Scan(&status, &expires, &discountCode)
 	if e != nil {
 		return "", errors.New("سفارش پیدا نشد")
 	}
@@ -331,6 +341,13 @@ func (a *App) settle(ctx context.Context, id, user string, success bool) (string
 		if status == "expired" && stock-reserved < it.g {
 			available = false
 		}
+	}
+	if success && status == "expired" {
+		capacity, err := reclaimDiscount(ctx, tx, discountCode)
+		if err != nil {
+			return "", err
+		}
+		available = available && capacity
 	}
 	final := "cancelled"
 	if success {

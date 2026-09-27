@@ -129,7 +129,9 @@ type OrderItem struct {
 	TotalRials   int64  `json:"totalRials"`
 }
 type Order struct {
-	Events []OrderEvent `json:"events"`
+	DiscountCode  string       `json:"discountCode"`
+	DiscountRials int64        `json:"discountRials"`
+	Events        []OrderEvent `json:"events"`
 
 	ID            string      `json:"id"`
 	Status        string      `json:"status"`

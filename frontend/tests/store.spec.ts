@@ -1,19 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
-import { createHmac } from "node:crypto";
+import { loginStaff } from "./staff-login";
 const phone = () => `091${String(Date.now()).slice(-8)}`;
-function totp() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  let bits = "";
-  for (const c of "JBSWY3DPEHPK3PXP")
-    bits += chars.indexOf(c).toString(2).padStart(5, "0");
-  const key = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)));
-  const b = Buffer.alloc(8);
-  b.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
-  const digest = createHmac("sha1", key).update(b).digest();
-  return String(
-    (digest.readUInt32BE(digest[19] & 15) & 0x7fffffff) % 1000000,
-  ).padStart(6, "0");
-}
 async function loginCustomer(page: Page) {
   await page.getByLabel("شماره همراه", { exact: true }).fill(phone());
   const response = page.waitForResponse(
@@ -126,16 +113,14 @@ test("SMS login, shipping quote, payment and order history", async ({
 test("employee drafts through UI, owner publishes, customer finds product", async ({
   browser,
 }) => {
+  test.setTimeout(90000);
   const editorContext = await browser.newContext();
   const editor = await editorContext.newPage();
   const slug = "browser-" + Date.now();
   await editor.goto("/staff");
-  await editor.getByLabel("نام کاربری", { exact: true }).fill("editor");
-  await editor.getByLabel("گذرواژه", { exact: true }).fill("Bomish-demo-2026!");
-  await editor.getByLabel("کد برنامه رمزساز", { exact: true }).fill(totp());
-  await editor.getByRole("button", { name: "ورود به فضای کار" }).click();
+  await loginStaff(editor, "editor");
   await editor
-    .getByRole("button", { name: "+ افزودن محصول", exact: true })
+    .getByRole("button", { name: "افزودن محصول", exact: true })
     .click();
   await editor
     .getByLabel("نام محصول", { exact: true })
@@ -152,12 +137,25 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
     .getByLabel("معرفی کوتاه")
     .fill("توضیحات محصول آزمایشی برای بررسی رابط کاربری فروشگاه.");
   await editor
-    .getByRole("button", { name: "+ افزودن بسته", exact: true })
+    .getByRole("navigation", { name: "مراحل محصول" })
+    .getByRole("button", { name: "بسته‌ها و قیمت" })
     .click();
   await editor
-    .getByLabel("بارگذاری تصویر")
-    .setInputFiles("public/images/spices.png");
-  await expect(editor.getByRole("img", { name: "تصویر 1" })).toBeVisible();
+    .getByRole("button", { name: "افزودن بسته", exact: true })
+    .click();
+  await editor
+    .getByRole("navigation", { name: "مراحل محصول" })
+    .getByRole("button", { name: "تصاویر" })
+    .click();
+  await editor
+    .getByLabel("بارگذاری تصاویر")
+    .setInputFiles(["public/images/spices.png", "public/images/spices.png"]);
+  await expect(
+    editor.getByRole("img", { name: "تصویر 1", exact: true }),
+  ).toBeVisible();
+  await expect(
+    editor.getByRole("img", { name: "تصویر 2", exact: true }),
+  ).toBeVisible();
   await editor
     .getByRole("button", { name: "ذخیره پیش‌نویس", exact: true })
     .click();
@@ -170,21 +168,35 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
   const ownerContext = await browser.newContext();
   const owner = await ownerContext.newPage();
   await owner.goto("/staff");
-  await owner.getByLabel("نام کاربری", { exact: true }).fill("owner");
-  await owner.getByLabel("گذرواژه", { exact: true }).fill("Bomish-demo-2026!");
-  await owner.getByLabel("کد برنامه رمزساز", { exact: true }).fill(totp());
-  await owner.getByRole("button", { name: "ورود به فضای کار" }).click();
+  await loginStaff(owner, "owner");
   await owner
     .getByRole("row")
     .filter({ hasText: "ادویه آزمایش مرورگر" })
     .first()
     .getByRole("button", { name: "ویرایش" })
     .click();
-  await owner.getByLabel("قیمت بسته (تومان)").fill("180000");
+  await owner
+    .getByRole("navigation", { name: "مراحل محصول" })
+    .getByRole("button", { name: "بسته‌ها و قیمت" })
+    .click();
+  await owner.getByLabel("قیمت بسته (تومان)", { exact: true }).fill("۱۸۰۰۰۰");
+  await expect(
+    owner.getByLabel("قیمت بسته (تومان)", { exact: true }),
+  ).toHaveValue("180,000");
+  await owner
+    .getByRole("navigation", { name: "مراحل محصول" })
+    .getByRole("button", { name: "بررسی و انتشار" })
+    .click();
   await owner
     .getByRole("button", { name: "ذخیره و انتشار", exact: true })
     .click();
   await expect(owner.getByRole("status")).toContainText("محصول منتشر شد");
+  await owner.getByRole("button", { name: "ادامه ویرایش" }).click();
+  await owner
+    .getByRole("navigation", { name: "مراحل محصول" })
+    .getByRole("button", { name: "بسته‌ها و قیمت" })
+    .click();
+  await owner.getByText("موجودی و انبار", { exact: true }).click();
   await owner.getByLabel("تغییر موجودی به گرم (مثبت یا منفی)").fill("10000");
   await owner.getByLabel("دلیل تغییر").fill("موجودی آزمایشی");
   await owner.getByRole("button", { name: "ثبت تغییر موجودی" }).click();

@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func audit(r *http.Request, tx pgx.Tx, action, id string) error {
@@ -262,7 +263,7 @@ func (a *App) saveCategory(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, map[string]bool{"ok": true})
 }
 func (a *App) staffArticles(w http.ResponseWriter, r *http.Request) {
-	rows, e := a.Pool.Query(r.Context(), "SELECT a.id,a.slug,a.title,a.status,coalesce(d.content,a.content),a.updated_at,d.article_id IS NOT NULL FROM articles a LEFT JOIN article_drafts d ON d.article_id=a.id ORDER BY a.updated_at DESC")
+	rows, e := a.Pool.Query(r.Context(), "SELECT a.id,a.slug,a.title,a.status,coalesce(d.content,a.content),coalesce(d.updated_at,a.updated_at),d.article_id IS NOT NULL FROM articles a LEFT JOIN article_drafts d ON d.article_id=a.id ORDER BY coalesce(d.updated_at,a.updated_at) DESC")
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -272,7 +273,7 @@ func (a *App) staffArticles(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var raw []byte
 		var id, slug, title, status string
-		var updated any
+		var updated time.Time
 		var draft bool
 		if e = rows.Scan(&id, &slug, &title, &status, &raw, &updated, &draft); e != nil {
 			a.dbError(w, e)
@@ -281,6 +282,7 @@ func (a *App) staffArticles(w http.ResponseWriter, r *http.Request) {
 		var v domain.Article
 		_ = json.Unmarshal(raw, &v)
 		v.ID = id
+		v.UpdatedAt = updated.Format(time.RFC3339)
 		if !draft {
 			v.Slug = slug
 			v.Title = title
@@ -325,7 +327,7 @@ func (a *App) saveArticle(w http.ResponseWriter, r *http.Request) {
 				_, e = tx.Exec(r.Context(), "DELETE FROM article_drafts WHERE article_id=$1", v.ID)
 			}
 		} else {
-			_, e = tx.Exec(r.Context(), "INSERT INTO article_drafts(article_id,content) VALUES($1,$2) ON CONFLICT(article_id) DO UPDATE SET content=excluded.content", v.ID, raw)
+			_, e = tx.Exec(r.Context(), "INSERT INTO article_drafts(article_id,content) VALUES($1,$2) ON CONFLICT(article_id) DO UPDATE SET content=excluded.content,updated_at=now()", v.ID, raw)
 		}
 	}
 	if e == nil {

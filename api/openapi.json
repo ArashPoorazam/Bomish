@@ -941,6 +941,10 @@
                 "properties": {
                   "province": {
                     "type": "string"
+                  },
+                  "discountCode": {
+                    "type": "string",
+                    "maxLength": 32
                   }
                 },
                 "required": [
@@ -1024,6 +1028,10 @@
                   },
                   "idempotencyKey": {
                     "type": "string"
+                  },
+                  "discountCode": {
+                    "type": "string",
+                    "maxLength": 32
                   }
                 },
                 "required": [
@@ -2604,6 +2612,186 @@
           }
         ]
       }
+    },
+    "/staff/discount-codes": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DiscountCode"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      },
+      "post": {
+        "responses": {
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscountCode"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscountCodeInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/discount-codes/{code}": {
+      "patch": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "active"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3010,6 +3198,13 @@
             "items": {
               "$ref": "#/components/schemas/OrderEvent"
             }
+          },
+          "discountCode": {
+            "type": "string"
+          },
+          "discountRials": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "required": [
@@ -3022,7 +3217,9 @@
           "totalRials",
           "tracking",
           "createdAt",
-          "events"
+          "events",
+          "discountCode",
+          "discountRials"
         ],
         "additionalProperties": false
       },
@@ -3068,13 +3265,22 @@
           "weightGrams": {
             "type": "integer",
             "format": "int64"
+          },
+          "discountCode": {
+            "type": "string"
+          },
+          "discountRials": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "required": [
           "subtotalRials",
           "shippingRials",
           "totalRials",
-          "weightGrams"
+          "weightGrams",
+          "discountCode",
+          "discountRials"
         ],
         "additionalProperties": false
       },
@@ -3492,6 +3698,125 @@
           "fulfillment",
           "notifications",
           "days"
+        ],
+        "additionalProperties": false
+      },
+      "DiscountCodeInput": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 32
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "percent",
+              "fixed"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "minSubtotalRials": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxDiscountRials": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxUses": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "code",
+          "kind",
+          "value",
+          "minSubtotalRials",
+          "maxDiscountRials",
+          "maxUses",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "DiscountCode": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 32
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "percent",
+              "fixed"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "minSubtotalRials": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxDiscountRials": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxUses": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usedCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reservedCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "code",
+          "kind",
+          "value",
+          "minSubtotalRials",
+          "maxDiscountRials",
+          "maxUses",
+          "expiresAt",
+          "active",
+          "createdAt",
+          "usedCount",
+          "reservedCount"
         ],
         "additionalProperties": false
       }

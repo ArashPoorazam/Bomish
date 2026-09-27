@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { Article, Product } from "@/lib/types";
 import { RichText } from "@/components/rich-text";
@@ -19,33 +19,56 @@ export function ArticleEditor({
   products,
   owner,
   onSaved,
+  onStateChange,
 }: {
   article: Article;
   products: Product[];
   owner: boolean;
   onSaved: () => Promise<void>;
+  onStateChange: (state: { dirty: boolean; busy: boolean }) => void;
 }) {
-  const [a, setA] = useState(article),
-    [preview, setPreview] = useState(true),
+  const initial = { ...article, productIds: article.productIds || [] };
+  const [a, setA] = useState(initial),
+    [preview, setPreview] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(JSON.stringify(initial));
+  const feedback = useRef<HTMLDialogElement>(null);
+  const trigger = useRef<HTMLElement | null>(null);
+  const dirty = JSON.stringify(a) !== saved;
+  useEffect(() => onStateChange({ dirty, busy }), [dirty, busy, onStateChange]);
   useEffect(() => {
-    setA({ ...article, productIds: article.productIds || [] });
-  }, [article]);
+    if (message && !busy) feedback.current?.showModal();
+  }, [message, busy]);
   useEffect(() => {
-    setMessage("");
-    setError("");
-  }, [article.id]);
+    if (!dirty && !busy) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty, busy]);
   async function save(publish = false) {
+    trigger.current = document.activeElement as HTMLElement;
     setBusy(true);
     setError("");
+    setMessage("");
     try {
       await api("/staff/articles/" + a.id, "PUT", {
         ...a,
         status: publish ? "published" : "draft",
       });
-      await onSaved();
+      const next = { ...a, status: publish ? "published" : "draft" } as Article;
+      setA(next);
+      setSaved(JSON.stringify(next));
+      try {
+        await onSaved();
+      } catch {
+        setError(
+          "مقاله ذخیره شد، اما فهرست به‌روز نشد. صفحه را دوباره باز کنید.",
+        );
+      }
       setMessage(publish ? "مقاله منتشر شد." : "پیش‌نویس ذخیره شد.");
     } catch (e) {
       setError((e as Error).message);
@@ -54,96 +77,110 @@ export function ArticleEditor({
     }
   }
   return (
-    <div className="form-card stack">
-      <h2>{a.title || "مقاله جدید"}</h2>
-      <label>
-        عنوان
-        <input
-          value={a.title}
-          onChange={(e) => setA({ ...a, title: e.target.value })}
-        />
-      </label>
-      <label>
-        نشانی صفحه
-        <input
-          dir="ltr"
-          value={a.slug}
-          onChange={(e) => setA({ ...a, slug: e.target.value })}
-        />
-      </label>
-      <label>
-        خلاصه
-        <textarea
-          value={a.excerpt}
-          onChange={(e) => setA({ ...a, excerpt: e.target.value })}
-        />
-      </label>
-      <label>
-        متن مقاله · Markdown با پیش‌نمایش زنده
-        <textarea
-          style={{ minHeight: 300 }}
-          value={a.body}
-          onChange={(e) => setA({ ...a, body: e.target.value })}
-        />
-      </label>
-      <label>
-        تصویر اصلی
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          disabled={busy}
-          onChange={async (e) => {
-            if (!e.target.files?.[0]) return;
-            setBusy(true);
-            try {
-              const f = new FormData();
-              f.set("image", e.target.files[0]);
-              const v = await api<{ url: string }>("/staff/uploads", "POST", f);
-              setA({ ...a, image: v.url });
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        />
-      </label>
-      {a.image ? <p className="muted">تصویر انتخاب شده است.</p> : null}
-      <fieldset>
-        <legend>محصولات مرتبط</legend>
-        {products.map((p) => (
-          <label key={p.id} className="check-label">
-            <input
-              type="checkbox"
-              checked={a.productIds.includes(p.id)}
-              onChange={(e) =>
-                setA({
-                  ...a,
-                  productIds: e.target.checked
-                    ? [...a.productIds, p.id]
-                    : a.productIds.filter((id) => id !== p.id),
-                })
+    <div className="form-card stack article-editor">
+      <div>
+        <span className="eyebrow">ویرایش مقاله</span>
+        <h2>{a.title || "مقاله جدید"}</h2>
+        <p>
+          {dirty ? "تغییرات ذخیره نشده" : "متن و تصویر مقاله را آماده کنید."}
+        </p>
+      </div>
+      <fieldset disabled={busy} className="product-step-fields stack">
+        <label>
+          عنوان
+          <input
+            value={a.title}
+            onChange={(e) => setA({ ...a, title: e.target.value })}
+          />
+        </label>
+        <label>
+          نشانی صفحه
+          <input
+            dir="ltr"
+            value={a.slug}
+            onChange={(e) => setA({ ...a, slug: e.target.value })}
+          />
+        </label>
+        <label>
+          خلاصه
+          <textarea
+            value={a.excerpt}
+            onChange={(e) => setA({ ...a, excerpt: e.target.value })}
+          />
+        </label>
+        <label>
+          متن مقاله · Markdown با پیش‌نمایش زنده
+          <textarea
+            style={{ minHeight: 300 }}
+            value={a.body}
+            onChange={(e) => setA({ ...a, body: e.target.value })}
+          />
+        </label>
+        <label>
+          تصویر اصلی
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            disabled={busy}
+            onChange={async (e) => {
+              if (!e.target.files?.[0]) return;
+              setBusy(true);
+              try {
+                const f = new FormData();
+                f.set("image", e.target.files[0]);
+                const v = await api<{ url: string }>(
+                  "/staff/uploads",
+                  "POST",
+                  f,
+                );
+                setA({ ...a, image: v.url });
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
               }
-            />
-            {p.name}
-          </label>
-        ))}
+            }}
+          />
+        </label>
+        {a.image ? <p className="muted">تصویر انتخاب شده است.</p> : null}
+        <fieldset>
+          <legend>محصولات مرتبط</legend>
+          {products.map((p) => (
+            <label key={p.id} className="check-label">
+              <input
+                type="checkbox"
+                checked={a.productIds.includes(p.id)}
+                onChange={(e) =>
+                  setA({
+                    ...a,
+                    productIds: e.target.checked
+                      ? [...a.productIds, p.id]
+                      : a.productIds.filter((id) => id !== p.id),
+                  })
+                }
+              />
+              {p.name}
+            </label>
+          ))}
+        </fieldset>
       </fieldset>
       <div className="inline-actions">
-        <button className="button" disabled={busy} onClick={() => save()}>
+        <button
+          className="button secondary"
+          disabled={busy}
+          onClick={() => save()}
+        >
           ذخیره پیش‌نویس
         </button>
         {owner ? (
-          <button
-            className="button secondary"
-            disabled={busy}
-            onClick={() => save(true)}
-          >
+          <button className="button" disabled={busy} onClick={() => save(true)}>
             انتشار مقاله
           </button>
         ) : null}
         <button
           className="button secondary"
+          disabled={busy}
+          aria-expanded={preview}
           onClick={() => setPreview(!preview)}
         >
           پیش‌نمایش
@@ -160,11 +197,24 @@ export function ArticleEditor({
           {error}
         </p>
       ) : null}
-      {message ? (
-        <p className="success" role="status">
-          {message}
-        </p>
-      ) : null}
+      <dialog
+        ref={feedback}
+        className="product-feedback"
+        aria-labelledby="article-feedback-title"
+        onClose={() => {
+          setMessage("");
+          trigger.current?.focus();
+        }}
+      >
+        <h2 id="article-feedback-title">{message}</h2>
+        <p role="status">{a.title}</p>
+        <button
+          className="button full"
+          onClick={() => feedback.current?.close()}
+        >
+          ادامه ویرایش
+        </button>
+      </dialog>
     </div>
   );
 }

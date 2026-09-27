@@ -1,9 +1,5 @@
 "use client";
-import {
-  CatalogManager,
-  CategoryManager,
-  PriceManager,
-} from "./catalog-manager";
+import { CatalogManager, CategoryManager } from "./catalog-manager";
 import { Analytics } from "./analytics";
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
@@ -16,7 +12,8 @@ import type {
   Member,
 } from "@/lib/types";
 import { useStore } from "@/components/store-provider";
-import { newArticle, ArticleEditor } from "./article-editor";
+import { ArticleManager } from "./article-manager";
+import { PriceManager } from "./price-manager";
 import { OrderManager, ShippingEditor, Members } from "./operations";
 import { date, digits, statuses } from "@/lib/format";
 export function Dashboard() {
@@ -29,9 +26,19 @@ export function Dashboard() {
     [orders, setOrders] = useState<Order[]>([]),
     [shipping, setShipping] = useState<ShippingConfig | null>(null),
     [members, setMembers] = useState<Member[]>([]),
-    [events, setEvents] = useState<Record<string, string>[]>([]),
-    [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+    [events, setEvents] = useState<Record<string, string>[]>([]);
   const role = user?.role || "";
+  const [productEditorState, setProductEditorState] = useState({
+    dirty: false,
+    busy: false,
+  });
+  function canLeaveProduct() {
+    return (
+      !productEditorState.busy &&
+      (!productEditorState.dirty ||
+        window.confirm("تغییرات ذخیره نشده‌اند. بدون ذخیره خارج می‌شوید؟"))
+    );
+  }
   const reload = useCallback(async () => {
     if (!role) return;
     const content = role === "owner" || role === "editor";
@@ -44,9 +51,6 @@ export function Dashboard() {
       setProducts(p);
       setCategories(c);
       setArticles(a);
-      setSelectedArticle((current) =>
-        current ? a.find((item) => item.id === current.id) || current : null,
-      );
     }
     if (role === "owner" || role === "operator")
       setOrders(await api<Order[]>("/staff/orders"));
@@ -94,7 +98,9 @@ export function Dashboard() {
         </div>
         <button
           className="button secondary"
+          disabled={productEditorState.busy}
           onClick={async () => {
+            if (!canLeaveProduct()) return;
             try {
               await api("/logout", "POST");
               await refresh();
@@ -118,7 +124,10 @@ export function Dashboard() {
           <button
             key={key}
             className={tab === key ? "selected" : ""}
+            disabled={productEditorState.busy}
             onClick={() => {
+              if (tab === key || !canLeaveProduct()) return;
+              setProductEditorState({ dirty: false, busy: false });
               setTab(key);
               setError("");
             }}
@@ -138,36 +147,17 @@ export function Dashboard() {
           categories={categories}
           owner={role === "owner"}
           reload={reload}
+          onEditorStateChange={setProductEditorState}
         />
       ) : null}
       {tab === "articles" ? (
-        <div className="dashboard-grid">
-          <aside className="dashboard-list">
-            <button onClick={() => setSelectedArticle(newArticle())}>
-              + مقاله جدید
-            </button>
-            {articles.map((a) => (
-              <button
-                key={a.id}
-                className={selectedArticle?.id === a.id ? "selected" : ""}
-                onClick={() => setSelectedArticle(a)}
-              >
-                {a.title}
-                <small>{statuses[a.status]}</small>
-              </button>
-            ))}
-          </aside>
-          {selectedArticle ? (
-            <ArticleEditor
-              article={selectedArticle}
-              products={products}
-              owner={role === "owner"}
-              onSaved={reload}
-            />
-          ) : (
-            <div className="empty-state">مقاله‌ای را انتخاب کنید.</div>
-          )}
-        </div>
+        <ArticleManager
+          articles={articles}
+          products={products}
+          owner={role === "owner"}
+          reload={reload}
+          onEditorStateChange={setProductEditorState}
+        />
       ) : null}
       {tab === "categories" ? (
         <CategoryManager
@@ -177,7 +167,11 @@ export function Dashboard() {
         />
       ) : null}
       {tab === "pricing" && role === "owner" ? (
-        <PriceManager products={products} reload={reload} />
+        <PriceManager
+          products={products}
+          reload={reload}
+          onStateChange={setProductEditorState}
+        />
       ) : null}
       {tab === "analytics" && role === "owner" ? <Analytics /> : null}
       {tab === "orders" ? (
@@ -210,6 +204,10 @@ export function Dashboard() {
                         "inventory.adjust": "اصلاح موجودی",
                         "article.save": "ذخیره مقاله",
                         "shipping.update": "تنظیم ارسال",
+                        "discount.create": "ساخت کد تخفیف",
+                        "discount.update": "تغییر وضعیت کد تخفیف",
+                        "pricing.discount": "تخفیف محصولات",
+                        "pricing.adjust": "اصلاح قیمت بسته‌ها",
                         "staff.update": "مدیریت همکار",
                         "order.packing": "آماده‌سازی سفارش",
                         "order.shipped": "ارسال سفارش",

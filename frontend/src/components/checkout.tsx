@@ -11,7 +11,7 @@ import type { Address, Quote, Order } from "@/lib/types";
 import { useStore } from "./store-provider";
 import { LoginForm } from "./login-form";
 import { money, weight, digits } from "@/lib/format";
-import { CheckCircle2, ArrowLeft } from "lucide-react";
+import { CheckCircle2, ArrowLeft, TicketPercent } from "lucide-react";
 const blank: Address = {
   id: "",
   recipient: "",
@@ -66,6 +66,23 @@ export function Checkout() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [key, setKey] = useState("");
+  const [codeInput, setCodeInput] = useState("");
+  const [appliedCode, setAppliedCode] = useState("");
+  const [codeError, setCodeError] = useState("");
+  const cartSnapshot = JSON.stringify(
+    cart.items.map((item) => [
+      item.product.id,
+      item.package.id,
+      item.quantity,
+      item.totalRials,
+    ]),
+  );
+  useEffect(() => {
+    if (!orderId) {
+      setQuote(null);
+      setKey(crypto.randomUUID());
+    }
+  }, [cartSnapshot, orderId]);
   useEffect(() => {
     setKey(crypto.randomUUID());
   }, []);
@@ -87,10 +104,34 @@ export function Checkout() {
     try {
       const q = await api<Quote>("/checkout/quote", "POST", {
         province: address.province,
+        discountCode: appliedCode,
       });
       setQuote(q);
+      setCodeError("");
     } catch (e) {
+      setQuote(null);
       setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function applyCode(remove = false) {
+    if (busy || orderId) return;
+    setBusy(true);
+    setCodeError("");
+    try {
+      const next = remove ? "" : codeInput.trim().toUpperCase();
+      const result = await api<Quote>("/checkout/quote", "POST", {
+        province: address.province,
+        discountCode: next,
+      });
+      // Only an address-validated quote can unlock placing the order.
+      if (quote) setQuote(result);
+      setAppliedCode(result.discountCode);
+      setCodeInput(result.discountCode);
+      setKey(crypto.randomUUID());
+    } catch (e) {
+      setCodeError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -109,6 +150,7 @@ export function Checkout() {
         address: a,
         expectedTotalRials: quote.totalRials,
         idempotencyKey: key,
+        discountCode: quote.discountCode,
       });
       setOrderId(response.orderId);
       if (save && !address.id) {
@@ -220,110 +262,116 @@ export function Checkout() {
             </div>
           ) : (
             <form onSubmit={getQuote} className="stack">
-              <h2>سفارش را کجا بفرستیم؟</h2>
-              {saved.length > 0 ? (
-                <label>
-                  نشانی‌های ذخیره‌شده
-                  <select
-                    value={address.id}
-                    onChange={(e) => {
-                      setAddress(
-                        saved.find((a) => a.id === e.target.value) || blank,
-                      );
-                      setQuote(null);
-                    }}
-                  >
-                    <option value="">نشانی جدید</option>
-                    {saved.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.recipient} — {a.city}، {a.street}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-              <AddressMap
-                key={address.id || "new"}
-                address={address}
-                onChange={(v) => {
-                  setAddress(v);
-                  setQuote(null);
-                }}
-              />
-              <div className="form-grid">
-                <label>
-                  نام گیرنده
-                  <input
-                    autoComplete="name"
-                    required
-                    value={address.recipient}
-                    onChange={(e) => update("recipient", e.target.value)}
-                  />
-                </label>
-                <label>
-                  شماره همراه گیرنده
-                  <input
-                    type="tel"
-                    autoComplete="tel"
-                    required
-                    value={address.phone}
-                    onChange={(e) => update("phone", e.target.value)}
-                  />
-                </label>
-                <label>
-                  استان
-                  <select
-                    value={address.province}
-                    onChange={(e) => update("province", e.target.value)}
-                  >
-                    {provinces.map((p) => (
-                      <option key={p}>{p}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  شهر
-                  <input
-                    autoComplete="address-level2"
-                    required
-                    value={address.city}
-                    onChange={(e) => update("city", e.target.value)}
-                  />
-                </label>
-                <label className="span-2">
-                  نشانی کامل، پلاک و واحد
-                  <textarea
-                    autoComplete="street-address"
-                    required
-                    minLength={10}
-                    value={address.street}
-                    onChange={(e) => update("street", e.target.value)}
-                  />
-                </label>
-                <label>
-                  کد پستی
-                  <input
-                    inputMode="numeric"
-                    autoComplete="postal-code"
-                    required
-                    minLength={10}
-                    maxLength={10}
-                    value={address.postalCode}
-                    onChange={(e) => update("postalCode", e.target.value)}
-                  />
-                </label>
-              </div>
-              <label className="check-label">
-                <input
-                  type="checkbox"
-                  checked={save}
-                  onChange={(e) => setSave(e.target.checked)}
+              <fieldset
+                className="product-step-fields stack"
+                disabled={busy}
+                inert={busy}
+              >
+                <h2>سفارش را کجا بفرستیم؟</h2>
+                {saved.length > 0 ? (
+                  <label>
+                    نشانی‌های ذخیره‌شده
+                    <select
+                      value={address.id}
+                      onChange={(e) => {
+                        setAddress(
+                          saved.find((a) => a.id === e.target.value) || blank,
+                        );
+                        setQuote(null);
+                      }}
+                    >
+                      <option value="">نشانی جدید</option>
+                      {saved.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.recipient} — {a.city}، {a.street}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+                <AddressMap
+                  key={address.id || "new"}
+                  address={address}
+                  onChange={(v) => {
+                    setAddress(v);
+                    setQuote(null);
+                  }}
                 />
-                ذخیره نشانی برای خرید بعدی
-              </label>
-              <button className="button" disabled={busy}>
-                محاسبه هزینه ارسال <ArrowLeft size={18} />
-              </button>
+                <div className="form-grid">
+                  <label>
+                    نام گیرنده
+                    <input
+                      autoComplete="name"
+                      required
+                      value={address.recipient}
+                      onChange={(e) => update("recipient", e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    شماره همراه گیرنده
+                    <input
+                      type="tel"
+                      autoComplete="tel"
+                      required
+                      value={address.phone}
+                      onChange={(e) => update("phone", e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    استان
+                    <select
+                      value={address.province}
+                      onChange={(e) => update("province", e.target.value)}
+                    >
+                      {provinces.map((p) => (
+                        <option key={p}>{p}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    شهر
+                    <input
+                      autoComplete="address-level2"
+                      required
+                      value={address.city}
+                      onChange={(e) => update("city", e.target.value)}
+                    />
+                  </label>
+                  <label className="span-2">
+                    نشانی کامل، پلاک و واحد
+                    <textarea
+                      autoComplete="street-address"
+                      required
+                      minLength={10}
+                      value={address.street}
+                      onChange={(e) => update("street", e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    کد پستی
+                    <input
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      required
+                      minLength={10}
+                      maxLength={10}
+                      value={address.postalCode}
+                      onChange={(e) => update("postalCode", e.target.value)}
+                    />
+                  </label>
+                </div>
+                <label className="check-label">
+                  <input
+                    type="checkbox"
+                    checked={save}
+                    onChange={(e) => setSave(e.target.checked)}
+                  />
+                  ذخیره نشانی برای خرید بعدی
+                </label>
+                <button className="button" disabled={busy}>
+                  محاسبه هزینه ارسال <ArrowLeft size={18} />
+                </button>
+              </fieldset>
             </form>
           )}
           {error ? (
@@ -345,6 +393,67 @@ export function Checkout() {
               <span>{money(it.totalRials)} تومان</span>
             </div>
           ))}
+          {!orderId && (
+            <form
+              className="checkout-code"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void applyCode();
+              }}
+            >
+              <label htmlFor="checkout-discount-code">
+                <TicketPercent size={18} />
+                کد تخفیف دارید؟
+              </label>
+              <div>
+                <input
+                  id="checkout-discount-code"
+                  aria-label="کد تخفیف"
+                  placeholder="کد را وارد کنید"
+                  dir="ltr"
+                  maxLength={32}
+                  autoComplete="off"
+                  disabled={busy}
+                  value={codeInput}
+                  onChange={(e) => {
+                    setCodeInput(e.target.value);
+                    setCodeError("");
+                  }}
+                />
+                <button
+                  className="button secondary"
+                  disabled={busy || !codeInput.trim() || !quote}
+                >
+                  اعمال کد
+                </button>
+              </div>
+              {!quote && (
+                <small className="muted">
+                  ابتدا نشانی را کامل و هزینه ارسال را محاسبه کنید.
+                </small>
+              )}
+              {appliedCode && (
+                <div className="applied-code">
+                  <span>
+                    کد <bdi>{appliedCode}</bdi>
+                    {quote ? " اعمال شد" : "؛ نیازمند محاسبه دوباره"}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void applyCode(true)}
+                  >
+                    حذف کد
+                  </button>
+                </div>
+              )}
+              {codeError && (
+                <p role="alert" className="error">
+                  {codeError}
+                </p>
+              )}
+            </form>
+          )}
           <div className="summary-line">
             <span>جمع محصولات</span>
             <strong>{money(cart.subtotalRials)} تومان</strong>
@@ -359,6 +468,14 @@ export function Checkout() {
                 : "پس از انتخاب نشانی"}
             </span>
           </div>
+          {quote && quote.discountRials > 0 && (
+            <div className="summary-line coupon-saving">
+              <span>
+                تخفیف کد <bdi>{quote.discountCode}</bdi>
+              </span>
+              <strong>−{money(quote.discountRials)} تومان</strong>
+            </div>
+          )}
           {quote ? (
             <>
               <div className="summary-line">
@@ -517,6 +634,14 @@ export function OrderView({
           </li>
         ))}
       </ul>
+      {o.discountRials > 0 && (
+        <div className="summary-line coupon-saving">
+          <span>
+            تخفیف کد <bdi>{o.discountCode}</bdi>
+          </span>
+          <strong>−{money(o.discountRials)} تومان</strong>
+        </div>
+      )}
       <div className="between">
         <strong>جمع با ارسال: {money(o.totalRials)} تومان</strong>
         {children}

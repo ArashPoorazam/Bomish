@@ -1,10 +1,26 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  ClipboardCheck,
+  Eye,
+  Save,
+  Send,
+  X,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import type { Product, Category } from "@/lib/types";
 import { RichText } from "@/components/rich-text";
-import { digits, statuses } from "@/lib/format";
+import { digits, fa, money, packageLabel, statuses } from "@/lib/format";
+import { normalizeProduct, productIssues, productSteps } from "./product-form";
+import { ProductBasics, ProductDetails } from "./product-content-fields";
+import { ProductImages } from "./product-images";
+import { ProductPackages } from "./product-packages";
+
 export function newProduct(): Product {
   return {
     id: crypto.randomUUID(),
@@ -36,647 +52,504 @@ export function newProduct(): Product {
     nutrientSource: "",
   };
 }
+
 export function ProductEditor({
   product,
   products,
   categories,
   owner,
   onSaved,
+  onStateChange,
 }: {
   product: Product;
   products: Product[];
   categories: Category[];
   owner: boolean;
   onSaved: () => Promise<void>;
+  onStateChange: (state: { dirty: boolean; busy: boolean }) => void;
 }) {
-  const [p, setP] = useState(product),
-    [message, setMessage] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [preview, setPreview] = useState(false),
-    [delta, setDelta] = useState(""),
-    [reason, setReason] = useState("");
+  // Normalize before the first render: legacy API records contain null arrays.
+  const [p, setP] = useState(() => normalizeProduct(product));
+  const [saved, setSaved] = useState(() =>
+    JSON.stringify(normalizeProduct(product)),
+  );
+  const [step, setStep] = useState(0);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState<{
+    title: string;
+    body: string;
+  } | null>(null);
+  const [preview, setPreview] = useState(false);
+  const [delta, setDelta] = useState("");
+  const [reason, setReason] = useState("");
+  const [stockMessage, setStockMessage] = useState("");
+  const heading = useRef<HTMLHeadingElement>(null);
+  const feedback = useRef<HTMLDialogElement>(null);
+  const feedbackTrigger = useRef<HTMLElement | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const dirty = JSON.stringify(p) !== saved;
+  const locked = !!busy || uploading;
+  const existing = products.find((x) => x.id === p.id);
+  const issues = productIssues(p, true);
   useEffect(() => {
-    setP({
-      ...product,
-      images: product.images || [],
-      tags: product.tags || [],
-      aliases: product.aliases || [],
-      relatedIds: product.relatedIds || [],
-      nutrients: product.nutrients || [],
-      packages: product.packages || [],
-      sections: product.sections || [],
-    });
-  }, [product]);
+    onStateChange({ dirty, busy: locked });
+  }, [dirty, locked, onStateChange]);
   useEffect(() => {
-    setMessage("");
+    if (!dirty && !locked) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty, locked]);
+  useEffect(() => {
+    if (message && !locked) feedback.current?.showModal();
+  }, [message, locked]);
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+  function field<K extends keyof Product>(key: K, value: Product[K]) {
+    setP((current) => ({ ...current, [key]: value }));
     setError("");
-  }, [product.id]);
-  function field<K extends keyof Product>(k: K, v: Product[K]) {
-    setP((x) => ({ ...x, [k]: v }));
   }
-  async function save(publish = false) {
-    setBusy(true);
-    setMessage("");
+  function go(next: number) {
+    setStep(next);
     setError("");
+    requestAnimationFrame(() => heading.current?.focus());
+  }
+  async function save(publish: boolean) {
+    if (locked) return;
+    feedbackTrigger.current = document.activeElement as HTMLElement;
+    const invalid = productIssues(p, publish);
+    if (invalid.length) {
+      setStep(invalid[0].step);
+      setError(invalid[0].text);
+      return;
+    }
+    setBusy(publish ? "publish" : "draft");
+    setError("");
+    let draftSaved = false;
     try {
       await api("/staff/products/" + p.id, "PUT", p);
+      draftSaved = true;
+      setSaved(JSON.stringify(p));
       if (publish) await api("/staff/products/" + p.id + "/publish", "POST");
-      await onSaved();
+      const next = { ...p, status: publish ? "published" : "draft" } as Product;
+      setP(next);
+      setSaved(JSON.stringify(next));
       setMessage(
         publish
-          ? "محصول منتشر شد."
-          : "پیش‌نویس ذخیره شد؛ نسخه عمومی تا تأیید مالک تغییر نمی‌کند.",
+          ? {
+              title: "محصول منتشر شد",
+              body: `«${p.name}» اکنون در فروشگاه قابل مشاهده است.`,
+            }
+          : {
+              title: "پیش‌نویس ذخیره شد",
+              body: "می‌توانید بعداً ادامه دهید. نسخه عمومی تا زمان انتشار تغییر نمی‌کند.",
+            },
       );
+      try {
+        await onSaved();
+      } catch {
+        setError(
+          "محصول ذخیره شد، اما فهرست به‌روز نشد. برای دریافت فهرست تازه صفحه را دوباره باز کنید.",
+        );
+      }
     } catch (e) {
-      setError((e as Error).message);
+      if (draftSaved) {
+        const next = { ...p, status: "draft" } as Product;
+        setP(next);
+        setSaved(JSON.stringify(next));
+      }
+      setError(
+        (draftSaved ? "پیش‌نویس ذخیره شد، اما انتشار انجام نشد: " : "") +
+          (e as Error).message,
+      );
     } finally {
-      setBusy(false);
-    }
-  }
-  async function upload(file?: File) {
-    if (!file) return;
-    setBusy(true);
-    try {
-      const form = new FormData();
-      form.set("image", file);
-      const v = await api<{ url: string }>("/staff/uploads", "POST", form);
-      field("images", [...p.images, v.url]);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
+      setBusy("");
     }
   }
   async function stock() {
-    setBusy(true);
+    setBusy("stock");
     setError("");
+    setStockMessage("");
     try {
       await api(`/staff/products/${p.id}/inventory`, "POST", {
         deltaGrams: Number(digits(delta)),
         reason,
       });
-      setMessage("موجودی به‌روز شد.");
+      setStockMessage("موجودی به‌روز شد.");
       setDelta("");
+      setReason("");
       await onSaved();
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      setBusy("");
     }
   }
   return (
-    <div className="form-card">
-      <div className="between">
-        <h2>{p.name || "محصول جدید"}</h2>
-        <span className="badge">{statuses[p.status]}</span>
+    <div className="form-card product-wizard" aria-busy={locked}>
+      <div className="product-editor-heading">
+        <div>
+          <span className="eyebrow">
+            {existing ? "ویرایش محصول" : "محصول جدید"}
+          </span>
+          <h2>{p.name || "افزودن محصول"}</h2>
+        </div>
+        <div className="product-save-state">
+          <span className="badge">{statuses[p.status]}</span>
+          <small>
+            {locked
+              ? "در حال انجام…"
+              : dirty
+                ? "تغییرات ذخیره نشده"
+                : existing
+                  ? "همه تغییرات ذخیره شده"
+                  : "هنوز ذخیره نشده"}
+          </small>
+        </div>
       </div>
+      <nav className="product-steps" aria-label="مراحل محصول">
+        {productSteps.map((item, i) => (
+          <button
+            key={item.title}
+            type="button"
+            aria-current={i === step ? "step" : undefined}
+            disabled={locked}
+            onClick={() => go(i)}
+          >
+            <span className="step-number">
+              {i < step && !issues.some((issue) => issue.step === i) ? (
+                <Check size={16} aria-hidden="true" />
+              ) : (
+                fa(i + 1)
+              )}
+            </span>
+            <span>{item.title}</span>
+          </button>
+        ))}
+      </nav>
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          save();
+          if (step < 4) go(step + 1);
+          else void save(false);
         }}
-        className="stack"
-        style={{ marginTop: 24 }}
       >
-        <div className="form-grid">
-          <label>
-            نام محصول
-            <input
-              required
-              value={p.name}
-              onChange={(e) => field("name", e.target.value)}
-            />
-          </label>
-          <label>
-            نشانی صفحه
-            <input
-              required
-              dir="ltr"
-              value={p.slug}
-              onChange={(e) => field("slug", e.target.value)}
-              placeholder="turmeric"
-            />
-          </label>
-          <label>
-            دسته‌بندی
-            <select
-              aria-label="دسته‌بندی"
-              required
-              value={p.categoryId}
-              onChange={(e) => field("categoryId", e.target.value)}
-            >
-              <option value="">انتخاب کنید</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="span-2">
-            خلاصه محصول
-            <input
-              required
-              value={p.summary}
-              onChange={(e) => field("summary", e.target.value)}
-            />
-          </label>
-          <label className="span-2">
-            معرفی کوتاه
-            <textarea
-              value={p.description}
-              onChange={(e) => field("description", e.target.value)}
-            />
-          </label>
-        </div>
-        {p.description && (
-          <details>
-            <summary>پیش‌نمایش زنده معرفی</summary>
-            <RichText text={p.description} />
-          </details>
-        )}
-        <fieldset className="stack">
-          <legend>بسته‌های قابل خرید</legend>
-          {p.packages.map((pack, i) => (
-            <div className="package-editor" key={pack.id}>
-              <label>
-                مقدار
-                <input
-                  type="number"
-                  min="0.001"
-                  step="any"
-                  required
-                  value={pack.amount}
-                  onChange={(e) =>
-                    field(
-                      "packages",
-                      p.packages.map((x, j) =>
-                        i === j ? { ...x, amount: Number(e.target.value) } : x,
-                      ),
-                    )
-                  }
-                />
-              </label>
-              <label>
-                واحد
-                <select
-                  value={pack.unit}
-                  onChange={(e) =>
-                    field(
-                      "packages",
-                      p.packages.map((x, j) =>
-                        i === j
-                          ? { ...x, unit: e.target.value as typeof pack.unit }
-                          : x,
-                      ),
-                    )
-                  }
-                >
-                  <option value="g">گرم</option>
-                  <option value="kg">کیلوگرم</option>
-                  <option value="ml">میلی‌لیتر</option>
-                  <option value="l">لیتر</option>
-                </select>
-              </label>
-              {owner && (
-                <label>
-                  قیمت بسته (تومان)
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={pack.priceRials / 10}
-                    onChange={(e) =>
-                      field(
-                        "packages",
-                        p.packages.map((x, j) =>
-                          i === j
-                            ? { ...x, priceRials: Number(e.target.value) * 10 }
-                            : x,
-                        ),
-                      )
-                    }
+        <fieldset disabled={locked} className="product-step-fields">
+          <div className="product-step-heading">
+            <span className="eyebrow">
+              مرحله {fa(step + 1)} از {fa(productSteps.length)}
+            </span>
+            <h3 ref={heading} tabIndex={-1}>
+              {productSteps[step].title}
+            </h3>
+            <p>{productSteps[step].description}</p>
+          </div>
+          {step === 0 && (
+            <ProductBasics p={p} field={field} categories={categories} />
+          )}
+          {step === 1 && (
+            <ProductImages p={p} field={field} onBusy={setUploading} />
+          )}
+          {step === 2 && <ProductPackages p={p} field={field} owner={owner} />}
+          {step === 3 && <ProductDetails p={p} field={field} />}
+          {step === 4 && (
+            <div className="stack">
+              <div className="product-review-summary">
+                {p.images[0] && (
+                  <Image
+                    src={p.images[0]}
+                    alt={p.name}
+                    width={100}
+                    height={100}
                   />
-                </label>
-              )}
-              <label>
-                سقف خرید
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  required
-                  value={pack.maxQuantity}
-                  onChange={(e) =>
-                    field(
-                      "packages",
-                      p.packages.map((x, j) =>
-                        i === j
-                          ? { ...x, maxQuantity: Number(e.target.value) }
-                          : x,
-                      ),
-                    )
-                  }
-                />
-              </label>
-              {(pack.unit === "l" || pack.unit === "ml") && (
-                <label>
-                  وزن ارسال (گرم)
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={pack.shippingGrams}
-                    onChange={(e) =>
-                      field(
-                        "packages",
-                        p.packages.map((x, j) =>
-                          i === j
-                            ? { ...x, shippingGrams: Number(e.target.value) }
-                            : x,
-                        ),
-                      )
-                    }
-                  />
-                </label>
-              )}
-              <button
-                type="button"
-                className="text-link"
-                onClick={() =>
-                  field(
-                    "packages",
-                    p.packages.filter((_, j) => i !== j),
-                  )
+                )}
+                <div>
+                  <h4>{p.name || "نام محصول وارد نشده"}</h4>
+                  <p>
+                    {categories.find((c) => c.id === p.categoryId)?.name ||
+                      "بدون دسته‌بندی"}
+                  </p>
+                  <small>
+                    {fa(p.images.length)} تصویر · {fa(p.packages.length)} بسته
+                  </small>
+                </div>
+              </div>
+              <div
+                className={
+                  issues.length ? "product-checklist" : "product-ready"
                 }
               >
-                حذف بسته
-              </button>
+                <ClipboardCheck size={22} aria-hidden="true" />
+                <div>
+                  <strong>
+                    {issues.length
+                      ? "پیش از انتشار تکمیل کنید"
+                      : "محصول آماده انتشار است"}
+                  </strong>
+                  {issues.length ? (
+                    <ul>
+                      {issues.map((issue, i) => (
+                        <li key={i}>
+                          <button type="button" onClick={() => go(issue.step)}>
+                            {issue.text}
+                            <ArrowLeft size={15} aria-hidden="true" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>اطلاعات اصلی، تصاویر و بسته‌ها کامل هستند.</p>
+                  )}
+                </div>
+              </div>
+              <div className="between">
+                <h4>نمای محصول برای مشتری</h4>
+                <button
+                  type="button"
+                  className="button secondary"
+                  aria-expanded={preview}
+                  aria-controls="product-preview"
+                  onClick={() => setPreview(!preview)}
+                >
+                  <Eye size={17} aria-hidden="true" />
+                  {preview ? "بستن پیش‌نمایش" : "پیش‌نمایش"}
+                </button>
+              </div>
+              {preview && (
+                <div
+                  id="product-preview"
+                  className="preview-pane product-preview"
+                >
+                  <h2>{p.name}</h2>
+                  <p>{p.summary}</p>
+                  <div className="review-images">
+                    {p.images.map((src, i) => (
+                      <Image
+                        key={src + i}
+                        src={src}
+                        alt={`تصویر ${i + 1} محصول`}
+                        width={180}
+                        height={140}
+                      />
+                    ))}
+                  </div>
+                  <div className="review-packages">
+                    {p.packages.map((pack) => (
+                      <div key={pack.id}>
+                        <strong>{packageLabel(pack)}</strong>
+                        {owner && <span>{money(pack.priceRials)} تومان</span>}
+                      </div>
+                    ))}
+                  </div>
+                  {[
+                    p.description,
+                    p.uses,
+                    p.preparation,
+                    p.storage,
+                    p.ingredients,
+                    p.allergens,
+                  ]
+                    .filter(Boolean)
+                    .map((text, i) => (
+                      <RichText key={i} text={text} />
+                    ))}
+                  {p.sections.map((s, i) => (
+                    <section key={i}>
+                      <h3>{s.title}</h3>
+                      <RichText text={s.body} />
+                    </section>
+                  ))}
+                  {p.nutrients.length > 0 && (
+                    <section>
+                      <h3>ارزش غذایی در ۱۰۰ گرم</h3>
+                      {p.nutrients.map((n, i) => (
+                        <p key={i}>
+                          {n.name}: {n.value}
+                        </p>
+                      ))}
+                      <small>{p.nutrientSource}</small>
+                    </section>
+                  )}
+                </div>
+              )}
+              <p className="notice">
+                {owner
+                  ? "با انتشار، تغییرات برای مشتری‌ها نمایش داده می‌شود. با ذخیره پیش‌نویس می‌توانید بعداً ادامه دهید."
+                  : "محصول را به‌صورت پیش‌نویس ذخیره کنید تا مالک قیمت‌ها را تعیین و آن را منتشر کند."}
+              </p>
             </div>
-          ))}
-          <button
-            type="button"
-            className="button secondary"
-            onClick={() =>
-              field("packages", [
-                ...p.packages,
-                {
-                  id: crypto.randomUUID(),
-                  amount: 100,
-                  unit: "g",
-                  priceRials: 0,
-                  maxQuantity: 5,
-                  shippingGrams: 0,
-                },
-              ])
-            }
-          >
-            + افزودن بسته
-          </button>
+          )}
         </fieldset>
-        <details>
-          <summary>اطلاعات تکمیلی محصول · اختیاری</summary>
-          <div className="stack">
-            <datalist id="section-titles">
-              {[
-                "برای چه غذاهایی مناسب است؟",
-                "چطور استفاده کنیم؟",
-                "چطور نگهداری کنیم؟",
-                "ترکیبات",
-                "اطلاعات حساسیت‌زا",
-              ].map((x) => (
-                <option key={x} value={x} />
-              ))}
-            </datalist>
-            {p.sections.map((section, i) => (
-              <div className="stack form-card" key={i}>
-                <label>
-                  عنوان بخش · انتخاب یا عنوان دلخواه
-                  <input
-                    list="section-titles"
-                    required
-                    value={section.title}
-                    onChange={(e) =>
-                      field(
-                        "sections",
-                        p.sections.map((x, j) =>
-                          i === j ? { ...x, title: e.target.value } : x,
-                        ),
-                      )
-                    }
-                  />
-                </label>
-                <label>
-                  متن بخش
-                  <textarea
-                    value={section.body}
-                    onChange={(e) =>
-                      field(
-                        "sections",
-                        p.sections.map((x, j) =>
-                          i === j ? { ...x, body: e.target.value } : x,
-                        ),
-                      )
-                    }
-                  />
-                </label>
-                <RichText text={section.body} />
-                <button
-                  type="button"
-                  className="text-link"
-                  onClick={() =>
-                    field(
-                      "sections",
-                      p.sections.filter((_, j) => i !== j),
-                    )
-                  }
-                >
-                  حذف بخش
-                </button>
-              </div>
-            ))}
+        {error && (
+          <div ref={errorRef} tabIndex={-1} role="alert" className="error">
+            {error}
+          </div>
+        )}
+        <div className="product-editor-footer">
+          <div className="product-navigation">
+            {step > 0 && (
+              <button
+                type="button"
+                className="button secondary"
+                disabled={locked}
+                onClick={() => go(step - 1)}
+              >
+                <ArrowRight size={16} aria-hidden="true" />
+                مرحله قبل
+              </button>
+            )}
             <button
               type="button"
-              className="button secondary"
-              onClick={() =>
-                field("sections", [...p.sections, { title: "", body: "" }])
-              }
+              className="button secondary draft-button"
+              disabled={locked}
+              onClick={() => void save(false)}
             >
-              + افزودن بخش توضیحات
+              <Save size={16} aria-hidden="true" />
+              {busy === "draft" ? "در حال ذخیره…" : "ذخیره پیش‌نویس"}
             </button>
-            {(
-              [
-                "uses",
-                "preparation",
-                "storage",
-                "ingredients",
-                "allergens",
-              ] as const
+          </div>
+          {step < 4 ? (
+            <button
+              className="button"
+              type="button"
+              disabled={locked}
+              onClick={() => go(step + 1)}
+            >
+              مرحله بعد
+              <ArrowLeft size={16} aria-hidden="true" />
+            </button>
+          ) : (
+            owner && (
+              <button
+                className="button publish-button"
+                type="button"
+                disabled={locked}
+                onClick={() => void save(true)}
+              >
+                <Send size={16} aria-hidden="true" />
+                {busy === "publish" ? "در حال انتشار…" : "ذخیره و انتشار"}
+              </button>
             )
-              .filter((k) => p[k])
-              .map((k) => (
-                <label key={k}>
-                  اطلاعات قبلی محصول
-                  <textarea
-                    value={p[k]}
-                    onChange={(e) => field(k, e.target.value)}
-                  />
-                  <RichText text={p[k]} />
-                </label>
-              ))}
-          </div>
-        </details>
-        <details>
-          <summary>برچسب‌ها و نام‌های جستجو</summary>
-          <div className="form-grid">
-            <label>
-              نام‌های جایگزین (با ویرگول جدا کنید)
-              <input
-                value={p.aliases.join("، ")}
-                onChange={(e) =>
-                  field(
-                    "aliases",
-                    e.target.value
-                      .split(/[,،]/)
-                      .map((s) => s.trim())
-                      .filter(Boolean),
-                  )
-                }
-              />
-            </label>
-            <label>
-              برچسب‌ها (با ویرگول جدا کنید)
-              <input
-                value={p.tags.join("، ")}
-                onChange={(e) =>
-                  field(
-                    "tags",
-                    e.target.value
-                      .split(/[,،]/)
-                      .map((s) => s.trim())
-                      .filter(Boolean),
-                  )
-                }
-              />
-            </label>
-          </div>
-        </details>
-        <fieldset>
-          <legend>تصاویر محصول · تصویر اول، تصویر اصلی است</legend>
-          <div className="image-editor">
-            {p.images.map((src, i) => (
-              <div key={src + i}>
-                <Image
-                  src={src}
-                  alt={"تصویر " + (i + 1)}
-                  width={70}
-                  height={70}
-                />
-                <button
-                  type="button"
-                  disabled={i === 0}
-                  aria-label={"بالا بردن تصویر " + (i + 1)}
-                  onClick={() => {
-                    const images = [...p.images];
-                    [images[i - 1], images[i]] = [images[i], images[i - 1]];
-                    field("images", images);
-                  }}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  aria-label={"حذف تصویر " + (i + 1)}
-                  onClick={() =>
-                    field(
-                      "images",
-                      p.images.filter((_, n) => n !== i),
-                    )
-                  }
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-          <label style={{ marginTop: 12 }}>
-            بارگذاری تصویر
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={busy}
-              onChange={(e) => upload(e.target.files?.[0])}
-            />
-          </label>
-        </fieldset>
-        <p className="muted">
-          پیشنهاد محصولات به‌صورت خودکار بر اساس دسته‌بندی و محبوبیت انجام
-          می‌شود.
-        </p>
-        <details>
-          <summary>ارزش غذایی · اختیاری</summary>
-          <fieldset>
-            <legend>ارزش غذایی در ۱۰۰ گرم · اختیاری</legend>
-            {p.nutrients.map((n, i) => (
-              <div className="form-grid" key={i}>
-                <label>
-                  نام ماده
-                  <input
-                    value={n.name}
-                    onChange={(e) =>
-                      field(
-                        "nutrients",
-                        p.nutrients.map((v, j) =>
-                          j === i ? { ...v, name: e.target.value } : v,
-                        ),
-                      )
-                    }
-                  />
-                </label>
-                <label>
-                  مقدار با واحد
-                  <input
-                    value={n.value}
-                    onChange={(e) =>
-                      field(
-                        "nutrients",
-                        p.nutrients.map((v, j) =>
-                          j === i ? { ...v, value: e.target.value } : v,
-                        ),
-                      )
-                    }
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="text-link icon-button"
-                  onClick={() =>
-                    field(
-                      "nutrients",
-                      p.nutrients.filter((_, j) => j !== i),
-                    )
-                  }
-                >
-                  حذف ردیف
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() =>
-                field("nutrients", [...p.nutrients, { name: "", value: "" }])
-              }
-            >
-              افزودن ماده غذایی
-            </button>
-            <label style={{ marginTop: 12 }}>
-              منبع اطلاعات تغذیه‌ای
-              <input
-                value={p.nutrientSource}
-                onChange={(e) => field("nutrientSource", e.target.value)}
-              />
-            </label>
-          </fieldset>
-        </details>
-        <div className="editor-actions">
-          <button className="button" disabled={busy}>
-            ذخیره پیش‌نویس
-          </button>
-          {owner ? (
-            <button
-              className="button secondary"
-              type="button"
-              disabled={busy}
-              onClick={() => save(true)}
-            >
-              ذخیره و انتشار
-            </button>
-          ) : null}
-          <button
-            className="button secondary"
-            type="button"
-            onClick={() => setPreview(!preview)}
-          >
-            پیش‌نمایش
-          </button>
-          {owner && products.some((x) => x.id === p.id) ? (
-            <button
-              className="button secondary"
-              type="button"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  await api(`/staff/products/${p.id}/archive`, "POST");
-                  await onSaved();
-                  setMessage("محصول بایگانی شد.");
-                } catch (e) {
-                  setError((e as Error).message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              بایگانی محصول
-            </button>
-          ) : null}
+          )}
         </div>
       </form>
-      {preview ? (
-        <div className="preview-pane">
-          <h2>{p.name}</h2>
-          <p>{p.summary}</p>
-          {[p.description, p.uses, p.preparation, p.storage]
-            .filter(Boolean)
-            .map((text, i) => (
-              <RichText text={text} key={i} />
-            ))}
-        </div>
-      ) : null}
-      {owner && products.some((x) => x.id === p.id) ? (
-        <div className="stack" style={{ marginTop: 28 }}>
-          <h3>اصلاح موجودی</h3>
-          <p>
-            موجودی قابل فروش: {p.availableGrams.toLocaleString("fa-IR")} گرم
-          </p>
-          <div className="form-grid">
-            <label>
-              تغییر موجودی به گرم (مثبت یا منفی)
-              <input
-                inputMode="numeric"
-                value={delta}
-                onChange={(e) => setDelta(e.target.value)}
-              />
-            </label>
-            <label>
-              دلیل تغییر
-              <input
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-              />
-            </label>
+      {step === 2 && owner && existing && (
+        <details className="product-inventory">
+          <summary>موجودی و انبار</summary>
+          <div className="stack">
+            <p>موجودی قابل فروش: {fa(existing.availableGrams)} گرم</p>
+            <div className="form-grid">
+              <label>
+                تغییر موجودی به گرم (مثبت یا منفی)
+                <input
+                  inputMode="numeric"
+                  value={delta}
+                  disabled={locked}
+                  onChange={(e) => setDelta(e.target.value)}
+                />
+              </label>
+              <label>
+                دلیل تغییر
+                <input
+                  value={reason}
+                  disabled={locked}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </label>
+            </div>
+            <button
+              className="button secondary"
+              disabled={
+                locked ||
+                !Number.isInteger(Number(digits(delta))) ||
+                Number(digits(delta)) === 0 ||
+                !reason.trim()
+              }
+              onClick={() => void stock()}
+            >
+              {busy === "stock" ? "در حال ثبت…" : "ثبت تغییر موجودی"}
+            </button>
+            {stockMessage && (
+              <p role="status" className="success">
+                {stockMessage}
+              </p>
+            )}
           </div>
+        </details>
+      )}
+      {step === 4 && owner && existing && (
+        <details className="product-inventory">
+          <summary>بایگانی محصول</summary>
+          <p>محصول بایگانی‌شده در فروشگاه نمایش داده نمی‌شود.</p>
           <button
-            className="button secondary"
-            disabled={busy || !delta || !reason}
-            onClick={stock}
+            type="button"
+            className="button subtle-danger"
+            disabled={locked}
+            onClick={async () => {
+              if (
+                !window.confirm(
+                  "محصول بایگانی و از فروشگاه پنهان شود؟ تغییرات ذخیره‌نشده در این فرم حفظ می‌شوند.",
+                )
+              )
+                return;
+              feedbackTrigger.current = document.activeElement as HTMLElement;
+              setBusy("archive");
+              setError("");
+              try {
+                await api(`/staff/products/${p.id}/archive`, "POST");
+                field("status", "archived");
+                if (!dirty)
+                  setSaved(JSON.stringify({ ...p, status: "archived" }));
+                setMessage({
+                  title: "محصول بایگانی شد",
+                  body: "این محصول دیگر در فروشگاه نمایش داده نمی‌شود.",
+                });
+                await onSaved();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy("");
+              }
+            }}
           >
-            ثبت تغییر موجودی
+            بایگانی محصول
           </button>
+        </details>
+      )}
+      <dialog
+        ref={feedback}
+        className="product-feedback"
+        aria-labelledby="product-feedback-title"
+        onClose={() => {
+          setMessage(null);
+          feedbackTrigger.current?.focus();
+        }}
+      >
+        <button
+          className="button secondary dialog-close"
+          aria-label="بستن پیام"
+          onClick={() => feedback.current?.close()}
+        >
+          <X size={18} />
+        </button>
+        <CheckCircle2 className="feedback-check" size={52} aria-hidden="true" />
+        <div role="status">
+          <h2 id="product-feedback-title">{message?.title}</h2>
+          <p>{message?.body}</p>
         </div>
-      ) : null}
-      {message ? (
-        <p role="status" className="success">
-          {message}
-        </p>
-      ) : null}
-      {error ? (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      ) : null}
+        <button
+          className="button full"
+          onClick={() => feedback.current?.close()}
+        >
+          ادامه ویرایش
+        </button>
+      </dialog>
     </div>
   );
 }

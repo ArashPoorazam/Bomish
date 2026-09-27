@@ -27,14 +27,11 @@ export default async function Home() {
     <>
       <section className="hero container">
         <div className="hero-copy">
-          <span className="kicker">
-            <span />
-            از دل طبیعت، برای سفره شما
-          </span>
+          
           <h1>
-            کمی عطر،
+           دنیایی از عطر
             <br />
-            یک دنیا <em>طعم.</em>
+            دنیایی از <em>طعم</em>
           </h1>
           <p>
             ادویه‌های خوش‌عطر، سبزی‌های خشک و دانه‌های خوراکی.
