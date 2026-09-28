@@ -2,27 +2,27 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { ArrowRight, BookOpen, Pencil, Plus, RotateCcw } from "lucide-react";
-import type { Article, Product } from "@/lib/types";
-import { date, fa, statuses } from "@/lib/format";
+import type { Article } from "@/lib/types";
+import { date, statuses } from "@/lib/format";
 import { ArticleEditor, newArticle } from "./article-editor";
 
 type EditorState = { dirty: boolean; busy: boolean };
 export function ArticleManager({
   initialQuery = "",
   articles,
-  products,
   owner,
   onFilters,
   reload,
   onEditorStateChange,
+  onEditingChange,
 }: {
   initialQuery?: string;
   articles: Article[];
-  products: Product[];
   owner: boolean;
   onFilters?: (filters: Record<string, string>) => void;
   reload: () => Promise<void>;
   onEditorStateChange: (state: EditorState) => void;
+  onEditingChange: (editing: boolean) => void;
 }) {
   const [query, setQuery] = useState(initialQuery);
   const [status, setStatus] = useState("");
@@ -54,6 +54,7 @@ export function ArticleManager({
       return;
     setEditorState({ dirty: false, busy: false });
     setSelected(article);
+    onEditingChange(article !== null);
   }
   const visible = onFilters
     ? articles
@@ -73,62 +74,67 @@ export function ArticleManager({
         );
   return (
     <div className="staff-workspace journal-workspace">
-      <aside className="staff-tools stack">
-        <div>
-          <span className="eyebrow">مدیریت محتوا</span>
-          <h3>مجله بومیش</h3>
+      {!selected && (
+        <div className="catalog-toolbar-area">
+          <button
+            className="button catalog-add-product"
+            onClick={() => select(newArticle())}
+          >
+            <Plus size={18} aria-hidden="true" /> مقاله جدید
+          </button>
+          <section
+            className="catalog-toolbar"
+            aria-label="جستجو و فیلتر مقاله‌ها"
+          >
+            <div className="catalog-toolbar-heading">
+              <strong>جستجو و فیلتر</strong>
+              <button
+                className="button secondary filter-reset"
+                disabled={!query && !status && sort === "newest"}
+                onClick={() => {
+                  setQuery("");
+                  setStatus("");
+                  setSort("newest");
+                }}
+              >
+                <RotateCcw size={16} />
+                پاک کردن فیلترها
+              </button>
+            </div>
+            <div className="catalog-filters journal-filters">
+              <label>
+                جستجوی مقاله
+                <input
+                  type="search"
+                  placeholder="عنوان، خلاصه یا نشانی"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </label>
+              <label>
+                وضعیت مقاله
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="">همه مقاله‌ها</option>
+                  <option value="published">منتشر شده</option>
+                  <option value="draft">پیش‌نویس</option>
+                  <option value="archived">بایگانی</option>
+                </select>
+              </label>
+              <label>
+                مرتب‌سازی مقاله‌ها
+                <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                  <option value="newest">تازه‌ترین ویرایش</option>
+                  <option value="oldest">قدیمی‌ترین ویرایش</option>
+                  <option value="title">عنوان مقاله</option>
+                </select>
+              </label>
+            </div>
+          </section>
         </div>
-        <button
-          className="button"
-          disabled={editorState.busy}
-          onClick={() => select(newArticle())}
-        >
-          <Plus size={18} />
-          مقاله جدید
-        </button>
-        <label>
-          جستجوی مقاله
-          <input
-            type="search"
-            placeholder="عنوان، خلاصه یا نشانی"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-        <label>
-          وضعیت مقاله
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">همه مقاله‌ها</option>
-            <option value="published">منتشرشده</option>
-            <option value="draft">پیش‌نویس</option>
-            <option value="archived">بایگانی</option>
-          </select>
-        </label>
-        <label>
-          مرتب‌سازی مقاله‌ها
-          <select value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="newest">تازه‌ترین ویرایش</option>
-            <option value="oldest">قدیمی‌ترین ویرایش</option>
-            <option value="title">عنوان مقاله</option>
-          </select>
-        </label>
-        <button
-          className="button filter-reset"
-          disabled={!query && !status && sort === "newest"}
-          onClick={() => {
-            setQuery("");
-            setStatus("");
-            setSort("newest");
-          }}
-        >
-          <RotateCcw size={16} />
-          پاک کردن فیلترها
-        </button>
-        <small className="muted">
-          {fa(articles.filter((a) => a.status === "published").length)} منتشرشده
-          · {fa(articles.filter((a) => a.status === "draft").length)} پیش‌نویس
-        </small>
-      </aside>
+      )}
       <div className="staff-main">
         {selected ? (
           <>
@@ -143,7 +149,6 @@ export function ArticleManager({
             <ArticleEditor
               key={selected.id}
               article={selected}
-              products={products}
               owner={owner}
               onSaved={reload}
               onStateChange={setEditorState}
@@ -151,13 +156,6 @@ export function ArticleManager({
           </>
         ) : (
           <>
-            <div className="between">
-              <div>
-                <h2>مقاله‌ها</h2>
-                <p>نوشته‌های مجله و پیش‌نویس‌های در حال آماده‌سازی</p>
-              </div>
-              <span className="badge">{fa(visible.length)} مقاله</span>
-            </div>
             <div className="journal-cards">
               {visible.map((a) => (
                 <article key={a.id} className="journal-card">

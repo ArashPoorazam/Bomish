@@ -1,8 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import { Eye, Pencil, Upload, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Article, Product } from "@/lib/types";
+import type { Article } from "@/lib/types";
+import { statuses } from "@/lib/format";
 import { RichText } from "@/components/rich-text";
+import { ArticleProducts } from "./article-products";
 export const newArticle = (): Article => ({
   id: crypto.randomUUID(),
   slug: "",
@@ -16,111 +20,81 @@ export const newArticle = (): Article => ({
 });
 export function ArticleEditor({
   article,
-  products,
   owner,
   onSaved,
   onStateChange,
 }: {
   article: Article;
-  products: Product[];
   owner: boolean;
   onSaved: () => Promise<void>;
   onStateChange: (state: { dirty: boolean; busy: boolean }) => void;
 }) {
-  const initial = { ...article, productIds: article.productIds || [] };
-  const [productQuery, setProductQuery] = useState("");
-  const [optionPage, setOptionPage] = useState(1),
-    [optionTotal, setOptionTotal] = useState(0);
-  const [options, setOptions] = useState<Product[]>(products);
-  const [knownProducts, setKnownProducts] = useState<Product[]>(products);
-  const [optionError, setOptionError] = useState("");
-  useEffect(() => {
-    let live = true;
-    const timer = setTimeout(() => {
-      api<{ items: Product[]; total: number }>(
-        "/staff/product-options?" +
-          new URLSearchParams({ q: productQuery, page: String(optionPage) }),
-      )
-        .then((v) => {
-          if (live) {
-            setOptions(v.items);
-            setOptionTotal(v.total);
-            setOptionError("");
-          }
-        })
-        .catch((e) => {
-          if (live) setOptionError(e.message);
-        });
-    }, 250);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-  }, [productQuery, optionPage]);
-  useEffect(() => {
-    let live = true;
-    if (initial.productIds.length) {
-      void (async () => {
-        const found: Product[] = [];
-        for (let page = 1; ; page++) {
-          const data = await api<{ items: Product[]; total: number }>(
-            "/staff/product-options?" +
-              new URLSearchParams({
-                ids: initial.productIds.join(","),
-                page: String(page),
-                pageSize: "100",
-              }),
-          );
-          found.push(...data.items);
-          if (!live) return;
-          if (found.length >= data.total || !data.items.length) break;
-        }
-        if (live) setKnownProducts(found);
-      })().catch((e) => {
-        if (live) setOptionError(e.message);
-      });
-    }
-    return () => {
-      live = false;
-    };
-  }, [article.id]);
-  const [a, setA] = useState(initial),
-    [preview, setPreview] = useState(false),
-    [error, setError] = useState(""),
-    [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(JSON.stringify(initial));
-  const feedback = useRef<HTMLDialogElement>(null);
-  const trigger = useRef<HTMLElement | null>(null);
+  const [a, setA] = useState(() => ({
+    ...article,
+    productIds: article.productIds || [],
+  }));
+  const [saved, setSaved] = useState(() =>
+    JSON.stringify({ ...article, productIds: article.productIds || [] }),
+  );
+  const [preview, setPreview] = useState(false);
+  const [hasSaved, setHasSaved] = useState(!!article.updatedAt);
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const lock = useRef(false);
+  const titleInput = useRef<HTMLInputElement>(null);
+  const slugInput = useRef<HTMLInputElement>(null);
   const dirty = JSON.stringify(a) !== saved;
+  const titleError = !a.title.trim();
+  const slugError = !a.slug.trim() || /[\s/?#\\]/.test(a.slug.trim());
+  const missing = [
+    !a.excerpt.trim() && "خلاصه",
+    !a.body.trim() && "متن مقاله",
+    !a.image && "تصویر اصلی",
+  ].filter(Boolean);
   useEffect(() => onStateChange({ dirty, busy }), [dirty, busy, onStateChange]);
   useEffect(() => {
-    if (message && !busy) feedback.current?.showModal();
-  }, [message, busy]);
-  useEffect(() => {
     if (!dirty && !busy) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, busy]);
-  async function save(publish = false, archive = false) {
-    trigger.current = document.activeElement as HTMLElement;
-    setBusy(true);
+  function field<K extends keyof Article>(key: K, value: Article[K]) {
+    setA((prev) => ({ ...prev, [key]: value }));
+    setMessage("");
+  }
+  async function save(status: Article["status"]) {
+    if (lock.current) return;
+    setAttempted(true);
     setError("");
     setMessage("");
+    if (titleError || slugError) {
+      setPreview(false);
+      (titleError ? titleInput : slugInput).current?.focus();
+      setError("عنوان و نشانی مقاله را بررسی کنید.");
+      return;
+    }
+    if (status === "published" && missing.length) {
+      setError(`برای انتشار، ${missing.join("، ")} را تکمیل کنید.`);
+      return;
+    }
+    lock.current = true;
+    setBusy(true);
     try {
-      await api("/staff/articles/" + a.id, "PUT", {
-        ...a,
-        status: archive ? "archived" : publish ? "published" : "draft",
-      });
-      const next = {
-        ...a,
-        status: archive ? "archived" : publish ? "published" : "draft",
-      } as Article;
+      const next = { ...a, title: a.title.trim(), slug: a.slug.trim(), status };
+      await api("/staff/articles/" + a.id, "PUT", next);
       setA(next);
+      setHasSaved(true);
       setSaved(JSON.stringify(next));
+      setMessage(
+        status === "published"
+          ? "مقاله منتشر شد."
+          : status === "archived"
+            ? "مقاله بایگانی شد."
+            : "پیش‌نویس ذخیره شد.",
+      );
       try {
         await onSaved();
       } catch {
@@ -128,212 +102,290 @@ export function ArticleEditor({
           "مقاله ذخیره شد، اما فهرست به‌روز نشد. صفحه را دوباره باز کنید.",
         );
       }
-      setMessage(
-        archive
-          ? "مقاله بایگانی شد."
-          : publish
-            ? "مقاله منتشر شد."
-            : "پیش‌نویس ذخیره شد.",
-      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      lock.current = false;
       setBusy(false);
     }
   }
+  async function upload(file: File) {
+    if (lock.current) return;
+    setError("");
+    if (
+      !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+      file.size >= 8 * 1024 * 1024
+    ) {
+      setError("تصویر JPG، PNG یا WebP با حجم کمتر از ۸ مگابایت انتخاب کنید.");
+      return;
+    }
+    lock.current = true;
+    setBusy(true);
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.set("image", file);
+      const result = await api<{ url: string }>("/staff/uploads", "POST", body);
+      field("image", result.url);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      lock.current = false;
+      setBusy(false);
+      setUploading(false);
+    }
+  }
   return (
-    <div className="form-card stack article-editor">
-      <div>
-        <span className="eyebrow">ویرایش مقاله</span>
-        <h2>{a.title || "مقاله جدید"}</h2>
-        <p>
-          {dirty ? "تغییرات ذخیره نشده" : "متن و تصویر مقاله را آماده کنید."}
-        </p>
-      </div>
-      <fieldset disabled={busy} className="product-step-fields stack">
-        <label>
-          عنوان
-          <input
-            value={a.title}
-            onChange={(e) => setA({ ...a, title: e.target.value })}
-          />
-        </label>
-        <label>
-          نشانی صفحه
-          <input
-            dir="ltr"
-            value={a.slug}
-            onChange={(e) => setA({ ...a, slug: e.target.value })}
-          />
-        </label>
-        <label>
-          خلاصه
-          <textarea
-            value={a.excerpt}
-            onChange={(e) => setA({ ...a, excerpt: e.target.value })}
-          />
-        </label>
-        <label>
-          متن مقاله · Markdown با پیش‌نمایش زنده
-          <textarea
-            style={{ minHeight: 300 }}
-            value={a.body}
-            onChange={(e) => setA({ ...a, body: e.target.value })}
-          />
-        </label>
-        <label>
-          تصویر اصلی
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            disabled={busy}
-            onChange={async (e) => {
-              if (!e.target.files?.[0]) return;
-              setBusy(true);
-              try {
-                const f = new FormData();
-                f.set("image", e.target.files[0]);
-                const v = await api<{ url: string }>(
-                  "/staff/uploads",
-                  "POST",
-                  f,
-                );
-                setA({ ...a, image: v.url });
-              } catch (e) {
-                setError((e as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          />
-        </label>
-        {a.image ? <p className="muted">تصویر انتخاب شده است.</p> : null}
-        <fieldset>
-          <legend>محصولات مرتبط</legend>
-          <label>
-            جستجوی همه محصولات
-            <input
-              type="search"
-              value={productQuery}
-              onChange={(e) => {
-                setProductQuery(e.target.value);
-                setOptionPage(1);
-              }}
-            />
-          </label>
-          {[
-            ...knownProducts.filter(
-              (p) =>
-                a.productIds.includes(p.id) &&
-                !options.some((o) => o.id === p.id),
-            ),
-            ...options,
-          ].map((p) => (
-            <label key={p.id} className="check-label">
-              <input
-                type="checkbox"
-                checked={a.productIds.includes(p.id)}
-                onChange={(e) => {
-                  if (e.target.checked)
-                    setKnownProducts((prev) =>
-                      prev.some((x) => x.id === p.id) ? prev : [...prev, p],
-                    );
-                  setA({
-                    ...a,
-                    productIds: e.target.checked
-                      ? [...a.productIds, p.id]
-                      : a.productIds.filter((id) => id !== p.id),
-                  });
-                }}
-              />
-              {p.name}
-            </label>
-          ))}
-          {optionError && (
-            <p role="alert" className="error">
-              {optionError}
-            </p>
-          )}
-          <div className="inline-actions">
-            <button
-              type="button"
-              className="button secondary"
-              disabled={optionPage === 1}
-              onClick={() => setOptionPage((p) => p - 1)}
-            >
-              محصولات قبلی
-            </button>
-            <button
-              type="button"
-              className="button secondary"
-              disabled={optionPage * 25 >= optionTotal}
-              onClick={() => setOptionPage((p) => p + 1)}
-            >
-              محصولات بعدی
-            </button>
-          </div>
-        </fieldset>
-      </fieldset>
-      <div className="inline-actions">
-        {a.status !== "archived" && (
-          <button
-            className="button secondary"
-            disabled={busy}
-            onClick={() => save(false, true)}
-          >
-            بایگانی مقاله
-          </button>
-        )}
-        <button
-          className="button secondary"
-          disabled={busy}
-          onClick={() => save()}
-        >
-          ذخیره پیش‌نویس
-        </button>
-        {owner ? (
-          <button className="button" disabled={busy} onClick={() => save(true)}>
-            انتشار مقاله
-          </button>
-        ) : null}
-        <button
-          className="button secondary"
-          disabled={busy}
-          aria-expanded={preview}
-          onClick={() => setPreview(!preview)}
-        >
-          پیش‌نمایش
-        </button>
-      </div>
-      {preview ? (
-        <div className="preview-pane">
-          <h2>{a.title}</h2>
-          <RichText text={a.body} />
+    <div className="article-composer">
+      <header className="article-composer-heading">
+        <div>
+          <h2>{hasSaved ? "ویرایش مقاله" : "مقاله جدید"}</h2>
+          <p className="muted">
+            از عنوان و متن شروع کنید، سپس تصویر و محصولات مرتبط را اضافه کنید.
+          </p>
         </div>
-      ) : null}
-      {error ? (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <dialog
-        ref={feedback}
-        className="product-feedback"
-        aria-labelledby="article-feedback-title"
-        onClose={() => {
-          setMessage("");
-          trigger.current?.focus();
-        }}
-      >
-        <h2 id="article-feedback-title">{message}</h2>
-        <p role="status">{a.title}</p>
-        <button
-          className="button full"
-          onClick={() => feedback.current?.close()}
-        >
-          ادامه ویرایش
-        </button>
-      </dialog>
+        <span className="badge">{statuses[a.status]}</span>
+      </header>
+      <fieldset className="article-composer-fields" disabled={busy}>
+        <div className="article-composer-layout">
+          <div className="article-writing-column">
+            <section
+              className="article-section stack"
+              aria-labelledby="article-basics-title"
+            >
+              <h3 id="article-basics-title">اطلاعات مقاله</h3>
+              <label>
+                عنوان مقاله <span className="muted">(ضروری)</span>
+                <input
+                  ref={titleInput}
+                  value={a.title}
+                  placeholder="عنوانی روشن و جذاب برای مقاله"
+                  aria-invalid={attempted && titleError}
+                  aria-describedby={
+                    attempted && titleError ? "article-title-error" : undefined
+                  }
+                  onChange={(e) => field("title", e.target.value)}
+                />
+              </label>
+              {attempted && titleError && (
+                <small className="error" id="article-title-error">
+                  عنوان مقاله را وارد کنید.
+                </small>
+              )}
+              <label>
+                نشانی صفحه <span className="muted">(ضروری)</span>
+                <input
+                  ref={slugInput}
+                  dir="auto"
+                  value={a.slug}
+                  placeholder="راهنمای-انتخاب-محصول"
+                  aria-invalid={attempted && slugError}
+                  aria-describedby="article-slug-help"
+                  onChange={(e) => field("slug", e.target.value)}
+                />
+              </label>
+              <small
+                id="article-slug-help"
+                className={attempted && slugError ? "error" : "muted"}
+              >
+                نشانی کوتاه و یکتا، بدون فاصله یا / ? # بنویسید؛ کلمات را با خط
+                تیره جدا کنید.
+              </small>
+              {a.slug && (
+                <small className="article-url" dir="ltr">
+                  /blog/{a.slug}
+                </small>
+              )}
+              <label>
+                خلاصه مقاله
+                <textarea
+                  rows={3}
+                  value={a.excerpt}
+                  placeholder="در چند جمله بگویید خواننده در این مقاله چه می‌آموزد."
+                  onChange={(e) => field("excerpt", e.target.value)}
+                />
+              </label>
+              <small className="muted">
+                خلاصه در فهرست مجله نمایش داده می‌شود.
+              </small>
+            </section>
+            <section
+              className="article-section stack"
+              aria-labelledby="article-body-title"
+            >
+              <div className="article-section-heading">
+                <h3 id="article-body-title">متن مقاله</h3>
+                <div className="article-view-switch" aria-label="نمای مقاله">
+                  <button
+                    type="button"
+                    aria-pressed={!preview}
+                    onClick={() => setPreview(false)}
+                  >
+                    <Pencil size={16} /> نوشتن
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={preview}
+                    onClick={() => setPreview(true)}
+                  >
+                    <Eye size={16} /> پیش‌نمایش
+                  </button>
+                </div>
+              </div>
+              {preview ? (
+                <article className="article-preview">
+                  {a.image && (
+                    <Image src={a.image} alt="" width={1000} height={560} />
+                  )}
+                  <h2>{a.title || "عنوان مقاله"}</h2>
+                  <p className="muted">{a.excerpt}</p>
+                  {a.body ? (
+                    <RichText text={a.body} />
+                  ) : (
+                    <p className="muted">
+                      برای دیدن پیش‌نمایش، متن مقاله را بنویسید.
+                    </p>
+                  )}
+                </article>
+              ) : (
+                <>
+                  <label className="article-body-label">
+                    محتوای مقاله
+                    <textarea
+                      className="article-body-input"
+                      value={a.body}
+                      placeholder="متن مقاله را اینجا بنویسید…"
+                      onChange={(e) => field("body", e.target.value)}
+                    />
+                  </label>
+                  <details className="article-format-help">
+                    <summary>راهنمای قالب‌بندی متن</summary>
+                    <p>
+                      برای تیتر از ##، برای متن پررنگ از **متن** و برای فهرست از
+                      خط تیره در ابتدای هر سطر استفاده کنید.
+                    </p>
+                  </details>
+                </>
+              )}
+            </section>
+            <ArticleProducts
+              ids={a.productIds}
+              onChange={(ids) => field("productIds", ids)}
+            />
+          </div>
+          <aside className="article-settings-column">
+            <section
+              className="article-section stack"
+              aria-labelledby="article-cover-title"
+            >
+              <h3 id="article-cover-title">تصویر اصلی</h3>
+              {a.image ? (
+                <Image
+                  className="article-cover"
+                  src={a.image}
+                  alt="تصویر اصلی مقاله"
+                  width={600}
+                  height={340}
+                />
+              ) : (
+                <div className="article-cover-empty">
+                  <Upload size={28} />
+                  <span>تصویر جلد مقاله را انتخاب کنید</span>
+                </div>
+              )}
+              <label className="article-upload-label">
+                {uploading
+                  ? "در حال بارگذاری…"
+                  : a.image
+                    ? "تغییر تصویر"
+                    : "انتخاب تصویر"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void upload(file);
+                  }}
+                />
+              </label>
+              <small className="muted">
+                JPG، PNG یا WebP · کمتر از ۸ مگابایت
+              </small>
+              {a.image && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => field("image", "")}
+                >
+                  <Trash2 size={16} /> حذف تصویر
+                </button>
+              )}
+            </section>
+            <section
+              className="article-section stack"
+              aria-labelledby="article-publish-title"
+            >
+              <h3 id="article-publish-title">ذخیره و انتشار</h3>
+              <p className="muted">
+                {dirty
+                  ? "تغییرات هنوز ذخیره نشده‌اند."
+                  : "تغییر ذخیره‌نشده‌ای ندارید."}
+              </p>
+              <p className="muted">
+                برای ذخیره پیش‌نویس، عنوان و نشانی کافی است. انتشار به متن،
+                خلاصه و تصویر هم نیاز دارد.
+              </p>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => void save("draft")}
+              >
+                ذخیره پیش‌نویس
+              </button>
+              {owner && (
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => void save("published")}
+                >
+                  {a.status === "published" ? "انتشار تغییرات" : "انتشار مقاله"}
+                </button>
+              )}
+              <div className="article-feedback" aria-live="polite">
+                {busy && (
+                  <p role="status">
+                    {uploading
+                      ? "در حال بارگذاری تصویر…"
+                      : "در حال ذخیره مقاله…"}
+                  </p>
+                )}
+                {message && (
+                  <p className="notice" role="status">
+                    {message}
+                  </p>
+                )}
+                {error && (
+                  <p className="error" role="alert">
+                    {error}
+                  </p>
+                )}
+              </div>
+              {hasSaved && a.status !== "archived" && (
+                <div className="article-archive">
+                  <button
+                    type="button"
+                    className="text-link"
+                    onClick={() => void save("archived")}
+                  >
+                    بایگانی مقاله
+                  </button>
+                </div>
+              )}
+            </section>
+          </aside>
+        </div>
+      </fieldset>
     </div>
   );
 }

@@ -41,6 +41,7 @@ export function Dashboard({
     [articles, setArticles] = useState<Article[]>([]),
     [orders, setOrders] = useState<Order[]>([]),
     [shipping, setShipping] = useState<ShippingConfig | null>(null);
+  const [editingArticle, setEditingArticle] = useState(false);
   const [editor, setEditor] = useState({ dirty: false, busy: false });
   const [page, setPage] = useState(1),
     [listData, setListData] = useState<PageData | null>(null),
@@ -65,7 +66,7 @@ export function Dashboard({
     setBusy(true);
     setError("");
     try {
-      if (["categories", "articles", "pricing"].includes(tab)) {
+      if (["categories", "pricing"].includes(tab)) {
         const [p, c] = await Promise.all([
           api<Product[]>("/staff/product-options"),
           api<Category[]>("/categories"),
@@ -124,14 +125,18 @@ export function Dashboard({
     <Workspace
       title={sectionLabels[tab] || "مدیریت فروشگاه"}
       titleDetail={
-        tab === "products" && listData ? (
-          <span className="badge">{fa(listData.total)} محصول</span>
+        ["products", "articles"].includes(tab) && listData ? (
+          <span className="badge">
+            {fa(listData.total)} {tab === "products" ? "محصول" : "مقاله"}
+          </span>
         ) : undefined
       }
       description={
         tab === "products"
           ? "محصولات فروشگاه را جستجو و مدیریت کنید؛ محصول جدید اضافه کنید و اطلاعات، تصاویر، بسته‌ها و وضعیت انتشار و موجودی آن‌ها را ویرایش کنید."
-          : undefined
+          : tab === "articles"
+            ? "مقاله‌های مجله را بنویسید و ویرایش کنید؛ تصویر و محصولات مرتبط را انتخاب کنید و نوشته‌ها را به‌صورت پیش‌نویس ذخیره یا منتشر کنید."
+            : undefined
       }
       activeSection={tab}
       navigationLocked={editor.busy}
@@ -143,6 +148,7 @@ export function Dashboard({
           return;
         setEditor({ dirty: false, busy: false });
         setPage(1);
+        setEditingArticle(false);
         setFilters({});
         setListData(null);
         setTab(p);
@@ -167,7 +173,7 @@ export function Dashboard({
           initialQuery={tab === initialSection ? initialQuery : ""}
           onFilters={onFilters}
           articles={articles}
-          products={products}
+          onEditingChange={setEditingArticle}
           owner
           reload={reload}
           onEditorStateChange={setEditor}
@@ -205,7 +211,7 @@ export function Dashboard({
           </Link>
         </div>
       )}
-      {["products", "orders", "articles"].includes(tab) && (
+      {["products", "orders", "articles"].includes(tab) && !editingArticle && (
         <Pager data={listData} page={page} onPage={setPage} />
       )}{" "}
       {!permissions.length && (
