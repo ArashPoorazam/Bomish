@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, RefreshCw, Search } from "lucide-react";
 import type { Order } from "@/lib/types";
 import { digits, fa, money, statuses } from "@/lib/format";
@@ -11,12 +11,14 @@ export function OrderManager({
   onFilters,
   reload,
   onStateChange,
+  onDetailChange,
 }: {
   initialQuery?: string;
   orders: Order[];
   onFilters?: (filters: Record<string, string>) => void;
   reload: () => Promise<void>;
   onStateChange: (state: { dirty: boolean; busy: boolean }) => void;
+  onDetailChange: (open: boolean) => void;
 }) {
   const [query, setQuery] = useState(initialQuery),
     [filter, setFilter] = useState(initialQuery ? "" : "active");
@@ -32,6 +34,12 @@ export function OrderManager({
     return () => clearTimeout(timer);
   }, [query, filter, onFilters]);
   useEffect(() => onStateChange({ dirty: false, busy }), [busy, onStateChange]);
+  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
+  const returnFocus = useRef("");
+  useEffect(() => {
+    if (!selected && returnFocus.current)
+      rowRefs.current.get(returnFocus.current)?.focus();
+  }, [selected]);
   const visible = onFilters
     ? orders
     : orders.filter(
@@ -44,6 +52,19 @@ export function OrderManager({
             `${o.id} ${o.address.recipient} ${o.address.phone} ${o.tracking}`,
           ).includes(digits(query)),
       );
+  if (selected)
+    return (
+      <StaffOrderDetail
+        key={selected.id}
+        initial={selected}
+        onClose={() => {
+          setSelected(null);
+          onDetailChange(false);
+        }}
+        onBusyChange={setBusy}
+        onChanged={reload}
+      />
+    );
   return (
     <div className="staff-orders stack">
       <div className="catalog-toolbar staff-orders-toolbar">
@@ -111,8 +132,15 @@ export function OrderManager({
             type="button"
             className="staff-order-row"
             key={o.id}
-            onClick={() => setSelected(o)}
-            aria-haspopup="dialog"
+            ref={(node) => {
+              if (node) rowRefs.current.set(o.id, node);
+              else rowRefs.current.delete(o.id);
+            }}
+            onClick={() => {
+              returnFocus.current = o.id;
+              setSelected(o);
+              onDetailChange(true);
+            }}
             aria-label={`جزئیات سفارش ${o.id.slice(0, 8)}، ${o.address.recipient}`}
           >
             <span className="staff-order-identity">
@@ -153,15 +181,6 @@ export function OrderManager({
           </div>
         )}
       </div>
-      {selected && (
-        <StaffOrderDetail
-          key={selected.id}
-          initial={selected}
-          onClose={() => setSelected(null)}
-          onBusyChange={setBusy}
-          onChanged={reload}
-        />
-      )}
     </div>
   );
 }

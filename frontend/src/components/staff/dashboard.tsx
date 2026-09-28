@@ -43,6 +43,7 @@ export function Dashboard({
     [orders, setOrders] = useState<Order[]>([]),
     [shipping, setShipping] = useState<ShippingConfig | null>(null);
   const [editingArticle, setEditingArticle] = useState(false);
+  const [viewingOrder, setViewingOrder] = useState(false);
   const [editor, setEditor] = useState({ dirty: false, busy: false });
   const [page, setPage] = useState(1),
     [listData, setListData] = useState<PageData | null>(null),
@@ -156,6 +157,7 @@ export function Dashboard({
         setEditor({ dirty: false, busy: false });
         setPage(1);
         setEditingArticle(false);
+        setViewingOrder(false);
         setFilters({});
         setListData(null);
         setTab(p);
@@ -205,6 +207,7 @@ export function Dashboard({
           initialQuery={tab === initialSection ? initialQuery : ""}
           onFilters={onFilters}
           orders={orders}
+          onDetailChange={setViewingOrder}
           reload={reload}
           onStateChange={setEditor}
         />
@@ -219,9 +222,11 @@ export function Dashboard({
           </Link>
         </div>
       )}
-      {["products", "orders", "articles"].includes(tab) && !editingArticle && (
-        <Pager data={listData} page={page} onPage={setPage} />
-      )}{" "}
+      {["products", "orders", "articles"].includes(tab) &&
+        !editingArticle &&
+        !viewingOrder && (
+          <Pager data={listData} page={page} onPage={setPage} />
+        )}{" "}
       {!permissions.length && (
         <p className="notice">در حال حاضر بخشی برای حساب شما فعال نیست.</p>
       )}

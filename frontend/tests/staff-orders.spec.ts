@@ -81,38 +81,48 @@ test("compact orders open clear details and retain per-package packing checks", 
     page.getByText(order.address.street, { exact: false }),
   ).toHaveCount(0);
   await row.click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
+  const detail = page.locator(".staff-order-detail");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(".staff-order-list")).toHaveCount(0);
+  await expect(detail.locator(".is-expanded .staff-stage-dot svg")).toHaveCount(
+    5,
+  );
   await expect(
-    dialog.getByText(order.address.street, { exact: false }),
+    detail.getByRole("heading", { name: "قدم بعدی", exact: true }),
   ).toBeVisible();
-  const checks = dialog.getByRole("checkbox");
+  await expect(detail).toBeVisible();
+  await expect(
+    detail.getByText(order.address.street, { exact: false }),
+  ).toBeVisible();
+  const checks = detail.getByRole("checkbox");
   await expect(checks).toHaveCount(2);
   await checks.first().check();
-  await expect(dialog.getByRole("status")).toHaveText(
+  await expect(detail.getByRole("status")).toHaveText(
     "وضعیت بسته‌بندی ذخیره شد.",
   );
   await expect(checks.first()).toBeChecked();
   await expect(checks.nth(1)).not.toBeChecked();
-  await dialog.screenshot({
+  await detail.screenshot({
     path: "test-results/staff-order-detail-desktop.png",
   });
-  await page.keyboard.press("Escape");
-  await expect(dialog).toHaveCount(0);
+  await detail
+    .getByRole("button", { name: "بازگشت به سفارش‌ها", exact: true })
+    .click();
+  await expect(detail).toHaveCount(0);
   await expect(row).toBeFocused();
   await page.reload();
   await row.click();
-  await expect(dialog.getByRole("checkbox").first()).toBeChecked();
+  await expect(detail.getByRole("checkbox").first()).toBeChecked();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
-    await dialog.evaluate(
+    await detail.evaluate(
       (element) => element.scrollWidth <= element.clientWidth,
     ),
   ).toBe(true);
-  await dialog.screenshot({
+  await detail.screenshot({
     path: "test-results/staff-order-detail-mobile.png",
   });
-  await dialog.getByRole("button", { name: "بستن جزئیات سفارش" }).click();
+  await detail.getByRole("button", { name: "بازگشت به سفارش‌ها" }).click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
