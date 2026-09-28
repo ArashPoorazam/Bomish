@@ -36,7 +36,7 @@ export function newProduct(): Product {
     minGrams: 100,
     stepGrams: 100,
     maxGrams: 25000,
-    availableGrams: 0,
+    outOfStock: false,
     summary: "",
     description: "",
     uses: "",
@@ -58,6 +58,7 @@ export function ProductEditor({
   products,
   categories,
   owner,
+  canPrice = owner,
   onSaved,
   onStateChange,
 }: {
@@ -65,6 +66,7 @@ export function ProductEditor({
   products: Product[];
   categories: Category[];
   owner: boolean;
+  canPrice?: boolean;
   onSaved: () => Promise<void>;
   onStateChange: (state: { dirty: boolean; busy: boolean }) => void;
 }) {
@@ -82,9 +84,6 @@ export function ProductEditor({
     body: string;
   } | null>(null);
   const [preview, setPreview] = useState(false);
-  const [delta, setDelta] = useState("");
-  const [reason, setReason] = useState("");
-  const [stockMessage, setStockMessage] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
   const feedback = useRef<HTMLDialogElement>(null);
   const feedbackTrigger = useRef<HTMLElement | null>(null);
@@ -171,18 +170,13 @@ export function ProductEditor({
       setBusy("");
     }
   }
-  async function stock() {
-    setBusy("stock");
+  async function availability(outOfStock: boolean) {
+    setBusy("availability");
     setError("");
-    setStockMessage("");
     try {
-      await api(`/staff/products/${p.id}/inventory`, "POST", {
-        deltaGrams: Number(digits(delta)),
-        reason,
-      });
-      setStockMessage("موجودی به‌روز شد.");
-      setDelta("");
-      setReason("");
+      await api(`/staff/products/${p.id}/availability`, "POST", { outOfStock });
+      setP((prev) => ({ ...prev, outOfStock }));
+      setSaved((prev) => JSON.stringify({ ...JSON.parse(prev), outOfStock }));
       await onSaved();
     } catch (e) {
       setError((e as Error).message);
@@ -256,7 +250,9 @@ export function ProductEditor({
           {step === 1 && (
             <ProductImages p={p} field={field} onBusy={setUploading} />
           )}
-          {step === 2 && <ProductPackages p={p} field={field} owner={owner} />}
+          {step === 2 && (
+            <ProductPackages p={p} field={field} owner={canPrice} />
+          )}
           {step === 3 && <ProductDetails p={p} field={field} />}
           {step === 4 && (
             <div className="stack">
@@ -439,53 +435,32 @@ export function ProductEditor({
           )}
         </div>
       </form>
-      {step === 2 && owner && existing && (
-        <details className="product-inventory">
-          <summary>موجودی و انبار</summary>
-          <div className="stack">
-            <p>موجودی قابل فروش: {fa(existing.availableGrams)} گرم</p>
-            <div className="form-grid">
-              <label>
-                تغییر موجودی به گرم (مثبت یا منفی)
-                <input
-                  inputMode="numeric"
-                  value={delta}
-                  disabled={locked}
-                  onChange={(e) => setDelta(e.target.value)}
-                />
-              </label>
-              <label>
-                دلیل تغییر
-                <input
-                  value={reason}
-                  disabled={locked}
-                  onChange={(e) => setReason(e.target.value)}
-                />
-              </label>
-            </div>
+      {existing && (
+        <section
+          className="product-availability stack"
+          aria-label="وضعیت فروش محصول"
+        >
+          <h3>وضعیت فروش محصول</h3>
+          <div className="inline-actions">
             <button
+              type="button"
               className="button secondary"
-              disabled={
-                locked ||
-                !Number.isInteger(Number(digits(delta))) ||
-                Number(digits(delta)) === 0 ||
-                !reason.trim()
-              }
-              onClick={() => void stock()}
+              disabled={locked}
+              aria-pressed={!p.outOfStock}
+              onClick={() => void availability(false)}
             >
-              {busy === "stock" ? "در حال ثبت…" : "ثبت تغییر موجودی"}
+              موجود
             </button>
-            {stockMessage && (
-              <p role="status" className="success">
-                {stockMessage}
-              </p>
-            )}
+            <button
+              type="button"
+              className="button secondary"
+              disabled={locked}
+              aria-pressed={p.outOfStock}
+              onClick={() => void availability(true)}
+            >
+              ناموجود
+            </button>
           </div>
-        </details>
-      )}
-      {step === 4 && owner && existing && (
-        <details className="product-inventory">
-          <summary>بایگانی محصول</summary>
           <p>محصول بایگانی‌شده در فروشگاه نمایش داده نمی‌شود.</p>
           <button
             type="button"
@@ -520,7 +495,7 @@ export function ProductEditor({
           >
             بایگانی محصول
           </button>
-        </details>
+        </section>
       )}
       <dialog
         ref={feedback}

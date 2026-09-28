@@ -35,7 +35,7 @@ const legacy = {
   minGrams: 100,
   stepGrams: 100,
   maxGrams: 25000,
-  availableGrams: 1000,
+  outOfStock: false,
 };
 async function workspace(page: Page) {
   const saved: Record<string, unknown>[] = [];
@@ -49,16 +49,56 @@ async function workspace(page: Page) {
       return route.fulfill({ json: { ok: true } });
     }
     const data: Record<string, unknown> = {
-      "/session": { csrf: "test", role: "owner", staffId: "owner" },
+      "/session": {
+        csrf: "test",
+        role: "owner",
+        staffId: "owner",
+        permissions: [
+          "products",
+          "articles",
+          "categories",
+          "pricing",
+          "orders",
+          "shipping",
+          "sales",
+          "omnisire",
+        ],
+      },
       "/cart": { items: [], subtotalRials: 0 },
-      "/staff/products": [legacy],
+      "/staff/products": { items: [legacy], total: 1, page: 1, pageSize: 25 },
+      "/staff/product-options": new URL(route.request().url()).searchParams.has(
+        "page",
+      )
+        ? { items: [legacy], total: 1, page: 1, pageSize: 25 }
+        : [legacy],
       "/categories": [{ id: "spices", name: "ادویه‌ها", description: "" }],
-      "/staff/articles": [],
+      "/staff/articles": { items: [], total: 0, page: 1, pageSize: 25 },
       "/staff/orders": [],
       "/staff/members": [],
       "/staff/audit": [],
       "/staff/shipping": {},
     };
+    const params = new URL(route.request().url()).searchParams;
+    const response = data[path];
+    if (
+      params.has("page") &&
+      response &&
+      typeof response === "object" &&
+      "items" in response
+    ) {
+      const paged = response as {
+        items: Record<string, unknown>[];
+        total: number;
+      };
+      const query = params.get("q") || "",
+        status = params.get("status") || "";
+      const items = paged.items.filter(
+        (item) =>
+          (!query || JSON.stringify(item).includes(query)) &&
+          (!status || item.status === status),
+      );
+      return route.fulfill({ json: { ...paged, items, total: items.length } });
+    }
     return route.fulfill({ json: data[path] ?? { ok: true } });
   });
   await page.goto("/staff");
@@ -228,4 +268,35 @@ test("filters reset and unsaved work is protected when leaving products", async 
   await page
     .locator(".product-wizard")
     .screenshot({ path: "test-results/product-review-desktop.png" });
+});
+
+test("manual availability is independent of editor drafts and stock fields are gone", async ({
+  page,
+}) => {
+  await workspace(page);
+  const availability: unknown[] = [];
+  await page.route("**/api/v1/staff/products/*/availability", async (route) => {
+    availability.push(route.request().postDataJSON());
+    await route.fulfill({ json: route.request().postDataJSON() });
+  });
+  await page.getByRole("button", { name: "ویرایش", exact: true }).click();
+  await page.getByLabel("نام محصول", { exact: true }).fill("تغییر ذخیره‌نشده");
+  await page.getByRole("button", { name: "ناموجود", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "ناموجود", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("نام محصول", { exact: true })).toHaveValue(
+    "تغییر ذخیره‌نشده",
+  );
+  await expect(page.getByText("موجودی و انبار", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("button", { name: "بایگانی محصول", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "موجود", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "موجود", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(availability).toEqual([{ outOfStock: true }, { outOfStock: false }]);
 });

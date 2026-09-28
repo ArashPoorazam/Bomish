@@ -26,6 +26,10 @@ func (a *App) adjustPrices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	if _, e = tx.Exec(r.Context(), "SELECT set_config('bomish.actor',$1,true)", current(r).StaffID); e != nil {
+		a.dbError(w, e)
+		return
+	}
 	rows, e := tx.Query(r.Context(), "SELECT id,content,price_rials,min_grams FROM products WHERE ($1='' OR id=$1) ORDER BY id FOR UPDATE", in.ProductID)
 	if e != nil {
 		a.dbError(w, e)
@@ -106,7 +110,7 @@ func (a *App) adjustPrices(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if e = audit(r, tx, "pricing."+in.Mode, in.ProductID); e == nil {
+	if e = auditDetail(r.Context(), tx, current(r).StaffID, "pricing."+in.Mode, in.ProductID, map[string]any{"mode": in.Mode, "amount": in.Amount, "products": len(items)}); e == nil {
 		e = tx.Commit(r.Context())
 	}
 	if e != nil {

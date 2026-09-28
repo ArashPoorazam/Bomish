@@ -123,6 +123,28 @@ function PriceAdjustment({
   mode: "discount" | "adjust";
   onBusyChange: (busy: boolean) => void;
 }) {
+  const [productQuery, setProductQuery] = useState("");
+  const [options, setOptions] = useState(products);
+  const [targetCount, setTargetCount] = useState(products.length);
+  useEffect(() => {
+    let live = true;
+    const timer = setTimeout(() => {
+      api<{ items: Product[]; total: number }>(
+        "/staff/product-options?page=1&q=" + encodeURIComponent(productQuery),
+      )
+        .then((v) => {
+          if (live) {
+            setOptions(v.items);
+            if (!productQuery) setTargetCount(v.total);
+          }
+        })
+        .catch(() => {});
+    }, 250);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [productQuery, products]);
   const [scope, setScope] = useState("one");
   const [id, setID] = useState("");
   const [direction, setDirection] = useState("increase");
@@ -135,7 +157,7 @@ function PriceAdjustment({
     Number(value.replace(/,/g, "")) *
     (mode === "adjust" ? 10 * (direction === "decrease" ? -1 : 1) : 1);
   const targets =
-    scope === "all" ? products : products.filter((p) => p.id === id);
+    scope === "all" ? products : options.filter((p) => p.id === id);
   const invalid =
     mode === "adjust" &&
     targets.some((p) =>
@@ -182,6 +204,14 @@ function PriceAdjustment({
         </h3>
         <fieldset className="product-step-fields stack" disabled={busy}>
           <label>
+            جستجوی همه محصولات
+            <input
+              type="search"
+              value={productQuery}
+              onChange={(e) => setProductQuery(e.target.value)}
+            />
+          </label>
+          <label>
             دامنه تغییر
             <select value={scope} onChange={(e) => setScope(e.target.value)}>
               <option value="one">یک محصول مشخص</option>
@@ -197,7 +227,7 @@ function PriceAdjustment({
                 onChange={(e) => setID(e.target.value)}
               >
                 <option value="">محصول را انتخاب کنید</option>
-                {products.map((p) => (
+                {options.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
@@ -267,7 +297,7 @@ function PriceAdjustment({
         >
           {busy
             ? "در حال اعمال…"
-            : `اعمال ${mode === "discount" ? "تخفیف" : "تغییر قیمت"} روی ${fa(targets.length)} محصول`}
+            : `اعمال ${mode === "discount" ? "تخفیف" : "تغییر قیمت"} روی ${fa(scope === "all" ? targetCount : targets.length)} محصول`}
           <ArrowLeft size={17} />
         </button>
       </div>
@@ -328,7 +358,10 @@ function PriceAdjustment({
               ))}
             </div>
             {targets.length > 5 && (
-              <p className="muted">و {fa(targets.length - 5)} محصول دیگر</p>
+              <p className="muted">
+                و {fa((scope === "all" ? targetCount : targets.length) - 5)}{" "}
+                محصول دیگر
+              </p>
             )}
             <p className="notice">
               {scope === "all"

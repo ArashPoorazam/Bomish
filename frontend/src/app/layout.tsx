@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { StoreProvider } from "@/components/store-provider";
-import { Header } from "@/components/header";
-import { Footer } from "@/components/footer";
+import { WorkspaceFrame } from "@/components/workspace-frame";
+
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
 const vazir = localFont({
@@ -31,9 +31,7 @@ export default function RootLayout({
           رفتن به محتوای اصلی
         </a>
         <StoreProvider>
-          <Header />
-          <main id="main">{children}</main>
-          <Footer />
+          <WorkspaceFrame>{children}</WorkspaceFrame>
         </StoreProvider>
       </body>
     </html>

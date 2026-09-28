@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
   output: "standalone",
+  distDir: process.env.BOMISH_DIST_DIR || ".next",
   poweredByHeader: false,
   async rewrites() {
     return [

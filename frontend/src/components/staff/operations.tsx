@@ -1,19 +1,27 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import type { Order, ShippingConfig, Member } from "@/lib/types";
+import type { Order, ShippingConfig } from "@/lib/types";
 import { digits, statuses, fa } from "@/lib/format";
 import { OrderView } from "@/components/checkout";
 
 export function OrderManager({
+  initialQuery = "",
   orders,
+  onFilters,
   reload,
 }: {
+  initialQuery?: string;
   orders: Order[];
+  onFilters?: (filters: Record<string, string>) => void;
   reload: () => Promise<void>;
 }) {
-  const [q, setQ] = useState(""),
-    [filter, setFilter] = useState("active");
+  const [q, setQ] = useState(initialQuery),
+    [filter, setFilter] = useState(initialQuery ? "" : "active");
+  useEffect(() => {
+    const timer = setTimeout(() => onFilters?.({ q, status: filter }), 250);
+    return () => clearTimeout(timer);
+  }, [q, filter, onFilters]);
   const [tracking, setTracking] = useState<Record<string, string>>({}),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -144,7 +152,7 @@ export function OrderManager({
               ) : null}
               {o.status === "review" ? (
                 <p className="error">
-                  پرداخت تأیید شده اما موجودی کافی نیست. مالک باید تأمین کالا یا
+                  پرداخت تأیید شده اما سفارش نیازمند بررسی است. مالک باید تأیید یا
                   بازپرداخت را پیگیری کند.
                 </p>
               ) : null}
@@ -327,126 +335,6 @@ export function ShippingEditor({ initial }: { initial: ShippingConfig }) {
       ) : null}
       {error ? (
         <p role="alert" className="error">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-export function Members({
-  members,
-  reload,
-}: {
-  members: Member[];
-  reload: () => Promise<void>;
-}) {
-  const [username, setUsername] = useState(""),
-    [password, setPassword] = useState(""),
-    [role, setRole] = useState("editor"),
-    [error, setError] = useState(""),
-    [secret, setSecret] = useState(""),
-    [busy, setBusy] = useState(false);
-  return (
-    <div className="form-card stack">
-      <h2>همکاران فروشگاه</h2>
-      {members.map((m) => (
-        <div className="between" key={m.id}>
-          <span>
-            {m.username} ·{" "}
-            {m.role === "owner"
-              ? "مالک"
-              : m.role === "editor"
-                ? "ویرایشگر محتوا"
-                : "مسئول سفارش‌ها"}{" "}
-            · {m.active ? "فعال" : "غیرفعال"}
-          </span>
-          <button
-            className="button secondary"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await api("/staff/members", "POST", {
-                  ...m,
-                  password: "",
-                  active: !m.active,
-                });
-                await reload();
-              } catch (e) {
-                setError((e as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {m.active ? "غیرفعال کردن" : "فعال کردن"}
-          </button>
-        </div>
-      ))}
-      <hr />
-      <h3>افزودن همکار</h3>
-      <div className="form-grid">
-        <label>
-          نام کاربری
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </label>
-        <label>
-          گذرواژه اولیه (حداقل ۱۲ نویسه)
-          <input
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        <label>
-          نقش
-          <select value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="editor">ویرایشگر محتوا</option>
-            <option value="operator">مسئول سفارش‌ها</option>
-            <option value="owner">مالک</option>
-          </select>
-        </label>
-      </div>
-      <button
-        className="button"
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true);
-          setError("");
-          setSecret("");
-          try {
-            const r = await api<{ totpSecret: string }>(
-              "/staff/members",
-              "POST",
-              { id: "", username, password, role, active: true },
-            );
-            setSecret(r.totpSecret);
-            setPassword("");
-            setUsername("");
-            await reload();
-          } catch (e) {
-            setError((e as Error).message);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        ساخت حساب همکار
-      </button>
-      {secret ? (
-        <div className="notice">
-          کلید برنامه رمزساز را یک‌بار به همکار تحویل دهید و در برنامه‌ای مانند
-          Authenticator با حالت TOTP ثبت کنید:
-          <br />
-          <code dir="ltr">{secret}</code>
-        </div>
-      ) : null}
-      {error ? (
-        <p className="error" role="alert">
           {error}
         </p>
       ) : null}

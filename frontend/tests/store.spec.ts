@@ -117,14 +117,13 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
   const editorContext = await browser.newContext();
   const editor = await editorContext.newPage();
   const slug = "browser-" + Date.now();
+  const productName = "ادویه آزمایش مرورگر " + slug;
   await editor.goto("/staff");
   await loginStaff(editor, "editor");
   await editor
     .getByRole("button", { name: "افزودن محصول", exact: true })
     .click();
-  await editor
-    .getByLabel("نام محصول", { exact: true })
-    .fill("ادویه آزمایش مرورگر");
+  await editor.getByLabel("نام محصول", { exact: true }).fill(productName);
   await editor.getByLabel("نشانی صفحه", { exact: true }).fill(slug);
   await editor
     .locator(".staff-main")
@@ -169,9 +168,16 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
   const owner = await ownerContext.newPage();
   await owner.goto("/staff");
   await loginStaff(owner, "owner");
+  const matching = owner.waitForResponse(
+    (r) =>
+      r.url().includes("/staff/products?") &&
+      new URL(r.url()).searchParams.get("q") === slug,
+  );
+  await owner.getByLabel("جستجوی محصول", { exact: true }).fill(slug);
+  await matching;
   await owner
     .getByRole("row")
-    .filter({ hasText: "ادویه آزمایش مرورگر" })
+    .filter({ hasText: productName })
     .first()
     .getByRole("button", { name: "ویرایش" })
     .click();
@@ -200,14 +206,16 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
   await owner.getByLabel("تغییر موجودی به گرم (مثبت یا منفی)").fill("10000");
   await owner.getByLabel("دلیل تغییر").fill("موجودی آزمایشی");
   await owner.getByRole("button", { name: "ثبت تغییر موجودی" }).click();
-  await expect(owner.getByRole("status")).toContainText("موجودی به‌روز شد");
+  await expect(
+    owner.getByRole("status").filter({ hasText: "موجودی به‌روز شد" }),
+  ).toBeVisible();
   await expect(owner.getByText("موجودی قابل فروش: ۱۰٬۰۰۰ گرم")).toBeVisible();
   await owner.goto("/products/" + slug);
   await expect(owner.getByRole("heading", { level: 1 })).toHaveText(
-    "ادویه آزمایش مرورگر",
+    productName,
   );
   await owner.getByRole("button", { name: "افزودن به سبد" }).click();
-  await expect(owner.getByRole("dialog")).toContainText("ادویه آزمایش مرورگر");
+  await expect(owner.getByRole("dialog")).toContainText(productName);
   const state = await (await owner.request.get("/api/v1/session")).json();
   const product = await (
     await owner.request.get("/api/v1/products/" + slug)

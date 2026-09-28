@@ -28,6 +28,62 @@ export function ArticleEditor({
   onStateChange: (state: { dirty: boolean; busy: boolean }) => void;
 }) {
   const initial = { ...article, productIds: article.productIds || [] };
+  const [productQuery, setProductQuery] = useState("");
+  const [optionPage, setOptionPage] = useState(1),
+    [optionTotal, setOptionTotal] = useState(0);
+  const [options, setOptions] = useState<Product[]>(products);
+  const [knownProducts, setKnownProducts] = useState<Product[]>(products);
+  const [optionError, setOptionError] = useState("");
+  useEffect(() => {
+    let live = true;
+    const timer = setTimeout(() => {
+      api<{ items: Product[]; total: number }>(
+        "/staff/product-options?" +
+          new URLSearchParams({ q: productQuery, page: String(optionPage) }),
+      )
+        .then((v) => {
+          if (live) {
+            setOptions(v.items);
+            setOptionTotal(v.total);
+            setOptionError("");
+          }
+        })
+        .catch((e) => {
+          if (live) setOptionError(e.message);
+        });
+    }, 250);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [productQuery, optionPage]);
+  useEffect(() => {
+    let live = true;
+    if (initial.productIds.length) {
+      void (async () => {
+        const found: Product[] = [];
+        for (let page = 1; ; page++) {
+          const data = await api<{ items: Product[]; total: number }>(
+            "/staff/product-options?" +
+              new URLSearchParams({
+                ids: initial.productIds.join(","),
+                page: String(page),
+                pageSize: "100",
+              }),
+          );
+          found.push(...data.items);
+          if (!live) return;
+          if (found.length >= data.total || !data.items.length) break;
+        }
+        if (live) setKnownProducts(found);
+      })().catch((e) => {
+        if (live) setOptionError(e.message);
+      });
+    }
+    return () => {
+      live = false;
+    };
+  }, [article.id]);
   const [a, setA] = useState(initial),
     [preview, setPreview] = useState(false),
     [error, setError] = useState(""),
@@ -49,7 +105,7 @@ export function ArticleEditor({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, busy]);
-  async function save(publish = false) {
+  async function save(publish = false, archive = false) {
     trigger.current = document.activeElement as HTMLElement;
     setBusy(true);
     setError("");
@@ -57,9 +113,12 @@ export function ArticleEditor({
     try {
       await api("/staff/articles/" + a.id, "PUT", {
         ...a,
-        status: publish ? "published" : "draft",
+        status: archive ? "archived" : publish ? "published" : "draft",
       });
-      const next = { ...a, status: publish ? "published" : "draft" } as Article;
+      const next = {
+        ...a,
+        status: archive ? "archived" : publish ? "published" : "draft",
+      } as Article;
       setA(next);
       setSaved(JSON.stringify(next));
       try {
@@ -69,7 +128,13 @@ export function ArticleEditor({
           "مقاله ذخیره شد، اما فهرست به‌روز نشد. صفحه را دوباره باز کنید.",
         );
       }
-      setMessage(publish ? "مقاله منتشر شد." : "پیش‌نویس ذخیره شد.");
+      setMessage(
+        archive
+          ? "مقاله بایگانی شد."
+          : publish
+            ? "مقاله منتشر شد."
+            : "پیش‌نویس ذخیره شد.",
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -145,26 +210,80 @@ export function ArticleEditor({
         {a.image ? <p className="muted">تصویر انتخاب شده است.</p> : null}
         <fieldset>
           <legend>محصولات مرتبط</legend>
-          {products.map((p) => (
+          <label>
+            جستجوی همه محصولات
+            <input
+              type="search"
+              value={productQuery}
+              onChange={(e) => {
+                setProductQuery(e.target.value);
+                setOptionPage(1);
+              }}
+            />
+          </label>
+          {[
+            ...knownProducts.filter(
+              (p) =>
+                a.productIds.includes(p.id) &&
+                !options.some((o) => o.id === p.id),
+            ),
+            ...options,
+          ].map((p) => (
             <label key={p.id} className="check-label">
               <input
                 type="checkbox"
                 checked={a.productIds.includes(p.id)}
-                onChange={(e) =>
+                onChange={(e) => {
+                  if (e.target.checked)
+                    setKnownProducts((prev) =>
+                      prev.some((x) => x.id === p.id) ? prev : [...prev, p],
+                    );
                   setA({
                     ...a,
                     productIds: e.target.checked
                       ? [...a.productIds, p.id]
                       : a.productIds.filter((id) => id !== p.id),
-                  })
-                }
+                  });
+                }}
               />
               {p.name}
             </label>
           ))}
+          {optionError && (
+            <p role="alert" className="error">
+              {optionError}
+            </p>
+          )}
+          <div className="inline-actions">
+            <button
+              type="button"
+              className="button secondary"
+              disabled={optionPage === 1}
+              onClick={() => setOptionPage((p) => p - 1)}
+            >
+              محصولات قبلی
+            </button>
+            <button
+              type="button"
+              className="button secondary"
+              disabled={optionPage * 25 >= optionTotal}
+              onClick={() => setOptionPage((p) => p + 1)}
+            >
+              محصولات بعدی
+            </button>
+          </div>
         </fieldset>
       </fieldset>
       <div className="inline-actions">
+        {a.status !== "archived" && (
+          <button
+            className="button secondary"
+            disabled={busy}
+            onClick={() => save(false, true)}
+          >
+            بایگانی مقاله
+          </button>
+        )}
         <button
           className="button secondary"
           disabled={busy}

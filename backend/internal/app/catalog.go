@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func productFrom(p db.Product, available int64) domain.Product {
+func productFrom(p db.Product, outOfStock bool) domain.Product {
 	var out domain.Product
 	_ = json.Unmarshal(p.Content, &out)
 	out.ID = p.ID
@@ -21,7 +21,7 @@ func productFrom(p db.Product, available int64) domain.Product {
 	out.MinGrams = p.MinGrams
 	out.StepGrams = p.StepGrams
 	out.MaxGrams = p.MaxGrams
-	out.AvailableGrams = available
+	out.OutOfStock = outOfStock
 	if out.Images == nil {
 		out.Images = []string{}
 	}
@@ -54,56 +54,14 @@ func (a *App) categories(w http.ResponseWriter, r *http.Request) {
 	}
 	write(w, 200, v)
 }
-func (a *App) products(w http.ResponseWriter, r *http.Request) {
-	q := domain.Normalize(r.URL.Query().Get("q"))
-	if len([]rune(q)) > 120 {
-		fail(w, 400, "جستجو بیش از حد طولانی است")
-		return
-	}
-	rows, e := a.Queries.ListPublicProducts(r.Context(), db.ListPublicProductsParams{Category: r.URL.Query().Get("category"), Query: q})
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	out := []domain.Product{}
-	for _, p := range rows {
-		out = append(out, productFrom(db.Product{ID: p.ID, Slug: p.Slug, Name: p.Name, CategoryID: p.CategoryID, Status: p.Status, PriceRials: p.PriceRials, MinGrams: p.MinGrams, StepGrams: p.StepGrams, MaxGrams: p.MaxGrams, Content: p.Content}, p.AvailableGrams))
-	}
-	// Paid package quantities dominate popularity; recorded detail visits break ties.
-	popularity, e := a.Pool.Query(r.Context(), `SELECT p.id,coalesce((SELECT sum(oi.quantity)*10 FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE oi.product_id=p.id AND o.status IN ('paid','packing','shipped','received')),0)+(SELECT count(*) FROM analytics_events ev WHERE ev.product_id=p.id AND ev.kind='view') FROM products p WHERE p.status='published'`)
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	scores := map[string]int64{}
-	for popularity.Next() {
-		var id string
-		var n int64
-		if e = popularity.Scan(&id, &n); e != nil {
-			popularity.Close()
-			a.dbError(w, e)
-			return
-		}
-		scores[id] = n
-	}
-	e = popularity.Err()
-	popularity.Close()
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	for i := range out {
-		out[i].Popularity = scores[out[i].ID]
-	}
-	write(w, 200, out)
-}
+func (a *App) products(w http.ResponseWriter, r *http.Request) { a.catalogPage(w, r, false) }
 func (a *App) product(w http.ResponseWriter, r *http.Request) {
 	p, e := a.Queries.GetPublicProduct(r.Context(), r.PathValue("slug"))
 	if e != nil {
 		fail(w, 404, "محصول پیدا نشد")
 		return
 	}
-	write(w, 200, productFrom(db.Product{ID: p.ID, Slug: p.Slug, Name: p.Name, CategoryID: p.CategoryID, Status: p.Status, PriceRials: p.PriceRials, MinGrams: p.MinGrams, StepGrams: p.StepGrams, MaxGrams: p.MaxGrams, Content: p.Content}, p.AvailableGrams))
+	write(w, 200, productFrom(db.Product{ID: p.ID, Slug: p.Slug, Name: p.Name, CategoryID: p.CategoryID, Status: p.Status, PriceRials: p.PriceRials, MinGrams: p.MinGrams, StepGrams: p.StepGrams, MaxGrams: p.MaxGrams, Content: p.Content}, p.OutOfStock))
 }
 func articleFrom(p db.Article) domain.Article {
 	var v domain.Article

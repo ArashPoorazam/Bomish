@@ -44,14 +44,9 @@ func TestDiscountCodeValidationAndQuote(t *testing.T) {
 	c := couponCustomer(t, a, "09120000101", "turmeric")
 	editor := newClient(t, a.Handler())
 	editor.staff(t, "editor")
-	for _, method := range []string{"GET", "POST"} {
-		if status, _ := editor.call(method, "/staff/discount-codes", nil); status != 403 {
-			t.Fatalf("editor allowed %s: %d", method, status)
-		}
-	}
-	if status, _ := editor.call("PATCH", "/staff/discount-codes/ANY", map[string]bool{"active": false}); status != 403 {
-		t.Fatal("editor toggled code")
-	}
+	editor.ok(t, "GET", "/staff/discount-codes", nil, nil)
+	createCode(t, editor, "EDITOR10", "percent", 10, 0)
+	editor.ok(t, "PATCH", "/staff/discount-codes/EDITOR10", map[string]bool{"active": false}, nil)
 	createCode(t, owner, " welcome10 ", "percent", 10, 0)
 	if status, _ := owner.call("POST", "/staff/discount-codes", map[string]any{"code": "WELCOME10", "kind": "fixed", "value": 100}); status != 409 {
 		t.Fatal("duplicate code accepted")

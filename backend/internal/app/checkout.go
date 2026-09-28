@@ -25,10 +25,8 @@ func calculateQuote(ctx context.Context, q querier, c domain.Cart, province stri
 	if len(c.Items) == 0 {
 		return v, errors.New("سبد خرید خالی است")
 	}
-	totals := map[string]int64{}
 	for _, item := range c.Items {
-		totals[item.Product.ID] += item.Grams
-		if item.Quantity < 1 || item.Quantity > item.Package.MaxQuantity || item.Grams <= 0 || item.Product.Status != "published" || item.Product.AvailableGrams < totals[item.Product.ID] {
+		if item.Quantity < 1 || item.Quantity > item.Package.MaxQuantity || item.Grams <= 0 || item.Product.Status != "published" || item.Product.OutOfStock {
 			return v, errUnavailable
 		}
 		v.WeightGrams += item.Grams
@@ -121,7 +119,7 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	// Coordinate with cart mutations so the purchased snapshot cannot change while locking stock.
+	// Coordinate with cart mutations so the purchased snapshot cannot change while checking product availability.
 	_, e = tx.Exec(r.Context(), "SELECT token_hash FROM sessions WHERE token_hash=$1 FOR UPDATE", s.Hash)
 	if e != nil {
 		a.dbError(w, e)
@@ -133,7 +131,7 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, item := range c.Items {
-		_, e = tx.Exec(r.Context(), "SELECT p.id FROM products p JOIN inventory i ON p.id=i.product_id WHERE p.id=$1 FOR UPDATE OF p,i", item.Product.ID)
+		_, e = tx.Exec(r.Context(), "SELECT p.id FROM products p WHERE p.id=$1 FOR UPDATE OF p", item.Product.ID)
 		if e != nil {
 			a.dbError(w, e)
 			return
@@ -164,10 +162,7 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, item := range c.Items {
-		_, e = tx.Exec(r.Context(), "UPDATE inventory SET reserved_grams=reserved_grams+$1 WHERE product_id=$2", item.Grams, item.Product.ID)
-		if e == nil {
-			_, e = tx.Exec(r.Context(), "INSERT INTO order_items(order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)", id, item.Product.ID, item.Product.Name, item.Grams, item.Product.PackagePrice(item.Package), item.TotalRials, item.Package.ID, item.Package.Label(), item.Quantity)
-		}
+		_, e = tx.Exec(r.Context(), "INSERT INTO order_items(order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)", id, item.Product.ID, item.Product.Name, item.Grams, item.Product.PackagePrice(item.Package), item.TotalRials, item.Package.ID, item.Package.Label(), item.Quantity)
 		if e != nil {
 			a.dbError(w, e)
 			return
@@ -188,11 +183,16 @@ func loadOrders(ctx context.Context, q querier, user string, ids ...string) ([]d
 	if len(ids) > 0 {
 		id = ids[0]
 	}
-	rows, e := q.Query(ctx, "SELECT id,status,address,subtotal_rials,shipping_rials,total_rials,tracking,created_at,coalesce(discount_code,''),discount_rials FROM orders WHERE ($1='' OR user_id=$1) AND ($2='' OR id=$2) ORDER BY created_at DESC LIMIT 100", user, id)
+	return loadOrderPage(ctx, q, user, id, "", "", 100, 0)
+}
+func loadOrderPage(ctx context.Context, q querier, user, id, status, search string, limit, offset int) ([]domain.Order, error) {
+	rows, e := q.Query(ctx, `SELECT id,status,address,subtotal_rials,shipping_rials,total_rials,tracking,created_at,coalesce(discount_code,''),discount_rials FROM orders WHERE ($1='' OR user_id=$1) AND ($2='' OR id=$2) AND ($3='' OR status=$3 OR ($3='active' AND status IN ('paid','packing','shipped','review'))) AND ($4='' OR id||' '||address::text||' '||tracking ILIKE '%'||$4||'%') ORDER BY created_at DESC,id LIMIT $5 OFFSET $6`, user, id, status, search, limit, offset)
 	if e != nil {
 		return nil, e
 	}
 	out := []domain.Order{}
+	indexes := map[string]int{}
+	ids := []string{}
 	for rows.Next() {
 		var v domain.Order
 		var raw []byte
@@ -204,6 +204,9 @@ func loadOrders(ctx context.Context, q querier, user string, ids ...string) ([]d
 		_ = json.Unmarshal(raw, &v.Address)
 		v.CreatedAt = date.Format(time.RFC3339)
 		v.Items = []domain.OrderItem{}
+		v.Events = []domain.OrderEvent{}
+		indexes[v.ID] = len(out)
+		ids = append(ids, v.ID)
 		out = append(out, v)
 	}
 	e = rows.Err()
@@ -211,48 +214,45 @@ func loadOrders(ctx context.Context, q querier, user string, ids ...string) ([]d
 	if e != nil {
 		return nil, e
 	}
-	for i := range out {
-		items, e := q.Query(ctx, "SELECT product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity FROM order_items WHERE order_id=$1 ORDER BY product_id", out[i].ID)
-		if e != nil {
-			return nil, e
-		}
-		for items.Next() {
-			var it domain.OrderItem
-			if e = items.Scan(&it.ProductID, &it.Name, &it.Grams, &it.PriceRials, &it.TotalRials, &it.PackageID, &it.PackageLabel, &it.Quantity); e != nil {
-				items.Close()
-				return nil, e
-			}
-			out[i].Items = append(out[i].Items, it)
-		}
-		e = items.Err()
-		items.Close()
-		if e != nil {
-			return nil, e
-		}
+	if len(ids) == 0 {
+		return out, nil
 	}
-	for i := range out {
-		out[i].Events = []domain.OrderEvent{}
-		rows, e := q.Query(ctx, "SELECT status,created_at FROM order_events WHERE order_id=$1 ORDER BY created_at", out[i].ID)
-		if e != nil {
-			return nil, e
-		}
-		for rows.Next() {
-			var v domain.OrderEvent
-			var t time.Time
-			if e = rows.Scan(&v.Status, &t); e != nil {
-				rows.Close()
-				return nil, e
-			}
-			v.CreatedAt = t.Format(time.RFC3339)
-			out[i].Events = append(out[i].Events, v)
-		}
-		e = rows.Err()
-		rows.Close()
-		if e != nil {
-			return nil, e
-		}
+	items, e := q.Query(ctx, `SELECT order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity FROM order_items WHERE order_id=ANY($1::text[]) ORDER BY product_id,package_id`, ids)
+	if e != nil {
+		return nil, e
 	}
-	return out, nil
+	for items.Next() {
+		var order string
+		var it domain.OrderItem
+		if e = items.Scan(&order, &it.ProductID, &it.Name, &it.Grams, &it.PriceRials, &it.TotalRials, &it.PackageID, &it.PackageLabel, &it.Quantity); e != nil {
+			items.Close()
+			return nil, e
+		}
+		i := indexes[order]
+		out[i].Items = append(out[i].Items, it)
+	}
+	e = items.Err()
+	items.Close()
+	if e != nil {
+		return nil, e
+	}
+	events, e := q.Query(ctx, "SELECT order_id,status,created_at FROM order_events WHERE order_id=ANY($1::text[]) ORDER BY created_at", ids)
+	if e != nil {
+		return nil, e
+	}
+	defer events.Close()
+	for events.Next() {
+		var id string
+		var v domain.OrderEvent
+		var t time.Time
+		if e = events.Scan(&id, &v.Status, &t); e != nil {
+			return nil, e
+		}
+		v.CreatedAt = t.Format(time.RFC3339)
+		i := indexes[id]
+		out[i].Events = append(out[i].Events, v)
+	}
+	return out, events.Err()
 }
 func (a *App) orders(w http.ResponseWriter, r *http.Request) {
 	if !requireCustomer(w, r) {
@@ -309,39 +309,7 @@ func (a *App) settle(ctx context.Context, id, user string, success bool) (string
 	if paymentStatus != "pending" {
 		return status, nil
 	}
-	rows, e := tx.Query(ctx, "SELECT product_id,sum(grams) FROM order_items WHERE order_id=$1 GROUP BY product_id ORDER BY product_id", id)
-	if e != nil {
-		return "", e
-	}
-	type item struct {
-		id string
-		g  int64
-	}
-	items := []item{}
-	for rows.Next() {
-		var it item
-		if e = rows.Scan(&it.id, &it.g); e != nil {
-			rows.Close()
-			return "", e
-		}
-		items = append(items, it)
-	}
-	e = rows.Err()
-	rows.Close()
-	if e != nil {
-		return "", e
-	}
 	available := true
-	for _, it := range items {
-		var stock, reserved int64
-		e = tx.QueryRow(ctx, "SELECT stock_grams,reserved_grams FROM inventory WHERE product_id=$1 FOR UPDATE", it.id).Scan(&stock, &reserved)
-		if e != nil {
-			return "", e
-		}
-		if status == "expired" && stock-reserved < it.g {
-			available = false
-		}
-	}
 	if success && status == "expired" {
 		capacity, err := reclaimDiscount(ctx, tx, discountCode)
 		if err != nil {
@@ -356,26 +324,6 @@ func (a *App) settle(ctx context.Context, id, user string, success bool) (string
 			final = "review"
 		}
 	}
-	for _, it := range items {
-		reservedDelta, stockDelta := int64(0), int64(0)
-		if status == "pending" {
-			reservedDelta = it.g
-		}
-		if final == "paid" {
-			stockDelta = it.g
-		}
-		_, e = tx.Exec(ctx, "UPDATE inventory SET stock_grams=stock_grams-$1,reserved_grams=reserved_grams-$2 WHERE product_id=$3", stockDelta, reservedDelta, it.id)
-		if e != nil {
-			return "", e
-		}
-		if final == "paid" {
-			_, e = tx.Exec(ctx, "INSERT INTO stock_movements(product_id,delta_grams,reason,order_id) VALUES($1,$2,'sale',$3)", it.id, -it.g, id)
-			if e != nil {
-				return "", e
-			}
-
-		}
-	}
 	if final == "paid" {
 		_, e = tx.Exec(ctx, `DELETE FROM carts c USING order_items oi,sessions s WHERE oi.order_id=$1 AND c.product_id=oi.product_id AND c.package_id=oi.package_id AND c.quantity=oi.quantity AND c.session_hash=s.token_hash AND s.user_id=$2`, id, user)
 		if e != nil {
@@ -384,6 +332,18 @@ func (a *App) settle(ctx context.Context, id, user string, success bool) (string
 		if e = queueOrderSMS(ctx, tx, id, final); e != nil {
 			return "", e
 		}
+	}
+	paidAt := time.Now()
+	if final == "paid" {
+		if _, e = tx.Exec(ctx, "UPDATE orders SET paid_at=$2 WHERE id=$1", id, paidAt); e != nil {
+			return "", e
+		}
+		if e = creditCommission(ctx, tx, id, user, paidAt); e != nil {
+			return "", e
+		}
+	}
+	if e = auditDetail(ctx, tx, "", "order."+final, id, map[string]string{"before": status, "after": final}); e != nil {
+		return "", e
 	}
 	_, e = tx.Exec(ctx, "UPDATE orders SET status=$1 WHERE id=$2", final, id)
 	if e == nil {
@@ -423,11 +383,10 @@ func (a *App) ExpireReservations(ctx context.Context) error {
 		return e
 	}
 	for _, id := range ids {
-		_, e = tx.Exec(ctx, `UPDATE inventory i SET reserved_grams=i.reserved_grams-oi.grams FROM (SELECT product_id,sum(grams) grams FROM order_items WHERE order_id=$1 GROUP BY product_id) oi WHERE oi.product_id=i.product_id`, id)
-		if e != nil {
-			return e
-		}
 		_, e = tx.Exec(ctx, "UPDATE orders SET status='expired' WHERE id=$1", id)
+		if e == nil {
+			e = auditDetail(ctx, tx, "", "order.expired", id, map[string]string{"before": "pending", "after": "expired"})
+		}
 		if e != nil {
 			return e
 		}

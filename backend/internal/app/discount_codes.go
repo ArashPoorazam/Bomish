@@ -209,7 +209,7 @@ func applyDiscount(ctx context.Context, q querier, v *quoteResult, code string, 
 	return nil
 }
 
-// A payment arriving after expiry must reclaim discount capacity, just like stock.
+// A payment arriving after expiry must reclaim discount capacity.
 func reclaimDiscount(ctx context.Context, tx pgx.Tx, code string) (bool, error) {
 	if code == "" {
 		return true, nil

@@ -70,7 +70,7 @@ type Product struct {
 	MinGrams       int64      `json:"minGrams"`
 	StepGrams      int64      `json:"stepGrams"`
 	MaxGrams       int64      `json:"maxGrams"`
-	AvailableGrams int64      `json:"availableGrams"`
+	OutOfStock     bool       `json:"outOfStock"`
 	Summary        string     `json:"summary"`
 	Description    string     `json:"description"`
 	Uses           string     `json:"uses"`

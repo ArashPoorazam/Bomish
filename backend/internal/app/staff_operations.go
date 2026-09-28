@@ -2,8 +2,6 @@ package app
 
 import (
 	"bomish/internal/domain"
-	"crypto/rand"
-	"encoding/base32"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,12 +9,21 @@ import (
 )
 
 func (a *App) staffOrders(w http.ResponseWriter, r *http.Request) {
-	v, e := loadOrders(r.Context(), a.Pool, "")
+	page, size := pageArgs(r)
+	q := r.URL.Query()
+	status, search := q.Get("status"), q.Get("q")
+	v, e := loadOrderPage(r.Context(), a.Pool, "", "", status, search, size, (page-1)*size)
 	if e != nil {
 		a.dbError(w, e)
 		return
 	}
-	write(w, 200, v)
+	var total int64
+	e = a.Pool.QueryRow(r.Context(), `SELECT count(*) FROM orders WHERE ($1='' OR status=$1 OR ($1='active' AND status IN ('paid','packing','shipped','review'))) AND ($2='' OR id||' '||address::text||' '||tracking ILIKE '%'||$2||'%')`, status, search).Scan(&total)
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+	listResponse(w, r, v, total)
 }
 func (a *App) updateOrder(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -57,7 +64,7 @@ func (a *App) updateOrder(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	if e = audit(r, tx, "order."+in.Status, r.PathValue("id")); e == nil {
+	if e = auditDetail(r.Context(), tx, current(r).StaffID, "order."+in.Status, r.PathValue("id"), map[string]string{"before": previous, "after": in.Status, "tracking": in.Tracking}); e == nil {
 		e = tx.Commit(r.Context())
 	}
 	if e != nil {
@@ -149,106 +156,6 @@ func (a *App) saveShipping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	write(w, 200, map[string]bool{"ok": true})
-}
-func (a *App) members(w http.ResponseWriter, r *http.Request) {
-	rows, e := a.Pool.Query(r.Context(), "SELECT id,username,role,active FROM staff ORDER BY username")
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	defer rows.Close()
-	out := []map[string]any{}
-	for rows.Next() {
-		var id, user, role string
-		var active bool
-		if e = rows.Scan(&id, &user, &role, &active); e != nil {
-			a.dbError(w, e)
-			return
-		}
-		out = append(out, map[string]any{"id": id, "username": user, "role": role, "active": active})
-	}
-	write(w, 200, out)
-}
-func (a *App) saveMember(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ID       string `json:"id"`
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Role     string `json:"role"`
-		Active   bool   `json:"active"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	if in.Role != "owner" && in.Role != "editor" && in.Role != "operator" {
-		fail(w, 400, "نقش معتبر نیست")
-		return
-	}
-	if in.ID == current(r).StaffID {
-		fail(w, 400, "حساب فعال خود را تغییر ندهید")
-		return
-	}
-	if in.Username == "" {
-		fail(w, 400, "نام کاربری لازم است")
-		return
-	}
-	fresh := in.ID == ""
-	if fresh && len(in.Password) < 12 {
-		fail(w, 400, "گذرواژه باید حداقل ۱۲ نویسه باشد")
-		return
-	}
-	if !fresh && in.Password != "" {
-		fail(w, 400, "برای تغییر گذرواژه از فرایند بازیابی مالک استفاده کنید")
-		return
-	}
-	tx, e := a.Pool.Begin(r.Context())
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	defer tx.Rollback(r.Context())
-	secret := ""
-	if fresh {
-		in.ID = token()
-		b := make([]byte, 20)
-		_, _ = rand.Read(b)
-		secret = base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b)
-		_, e = tx.Exec(r.Context(), "INSERT INTO staff(id,username,password_hash,totp_secret,role,active) VALUES($1,$2,$3,$4,$5,$6)", in.ID, in.Username, PasswordHash(in.Password), secret, in.Role, in.Active)
-	} else {
-		_, e = tx.Exec(r.Context(), "UPDATE staff SET role=$1,active=$2 WHERE id=$3", in.Role, in.Active, in.ID)
-		if e == nil {
-			_, e = tx.Exec(r.Context(), "DELETE FROM sessions WHERE staff_id=$1", in.ID)
-		}
-	}
-	if e == nil {
-		e = audit(r, tx, "staff.update", in.ID)
-	}
-	if e == nil {
-		e = tx.Commit(r.Context())
-	}
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	write(w, 200, map[string]string{"id": in.ID, "totpSecret": secret})
-}
-func (a *App) auditEvents(w http.ResponseWriter, r *http.Request) {
-	rows, e := a.Pool.Query(r.Context(), "SELECT a.action,a.entity_id,a.created_at::text,s.username FROM audit_events a LEFT JOIN staff s ON s.id=a.staff_id ORDER BY a.id DESC LIMIT 100")
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	defer rows.Close()
-	out := []map[string]string{}
-	for rows.Next() {
-		var action, id, date, user string
-		if e = rows.Scan(&action, &id, &date, &user); e != nil {
-			a.dbError(w, e)
-			return
-		}
-		out = append(out, map[string]string{"action": action, "entityId": id, "createdAt": date, "username": user})
-	}
-	write(w, 200, out)
 }
 func (a *App) upload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 8<<20)

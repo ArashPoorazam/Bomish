@@ -64,4 +64,4 @@ export function priceRange(p: import("./types").Product) {
   return min === max ? money(min) : `${money(min)} – ${money(max)}`;
 }
 export const inStock = (p: import("./types").Product) =>
-  p.packages?.some((x) => packageWeight(x) <= p.availableGrams);
+  !p.outOfStock && p.status !== "archived" && !!p.packages?.length;

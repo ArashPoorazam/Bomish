@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Plus, RotateCcw, ArrowRight } from "lucide-react";
 import type { Product, Category } from "@/lib/types";
@@ -7,23 +8,36 @@ import { ProductEditor, newProduct } from "./product-editor";
 import { RichText } from "@/components/rich-text";
 import { api } from "@/lib/api";
 export function CatalogManager({
+  initialQuery = "",
   products,
   categories,
   owner,
+  canPrice = owner,
+  onFilters,
   reload,
   onEditorStateChange,
 }: {
+  initialQuery?: string;
   products: Product[];
   categories: Category[];
   owner: boolean;
+  canPrice?: boolean;
+  onFilters?: (filters: Record<string, string>) => void;
   reload: () => Promise<void>;
   onEditorStateChange: (state: { dirty: boolean; busy: boolean }) => void;
 }) {
-  const [q, setQ] = useState(""),
+  const [q, setQ] = useState(initialQuery),
     [category, setCategory] = useState(""),
     [status, setStatus] = useState(""),
     [stock, setStock] = useState(""),
     [selected, setSelected] = useState<Product | null>(null);
+  useEffect(() => {
+    const timer = setTimeout(
+      () => onFilters?.({ q, category, status, available: stock }),
+      250,
+    );
+    return () => clearTimeout(timer);
+  }, [q, category, status, stock, onFilters]);
   useEffect(() => {
     setSelected((current) =>
       current ? products.find((p) => p.id === current.id) || current : null,
@@ -45,13 +59,15 @@ export function CatalogManager({
     setEditorState({ dirty: false, busy: false });
     setSelected(next);
   }
-  const visible = products.filter(
-    (p) =>
-      (p.name + " " + p.slug + " " + p.aliases?.join(" ")).includes(q) &&
-      (!category || p.categoryId === category) &&
-      (!status || p.status === status) &&
-      (!stock || (stock === "in" ? inStock(p) : !inStock(p))),
-  );
+  const visible = onFilters
+    ? products
+    : products.filter(
+        (p) =>
+          (p.name + " " + p.slug + " " + p.aliases?.join(" ")).includes(q) &&
+          (!category || p.categoryId === category) &&
+          (!status || p.status === status) &&
+          (!stock || (stock === "in" ? inStock(p) : !inStock(p))),
+      );
   return (
     <div className={`staff-workspace ${selected ? "catalog-editing" : ""}`}>
       <aside className="staff-tools stack">
@@ -97,7 +113,7 @@ export function CatalogManager({
           </select>
         </label>
         <label>
-          موجودی
+          وضعیت فروش
           <select value={stock} onChange={(e) => setStock(e.target.value)}>
             <option value="">همه محصولات</option>
             <option value="in">موجود</option>
@@ -133,6 +149,7 @@ export function CatalogManager({
               products={products}
               categories={categories}
               owner={owner}
+              canPrice={canPrice}
               onStateChange={setEditorState}
               onSaved={async () => {
                 await reload();
@@ -169,6 +186,7 @@ export function CatalogManager({
                       {owner && <td>{priceRange(p)}</td>}
                       <td>
                         <span className="badge">{statuses[p.status]}</span>
+                        {p.outOfStock && <span className="badge">ناموجود</span>}
                       </td>
                       <td>
                         <button
@@ -201,22 +219,29 @@ export function CategoryManager({
   products: Product[];
   reload: () => Promise<void>;
 }) {
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let live = true;
+    api<Record<string, number>>("/staff/category-counts")
+      .then((v) => {
+        if (live) setCounts(v);
+      })
+      .catch((e) => {
+        if (live) setError(e.message);
+      });
+    return () => {
+      live = false;
+    };
+  }, [categories]);
   const [q, setQ] = useState(""),
-    [selected, setSelected] = useState<Category | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   return (
     <div className="staff-workspace">
       <aside className="staff-tools stack">
-        <button
-          className="button"
-          onClick={() => {
-            setSelected({ id: crypto.randomUUID(), name: "", description: "" });
-            setError("");
-          }}
-        >
+        <Link className="button" href="/staff/categories/new">
           + دسته‌بندی جدید
-        </button>
+        </Link>
         <label>
           جستجوی دسته
           <input
@@ -233,66 +258,11 @@ export function CategoryManager({
             {error}
           </p>
         )}
-        {selected && (
-          <form
-            className="form-card stack"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setBusy(true);
-              setError("");
-              try {
-                await api("/staff/categories/" + selected.id, "PUT", {
-                  name: selected.name,
-                  description: selected.description,
-                });
-                await reload();
-              } catch (e) {
-                setError((e as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <label>
-              نام دسته
-              <input
-                required
-                value={selected.name}
-                onChange={(e) =>
-                  setSelected({ ...selected, name: e.target.value })
-                }
-              />
-            </label>
-            <label>
-              توضیح دسته
-              <textarea
-                value={selected.description}
-                onChange={(e) =>
-                  setSelected({ ...selected, description: e.target.value })
-                }
-              />
-            </label>
-            <div className="inline-actions">
-              <button className="button" disabled={busy}>
-                ذخیره دسته
-              </button>
-              <button
-                type="button"
-                className="button secondary"
-                onClick={() => setSelected(null)}
-              >
-                انصراف
-              </button>
-            </div>
-          </form>
-        )}
         <div className="category-cards">
           {categories
             .filter((c) => c.name.includes(q))
             .map((c) => {
-              const count = products.filter(
-                (p) => p.categoryId === c.id,
-              ).length;
+              const count = counts[c.id] ?? 0;
               return (
                 <article className="form-card stack" key={c.id}>
                   <div className="between">
@@ -301,15 +271,12 @@ export function CategoryManager({
                   </div>
                   <RichText text={c.description || "بدون توضیح"} />
                   <div className="inline-actions">
-                    <button
+                    <Link
                       className="button secondary"
-                      onClick={() => {
-                        setSelected(c);
-                        setError("");
-                      }}
+                      href={`/staff/categories/${c.id}`}
                     >
                       ویرایش
-                    </button>
+                    </Link>
                     {count === 0 && (
                       <button
                         className="text-link"

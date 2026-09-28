@@ -69,11 +69,6 @@ func TestPackagesOperations(t *testing.T) {
 	if len(cart.Items) != 0 {
 		t.Fatal("mixed package cart not cleared")
 	}
-	var stock int64
-	a.Pool.QueryRow(ctx, "SELECT stock_grams FROM inventory WHERE product_id='turmeric'").Scan(&stock)
-	if stock != 99100 {
-		t.Fatalf("stock deducted wrong: %d", stock)
-	}
 	if code, _ := operator.call("PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped", "tracking": "123456789012345678901234"}); code != 409 {
 		t.Fatal("skipped stage")
 	}
@@ -104,8 +99,8 @@ func TestPackagesOperations(t *testing.T) {
 	if code, _ := outsider.call("GET", "/orders/"+id, nil); code != 404 {
 		t.Fatal("order leaked")
 	}
-	if code, _ := editor.call("POST", "/staff/pricing", map[string]any{"mode": "discount", "amount": 10}); code != 403 {
-		t.Fatal("editor modified pricing")
+	if code, _ := editor.call("POST", "/staff/pricing", map[string]any{"mode": "discount", "amount": 10}); code != 200 {
+		t.Fatal("editor could not modify pricing")
 	}
 	owner.ok(t, "POST", "/staff/pricing", map[string]any{"productId": "turmeric", "mode": "discount", "amount": 10}, nil)
 	owner.ok(t, "POST", "/staff/pricing", map[string]any{"productId": "turmeric", "mode": "adjust", "amount": 100000}, nil)
@@ -125,16 +120,16 @@ func TestPackagesOperations(t *testing.T) {
 	c.ok(t, "POST", "/events", map[string]string{"kind": "view", "productId": "turmeric"}, nil)
 	c.ok(t, "POST", "/events", map[string]string{"kind": "search", "query": "زردچوبه"}, nil)
 	var report map[string]json.RawMessage
-	owner.ok(t, "GET", "/staff/analytics?days=30", nil, &report)
-	if len(report["products"]) == 0 || len(report["sales"]) == 0 {
+	owner.ok(t, "GET", "/omnisire/analytics?section=overview", nil, &report)
+	if len(report["items"]) == 0 || len(report["columns"]) == 0 {
 		t.Fatal("analytics missing")
 	}
 	for _, cli := range []*client{c, editor, operator} {
-		if code, _ := cli.call("GET", "/staff/analytics", nil); code != 403 {
+		if code, _ := cli.call("GET", "/omnisire/analytics", nil); code != 403 {
 			t.Fatal("business data leaked")
 		}
 	}
-	// Expiry must release the sum of all packages for a product.
+	// Expiry still closes an unpaid order without changing product availability.
 	c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "small", "quantity": 1}, nil)
 	c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "large", "quantity": 1}, nil)
 	c.ok(t, "POST", "/checkout/quote", map[string]string{"province": "تهران"}, &q)
@@ -143,9 +138,9 @@ func TestPackagesOperations(t *testing.T) {
 	if e := a.ExpireReservations(ctx); e != nil {
 		t.Fatal(e)
 	}
-	a.Pool.QueryRow(ctx, "SELECT reserved_grams FROM inventory WHERE product_id='turmeric'").Scan(&stock)
-	if stock != 0 {
-		t.Fatal("expiry leaked mixed-package reservation")
+	var expiredStatus string
+	if e := a.Pool.QueryRow(ctx, "SELECT status FROM orders WHERE id=$1", result["orderId"]).Scan(&expiredStatus); e != nil || expiredStatus != "expired" {
+		t.Fatalf("expiry: %s %v", expiredStatus, e)
 	}
 	// An oil can define a volume package with an independent shipping weight.
 	p.ID = "oil"

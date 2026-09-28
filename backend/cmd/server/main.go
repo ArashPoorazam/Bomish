@@ -42,6 +42,7 @@ func main() {
 	if e != nil {
 		panic(e)
 	}
+	defer tx.Rollback(ctx)
 	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(7234109)"); e != nil {
 		panic(e)
 	}
@@ -100,6 +101,20 @@ func main() {
 		fmt.Println(app.TOTP(app.DemoTOTP, time.Now().Unix()/30))
 		return
 	}
+	go func() {
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if e := a.ProcessExports(ctx); e != nil {
+					slog.Error("report export failed", "error", e)
+				}
+			}
+		}
+	}()
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()

@@ -88,6 +88,9 @@ func setup(t *testing.T) *App {
 	if e != nil {
 		t.Fatal(e)
 	}
+	if _, e = base.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public"); e != nil {
+		t.Fatal(e)
+	}
 	schema := "test_" + token()[:16]
 	if _, e = base.Exec(ctx, "CREATE SCHEMA "+schema); e != nil {
 		t.Fatal(e)
@@ -115,7 +118,7 @@ func setup(t *testing.T) *App {
 	if e = a.Seed(ctx); e != nil {
 		t.Fatal(e)
 	}
-	// A 500g package preserves the existing stock/reservation scenarios.
+	// A 500g package preserves the existing checkout scenarios.
 	var raw []byte
 	if e = a.Pool.QueryRow(ctx, "SELECT content FROM products WHERE id='turmeric'").Scan(&raw); e != nil {
 		t.Fatal(e)
@@ -150,12 +153,12 @@ func TestStoreIntegration(t *testing.T) {
 		for _, test := range []struct {
 			c    *client
 			path string
-		}{{c, "/staff/products"}, {editor, "/staff/orders"}, {editor, "/staff/shipping"}, {operator, "/staff/products"}, {operator, "/staff/members"}} {
+		}{{c, "/staff/products"}, {editor, "/staff/orders"}, {editor, "/staff/shipping"}, {operator, "/staff/products"}, {operator, "/omnisire/members"}} {
 			if code, _ := test.c.call("GET", test.path, nil); code != 403 {
 				t.Fatalf("%s %d", test.path, code)
 			}
 		}
-		if code, _ := editor.call("POST", "/staff/products/turmeric/publish", nil); code != 403 {
+		if code, _ := editor.call("POST", "/staff/products/turmeric/publish", nil); code != 200 {
 			t.Fatal(code)
 		}
 	})
@@ -167,12 +170,12 @@ func TestStoreIntegration(t *testing.T) {
 		}
 		p.PriceRials = 1200000
 		p.Packages = []domain.Package{{ID: "small", Amount: 100, Unit: "g", PriceRials: 120000, MaxQuantity: 5}}
-		if code, _ := editor.call("PUT", "/staff/products/test-spice", p); code != 403 {
-			t.Fatal("editor set price", code)
+		if code, _ := editor.call("PUT", "/staff/products/test-spice", p); code != 200 {
+			t.Fatal("editor could not set price", code)
 		}
 		owner.ok(t, "PUT", "/staff/products/test-spice", p, nil)
 		owner.ok(t, "POST", "/staff/products/test-spice/publish", nil, nil)
-		owner.ok(t, "POST", "/staff/products/test-spice/inventory", map[string]any{"deltaGrams": 1000, "reason": "test"}, nil)
+		owner.ok(t, "POST", "/staff/products/test-spice/availability", map[string]any{"outOfStock": false}, nil)
 		var result []domain.Product
 		owner.ok(t, "GET", "/products?q=ادویه%20آزمایشی", nil, &result)
 		if len(result) == 0 || result[0].ID != "test-spice" {
@@ -257,15 +260,10 @@ func TestStoreIntegration(t *testing.T) {
 		for i := 0; i < 2; i++ {
 			c.ok(t, "POST", "/orders/"+id+"/simulate", map[string]bool{"success": true}, nil)
 		}
-		var stock, reserved int64
-		_ = a.Pool.QueryRow(ctx, "SELECT stock_grams,reserved_grams FROM inventory WHERE product_id='turmeric'").Scan(&stock, &reserved)
-		if stock != 98500 || reserved != 0 {
-			t.Fatalf("stock %d reserved %d", stock, reserved)
-		}
 		var count int
 		_ = a.Pool.QueryRow(ctx, "SELECT count(*) FROM stock_movements WHERE order_id=$1", id).Scan(&count)
-		if count != 1 {
-			t.Fatal("duplicated movement")
+		if count != 0 {
+			t.Fatal("checkout must not create stock movements")
 		}
 		c.ok(t, "GET", "/cart", nil, &cart)
 		if len(cart.Items) != 0 {
@@ -284,11 +282,6 @@ func TestStoreIntegration(t *testing.T) {
 		c.login(t, "09120000006")
 		id := create(c, 500, "failed-payment-00001")
 		c.ok(t, "POST", "/orders/"+id+"/simulate", map[string]bool{"success": false}, nil)
-		var reserved int64
-		_ = a.Pool.QueryRow(ctx, "SELECT reserved_grams FROM inventory WHERE product_id='turmeric'").Scan(&reserved)
-		if reserved != 0 {
-			t.Fatal("failed reservation retained")
-		}
 		id = create(c, 500, "expired-payment-0001")
 		_, _ = a.Pool.Exec(ctx, "UPDATE orders SET reservation_expires_at=now()-interval '1 second' WHERE id=$1", id)
 		if e := a.ExpireReservations(ctx); e != nil {
@@ -299,19 +292,19 @@ func TestStoreIntegration(t *testing.T) {
 		if s["status"] != "paid" {
 			t.Fatal(s)
 		}
-		id = create(c, 500, "late-no-stock-000001")
+		id = create(c, 500, "late-available-00001")
 		_, _ = a.Pool.Exec(ctx, "UPDATE orders SET reservation_expires_at=now()-interval '1 second' WHERE id=$1", id)
 		if e := a.ExpireReservations(ctx); e != nil {
 			t.Fatal(e)
 		}
-		_, _ = a.Pool.Exec(ctx, "UPDATE inventory SET stock_grams=0 WHERE product_id='turmeric'")
+		_, _ = a.Pool.Exec(ctx, "UPDATE products SET content=jsonb_set(content,'{outOfStock}','true') WHERE id='turmeric'")
 		c.ok(t, "POST", "/orders/"+id+"/simulate", map[string]bool{"success": true}, &s)
-		if s["status"] != "review" {
+		if s["status"] != "paid" {
 			t.Fatal(s)
 		}
 	})
-	t.Run("concurrent stock reservations", func(t *testing.T) {
-		_, e := a.Pool.Exec(ctx, "UPDATE inventory SET stock_grams=1000,reserved_grams=0 WHERE product_id='turmeric'")
+	t.Run("concurrent orders do not reserve stock", func(t *testing.T) {
+		_, e := a.Pool.Exec(ctx, "UPDATE products SET content=jsonb_set(content,'{outOfStock}','false') WHERE id='turmeric'")
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -331,14 +324,10 @@ func TestStoreIntegration(t *testing.T) {
 			go func(i int) { defer wg.Done(); codes[i], _ = customers[i].call("POST", "/checkout", bodies[i]) }(i)
 		}
 		wg.Wait()
-		if !((codes[0] == 201 && codes[1] == 409) || (codes[1] == 201 && codes[0] == 409)) {
+		if codes[0] != 201 || codes[1] != 201 {
 			t.Fatal(codes)
 		}
-		var reserved int64
-		_ = a.Pool.QueryRow(ctx, "SELECT reserved_grams FROM inventory WHERE product_id='turmeric'").Scan(&reserved)
-		if reserved != 1000 {
-			t.Fatal(reserved)
-		}
+
 	})
 	t.Run("draft articles and session permissions", func(t *testing.T) {
 		v := domain.Article{ID: "test-article", Slug: "test-article", Title: "مقاله", Excerpt: "خلاصه", Body: "## عنوان\nمتن", Image: "/images/spices.png", Status: "draft"}
@@ -347,7 +336,7 @@ func TestStoreIntegration(t *testing.T) {
 			t.Fatal(code)
 		}
 		v.Status = "published"
-		if code, _ := editor.call("PUT", "/staff/articles/test-article", v); code != 403 {
+		if code, _ := editor.call("PUT", "/staff/articles/test-article", v); code != 200 {
 			t.Fatal(code)
 		}
 		owner.ok(t, "PUT", "/staff/articles/test-article", v, nil)
@@ -359,7 +348,7 @@ func TestStoreIntegration(t *testing.T) {
 	})
 	t.Run("delivery weight boundaries", func(t *testing.T) {
 		for _, c := range []struct{ grams, fee int64 }{{2000, 650000}, {2001, 950000}, {5000, 950000}, {5001, 1800000}, {25000, 1800000}} {
-			cart := domain.Cart{Items: []domain.CartItem{{Product: domain.Product{Status: "published", MinGrams: 1, StepGrams: 1, MaxGrams: 100000, AvailableGrams: 100000}, Grams: c.grams, Quantity: 1, Package: domain.Package{MaxQuantity: 5}}}, SubtotalRials: 1000}
+			cart := domain.Cart{Items: []domain.CartItem{{Product: domain.Product{Status: "published", MinGrams: 1, StepGrams: 1, MaxGrams: 100000, OutOfStock: false}, Grams: c.grams, Quantity: 1, Package: domain.Package{MaxQuantity: 5}}}, SubtotalRials: 1000}
 			q, e := calculateQuote(ctx, a.Pool, cart, "تهران")
 			if e != nil || q.ShippingRials != c.fee || q.WeightGrams != c.grams+200 {
 				t.Fatalf("%+v %+v %v", c, q, e)

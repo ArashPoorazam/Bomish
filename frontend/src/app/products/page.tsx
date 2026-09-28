@@ -3,7 +3,7 @@ import Link from "next/link";
 import { serverApi } from "@/lib/api";
 import type { Product, Category } from "@/lib/types";
 import { ProductCard } from "@/components/product-card";
-import { fa, digits, priceBounds, inStock } from "@/lib/format";
+import { fa } from "@/lib/format";
 export const metadata = { title: "همه محصولات" };
 export default async function Products({
   searchParams,
@@ -12,25 +12,25 @@ export default async function Products({
 }) {
   const q = await searchParams;
   const [all, categories] = await Promise.all([
-    serverApi<Product[]>(
+    serverApi<{
+      items: Product[];
+      total: number;
+      page: number;
+      pageSize: number;
+    }>(
       "/products?" +
-        new URLSearchParams({ q: q.q || "", category: q.category || "" }),
+        new URLSearchParams({
+          q: q.q || "",
+          category: q.category || "",
+          page: q.page || "1",
+          max: q.max || "",
+          available: q.available === "true" ? "true" : "",
+          sort: q.sort || "",
+        }),
     ),
     serverApi<Category[]>("/categories"),
   ]);
-  let products = all.filter(
-    (p) =>
-      (q.available !== "true" || inStock(p)) &&
-      (!q.max || priceBounds(p)[0] <= Number(digits(q.max)) * 10),
-  );
-  if (q.sort === "price-asc")
-    products = products.toSorted(
-      (a, b) => priceBounds(a)[0] - priceBounds(b)[0],
-    );
-  if (q.sort === "price-desc")
-    products = products.toSorted(
-      (a, b) => priceBounds(b)[0] - priceBounds(a)[0],
-    );
+  const products = all.items;
   const title =
     categories.find((c) => c.id === q.category)?.name || "همه محصولات";
   return (
@@ -93,8 +93,45 @@ export default async function Products({
         </form>
         <div>
           <div className="between catalog-count">
-            <span>{fa(products.length)} محصول</span>
+            <span>{fa(all.total)} محصول</span>
             <span className="muted">بازه قیمت بسته‌های هر محصول</span>
+          </div>
+          <div className="omni-pager">
+            <span>صفحه {fa(all.page)}</span>
+            <div>
+              {all.page > 1 && (
+                <Link
+                  className="button secondary"
+                  href={
+                    "/products?" +
+                    new URLSearchParams({
+                      ...(Object.fromEntries(
+                        Object.entries(q).filter(([, v]) => v !== undefined),
+                      ) as Record<string, string>),
+                      page: String(all.page - 1),
+                    })
+                  }
+                >
+                  قبلی
+                </Link>
+              )}
+              {all.page * all.pageSize < all.total && (
+                <Link
+                  className="button secondary"
+                  href={
+                    "/products?" +
+                    new URLSearchParams({
+                      ...(Object.fromEntries(
+                        Object.entries(q).filter(([, v]) => v !== undefined),
+                      ) as Record<string, string>),
+                      page: String(all.page + 1),
+                    })
+                  }
+                >
+                  بعدی
+                </Link>
+              )}
+            </div>
           </div>
           {products.length ? (
             <div className="product-grid catalog-grid">

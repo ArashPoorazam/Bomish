@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"github.com/jackc/pgx/v5"
 	"math/big"
 	"net"
 	"net/http"
@@ -112,7 +113,20 @@ func (a *App) verifyOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var uid string
-	e = tx.QueryRow(r.Context(), "INSERT INTO users(id,phone) VALUES($1,$2) ON CONFLICT(phone) DO UPDATE SET phone=excluded.phone RETURNING id", token(), in.Phone).Scan(&uid)
+	candidate := token()
+	e = tx.QueryRow(r.Context(), "INSERT INTO users(id,phone) VALUES($1,$2) ON CONFLICT(phone) DO UPDATE SET phone=excluded.phone RETURNING id", candidate, in.Phone).Scan(&uid)
+	if e == nil && uid == candidate {
+		var ref string
+		err := tx.QueryRow(r.Context(), `SELECT t.id FROM sessions s JOIN staff t ON t.id=s.referral_staff_id WHERE s.token_hash=$1 AND s.referral_seen_at>now()-interval '720 hours' AND t.active AND t.archived_at IS NULL FOR SHARE OF t`, current(r).Hash).Scan(&ref)
+		if err == nil {
+			_, e = tx.Exec(r.Context(), "INSERT INTO customer_referrals(user_id,staff_id) VALUES($1,$2)", uid, ref)
+			if e == nil {
+				e = auditDetail(r.Context(), tx, "", "referral.signup", uid, map[string]string{"staffId": ref})
+			}
+		} else if err != pgx.ErrNoRows {
+			e = err
+		}
+	}
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -120,7 +134,7 @@ func (a *App) verifyOTP(w http.ResponseWriter, r *http.Request) {
 	s := current(r)
 	raw := token()
 	newHash := hash(raw)
-	_, e = tx.Exec(r.Context(), "INSERT INTO sessions(token_hash,csrf,user_id,expires_at) VALUES($1,$2,$3,now()+interval '30 days')", newHash, s.CSRF, uid)
+	_, e = tx.Exec(r.Context(), "INSERT INTO sessions(token_hash,csrf,user_id,expires_at) VALUES($1,$2,$3,now()+interval '720 hours')", newHash, s.CSRF, uid)
 	if e == nil {
 		_, e = tx.Exec(r.Context(), "UPDATE carts SET session_hash=$1 WHERE session_hash=$2", newHash, s.Hash)
 	}
@@ -129,6 +143,9 @@ func (a *App) verifyOTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if e == nil {
 		_, e = tx.Exec(r.Context(), "DELETE FROM otp_challenges WHERE phone=$1", in.Phone)
+	}
+	if e == nil {
+		e = auditDetail(r.Context(), tx, "", "auth.customer_login", uid, map[string]bool{"newAccount": uid == candidate})
 	}
 	if e == nil {
 		e = tx.Commit(r.Context())
@@ -182,8 +199,9 @@ func (a *App) staffLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	var id, pw, secret string
 	var last int64
-	e := a.Pool.QueryRow(r.Context(), "SELECT id,password_hash,totp_secret,last_totp_step FROM staff WHERE username=$1 AND active", in.Username).Scan(&id, &pw, &secret, &last)
+	e := a.Pool.QueryRow(r.Context(), "SELECT id,password_hash,totp_secret,last_totp_step FROM staff WHERE username=$1 AND active AND archived_at IS NULL", in.Username).Scan(&id, &pw, &secret, &last)
 	if e != nil || !checkPassword(pw, in.Password) {
+		a.logEvent(r.Context(), "", "auth.failed", "staff", map[string]string{})
 		fail(w, 401, "اطلاعات ورود معتبر نیست")
 		return
 	}
@@ -195,6 +213,7 @@ func (a *App) staffLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if valid == 0 {
+		a.logEvent(r.Context(), id, "auth.failed", id, map[string]string{"stage": "totp"})
 		fail(w, 401, "کد ورود معتبر نیست یا قبلاً استفاده شده است")
 		return
 	}
@@ -204,7 +223,7 @@ func (a *App) staffLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	tag, e := tx.Exec(r.Context(), "UPDATE staff SET last_totp_step=$1 WHERE id=$2 AND last_totp_step<$1", valid, id)
+	tag, e := tx.Exec(r.Context(), "UPDATE staff SET last_totp_step=$1 WHERE id=$2 AND last_totp_step<$1 AND active AND archived_at IS NULL AND password_hash=$3 AND totp_secret=$4", valid, id, pw, secret)
 	if e != nil || tag.RowsAffected() == 0 {
 		fail(w, 401, "کد ورود قبلاً استفاده شده است")
 		return
@@ -214,6 +233,9 @@ func (a *App) staffLogin(w http.ResponseWriter, r *http.Request) {
 	_, e = tx.Exec(r.Context(), "INSERT INTO sessions(token_hash,csrf,staff_id,expires_at) VALUES($1,$2,$3,now()+interval '8 hours')", hash(raw), s.CSRF, id)
 	if e == nil {
 		_, e = tx.Exec(r.Context(), "DELETE FROM sessions WHERE token_hash=$1", s.Hash)
+	}
+	if e == nil {
+		e = auditDetail(r.Context(), tx, id, "auth.login", id, map[string]string{})
 	}
 	if e == nil {
 		e = tx.Commit(r.Context())

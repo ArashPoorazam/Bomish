@@ -1,7 +1,7 @@
 "use client";
-import { CatalogManager, CategoryManager } from "./catalog-manager";
-import { Analytics } from "./analytics";
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { useStore } from "@/components/store-provider";
 import { api } from "@/lib/api";
 import type {
   Product,
@@ -9,295 +9,197 @@ import type {
   Article,
   Order,
   ShippingConfig,
-  Member,
 } from "@/lib/types";
-import { useStore } from "@/components/store-provider";
+import {
+  Workspace,
+  Feedback,
+  sectionLabels,
+  Pager,
+  type PageData,
+} from "@/components/omnisire/shared";
+import { CatalogManager, CategoryManager } from "./catalog-manager";
 import { ArticleManager } from "./article-manager";
 import { PriceManager } from "./price-manager";
-import { OrderManager, ShippingEditor, Members } from "./operations";
-import { date, digits, statuses } from "@/lib/format";
-export function Dashboard() {
-  const { user, refresh } = useStore();
-  const [tab, setTab] = useState("products"),
-    [error, setError] = useState(""),
-    [products, setProducts] = useState<Product[]>([]),
+import { OrderManager, ShippingEditor } from "./operations";
+export function Dashboard({
+  initialSection = "",
+  initialQuery = "",
+}: {
+  initialSection?: string;
+  initialQuery?: string;
+}) {
+  const { user } = useStore();
+  const permissions = user?.permissions || [];
+  const key = permissions.join(",");
+  const [tab, setTab] = useState(initialSection);
+  const requestVersion = useRef(0);
+  const [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]),
     [categories, setCategories] = useState<Category[]>([]),
     [articles, setArticles] = useState<Article[]>([]),
     [orders, setOrders] = useState<Order[]>([]),
-    [shipping, setShipping] = useState<ShippingConfig | null>(null),
-    [members, setMembers] = useState<Member[]>([]),
-    [events, setEvents] = useState<Record<string, string>[]>([]);
-  const role = user?.role || "";
-  const [productEditorState, setProductEditorState] = useState({
-    dirty: false,
-    busy: false,
-  });
-  function canLeaveProduct() {
-    return (
-      !productEditorState.busy &&
-      (!productEditorState.dirty ||
-        window.confirm("تغییرات ذخیره نشده‌اند. بدون ذخیره خارج می‌شوید؟"))
+    [shipping, setShipping] = useState<ShippingConfig | null>(null);
+  const [editor, setEditor] = useState({ dirty: false, busy: false });
+  const [page, setPage] = useState(1),
+    [listData, setListData] = useState<PageData | null>(null),
+    [filters, setFilters] = useState<Record<string, string>>({
+      q: initialQuery,
+    });
+  const filterKey = JSON.stringify(filters);
+  const onFilters = useCallback((next: Record<string, string>) => {
+    setFilters((prev) =>
+      JSON.stringify(prev) === JSON.stringify(next) ? prev : next,
     );
-  }
-  const reload = useCallback(async () => {
-    if (!role) return;
-    const content = role === "owner" || role === "editor";
-    if (content) {
-      const [p, c, a] = await Promise.all([
-        api<Product[]>("/staff/products"),
-        api<Category[]>("/categories"),
-        api<Article[]>("/staff/articles"),
-      ]);
-      setProducts(p);
-      setCategories(c);
-      setArticles(a);
-    }
-    if (role === "owner" || role === "operator")
-      setOrders(await api<Order[]>("/staff/orders"));
-    if (role === "owner") {
-      const [s, m, e] = await Promise.all([
-        api<ShippingConfig>("/staff/shipping"),
-        api<Member[]>("/staff/members"),
-        api<Record<string, string>[]>("/staff/audit"),
-      ]);
-      setShipping(s);
-      setMembers(m);
-      setEvents(e);
-    }
-  }, [role]);
+    setPage(1);
+  }, []);
   useEffect(() => {
-    reload().catch((e) => setError(e.message));
-    if (role === "operator") setTab("orders");
-  }, [reload, role]);
-  if (!user) return <div className="loading">در حال دریافت اطلاعات…</div>;
-  if (!role) return <StaffLogin />;
-  const tabs =
-    role === "operator"
-      ? [["orders", "سفارش‌ها"]]
-      : [
-          ["products", "محصولات"],
-          ["articles", "مجله"],
-          ["categories", "دسته‌بندی‌ها"],
-          ...(role === "owner"
-            ? [
-                ["orders", "سفارش‌ها"],
-                ["pricing", "قیمت و تخفیف"],
-                ["analytics", "تحلیل داده‌ها"],
-                ["shipping", "ارسال"],
-                ["members", "همکاران"],
-                ["audit", "رویدادها"],
-              ]
-            : []),
-        ];
+    if (!user?.role) return;
+    if (!permissions.includes(tab))
+      setTab(permissions.find((x) => x !== "omnisire") || "");
+  }, [key, tab]);
+  const reload = useCallback(async () => {
+    const request = ++requestVersion.current;
+    if (!tab || tab === "sales") return;
+    setBusy(true);
+    setError("");
+    try {
+      if (["categories", "articles", "pricing"].includes(tab)) {
+        const [p, c] = await Promise.all([
+          api<Product[]>("/staff/product-options"),
+          api<Category[]>("/categories"),
+        ]);
+        if (request !== requestVersion.current) return;
+        setProducts(p);
+        setCategories(c);
+      }
+      if (tab === "products") {
+        const categories = await api<Category[]>("/categories");
+        if (request !== requestVersion.current) return;
+        setCategories(categories);
+        const d = await api<PageData>(
+          "/staff/products?" +
+            new URLSearchParams({ ...filters, page: String(page) }),
+        );
+        if (request !== requestVersion.current) return;
+        setProducts(d.items as unknown as Product[]);
+        setListData(d);
+      }
+      if (tab === "articles") {
+        const d = await api<PageData>(
+          "/staff/articles?" +
+            new URLSearchParams({ ...filters, page: String(page) }),
+        );
+        if (request !== requestVersion.current) return;
+        setArticles(d.items as unknown as Article[]);
+        setListData(d);
+      }
+      if (tab === "orders") {
+        const d = await api<PageData>(
+          "/staff/orders?" +
+            new URLSearchParams({ ...filters, page: String(page) }),
+        );
+        if (request !== requestVersion.current) return;
+        setOrders(d.items as unknown as Order[]);
+        setListData(d);
+      }
+      if (tab === "shipping") {
+        const config = await api<ShippingConfig>("/staff/shipping");
+        if (request === requestVersion.current) setShipping(config);
+      }
+    } catch (e) {
+      if (request === requestVersion.current) setError((e as Error).message);
+    } finally {
+      if (request === requestVersion.current) setBusy(false);
+    }
+  }, [tab, key, page, filterKey]);
+  useEffect(() => {
+    void reload();
+    return () => {
+      requestVersion.current++;
+    };
+  }, [reload]);
   return (
-    <div className="container section">
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">فضای کار بومیش</span>
-          <h1>مدیریت فروشگاه</h1>
-        </div>
-        <button
-          className="button secondary"
-          disabled={productEditorState.busy}
-          onClick={async () => {
-            if (!canLeaveProduct()) return;
-            try {
-              await api("/logout", "POST");
-              await refresh();
-            } catch (e) {
-              setError((e as Error).message);
-            }
-          }}
-        >
-          خروج
-        </button>
-      </div>
-      <div className="notice">
-        {role === "owner"
-          ? "مالک فروشگاه · انتشار، قیمت و موجودی در اختیار شماست."
-          : role === "editor"
-            ? "ویرایشگر محتوا · تغییرات شما به صورت پیش‌نویس برای تأیید مالک ذخیره می‌شود."
-            : "مسئول سفارش‌ها · سفارش‌های پرداخت‌شده را آماده و ارسال کنید."}
-      </div>
-      <nav className="dashboard-tabs">
-        {tabs.map(([key, title]) => (
-          <button
-            key={key}
-            className={tab === key ? "selected" : ""}
-            disabled={productEditorState.busy}
-            onClick={() => {
-              if (tab === key || !canLeaveProduct()) return;
-              setProductEditorState({ dirty: false, busy: false });
-              setTab(key);
-              setError("");
-            }}
-          >
-            {title}
-          </button>
-        ))}
-      </nav>
-      {error ? (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {tab === "products" ? (
+    <Workspace
+      title={sectionLabels[tab] || "مدیریت فروشگاه"}
+      activeSection={tab}
+      navigationLocked={editor.busy}
+      onSectionChange={(p) => {
+        if (
+          editor.dirty &&
+          !confirm("تغییرات ذخیره نشده‌اند. بدون ذخیره خارج می‌شوید؟")
+        )
+          return;
+        setEditor({ dirty: false, busy: false });
+        setPage(1);
+        setFilters({});
+        setListData(null);
+        setTab(p);
+        window.history.replaceState(null, "", `/staff?section=${p}`);
+      }}
+    >
+      <Feedback error={error} loading={busy} />
+      {tab === "products" && (
         <CatalogManager
+          initialQuery={tab === initialSection ? initialQuery : ""}
           products={products}
           categories={categories}
-          owner={role === "owner"}
+          owner
+          canPrice={permissions.includes("pricing")}
+          onFilters={onFilters}
           reload={reload}
-          onEditorStateChange={setProductEditorState}
+          onEditorStateChange={setEditor}
         />
-      ) : null}
-      {tab === "articles" ? (
+      )}
+      {tab === "articles" && (
         <ArticleManager
+          initialQuery={tab === initialSection ? initialQuery : ""}
+          onFilters={onFilters}
           articles={articles}
           products={products}
-          owner={role === "owner"}
+          owner
           reload={reload}
-          onEditorStateChange={setProductEditorState}
+          onEditorStateChange={setEditor}
         />
-      ) : null}
-      {tab === "categories" ? (
+      )}
+      {tab === "categories" && (
         <CategoryManager
           categories={categories}
           products={products}
           reload={reload}
         />
-      ) : null}
-      {tab === "pricing" && role === "owner" ? (
+      )}
+      {tab === "pricing" && (
         <PriceManager
           products={products}
           reload={reload}
-          onStateChange={setProductEditorState}
+          onStateChange={setEditor}
         />
-      ) : null}
-      {tab === "analytics" && role === "owner" ? <Analytics /> : null}
-      {tab === "orders" ? (
-        <OrderManager orders={orders} reload={reload} />
-      ) : null}
-      {tab === "shipping" && shipping ? (
-        <ShippingEditor initial={shipping} />
-      ) : null}
-      {tab === "members" ? <Members members={members} reload={reload} /> : null}
-      {tab === "audit" ? (
-        <div className="form-card table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>همکار</th>
-                <th>عملیات</th>
-                <th>زمان</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((e, i) => (
-                <tr key={i}>
-                  <td>{e.username}</td>
-                  <td>
-                    {(
-                      {
-                        "product.draft": "ذخیره پیش‌نویس محصول",
-                        "product.publish": "انتشار محصول",
-                        "product.archive": "بایگانی محصول",
-                        "inventory.adjust": "اصلاح موجودی",
-                        "article.save": "ذخیره مقاله",
-                        "shipping.update": "تنظیم ارسال",
-                        "discount.create": "ساخت کد تخفیف",
-                        "discount.update": "تغییر وضعیت کد تخفیف",
-                        "pricing.discount": "تخفیف محصولات",
-                        "pricing.adjust": "اصلاح قیمت بسته‌ها",
-                        "staff.update": "مدیریت همکار",
-                        "order.packing": "آماده‌سازی سفارش",
-                        "order.shipped": "ارسال سفارش",
-                      } as Record<string, string>
-                    )[e.action] || "تغییر فروشگاه"}
-                  </td>
-                  <td dir="ltr">{date(e.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      )}
+      {tab === "orders" && (
+        <OrderManager
+          initialQuery={tab === initialSection ? initialQuery : ""}
+          onFilters={onFilters}
+          orders={orders}
+          reload={reload}
+        />
+      )}
+      {tab === "shipping" && shipping && <ShippingEditor initial={shipping} />}{" "}
+      {tab === "sales" && (
+        <div className="omni-welcome">
+          <h2>فروش‌های شما، دستاورد شما</h2>
+          <p>لینک اختصاصی، کمیسیون و پرداخت‌های خود را در یک‌جا ببینید.</p>
+          <Link className="button" href="/staff/sales">
+            مشاهده فروش من
+          </Link>
         </div>
-      ) : null}
-    </div>
-  );
-}
-function StaffLogin() {
-  const { refresh } = useStore();
-  const [username, setUsername] = useState(""),
-    [password, setPassword] = useState(""),
-    [code, setCode] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  return (
-    <div className="auth-layout">
-      <div className="form-card">
-        <h1>ورود همکاران</h1>
-        <p>نام کاربری، گذرواژه و کد برنامه رمزساز را وارد کنید.</p>
-        <form
-          className="stack"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setBusy(true);
-            setError("");
-            try {
-              await api("/staff/login", "POST", {
-                username,
-                password,
-                code: digits(code),
-              });
-              await refresh();
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          <label>
-            نام کاربری
-            <input
-              autoComplete="username"
-              required
-              dir="ltr"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </label>
-          <label>
-            گذرواژه
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-          <label>
-            کد برنامه رمزساز
-            <input
-              autoComplete="one-time-code"
-              inputMode="numeric"
-              maxLength={6}
-              required
-              dir="ltr"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-          </label>
-          <button className="button" disabled={busy}>
-            {busy ? "در حال ورود…" : "ورود به فضای کار"}
-          </button>
-          {error ? (
-            <p role="alert" className="error">
-              {error}
-            </p>
-          ) : null}
-        </form>
-      </div>
-    </div>
+      )}
+      {["products", "orders", "articles"].includes(tab) && (
+        <Pager data={listData} page={page} onPage={setPage} />
+      )}{" "}
+      {!permissions.length && (
+        <p className="notice">در حال حاضر بخشی برای حساب شما فعال نیست.</p>
+      )}
+    </Workspace>
   );
 }

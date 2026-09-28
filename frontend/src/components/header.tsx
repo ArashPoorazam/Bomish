@@ -20,7 +20,7 @@ export function Header() {
     if (!q.trim()) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetch("/api/v1/products?q=" + encodeURIComponent(q), {
+      fetch("/api/v1/products?pageSize=5&q=" + encodeURIComponent(q), {
         signal: controller.signal,
       })
         .then((r) => (r.ok ? r.json() : []))
@@ -69,6 +69,12 @@ export function Header() {
                 void api("/events", "POST", { kind: "search", query: q }).catch(
                   () => {},
                 );
+              if (active >= 0 && hits[active])
+                void api("/events", "POST", {
+                  kind: "click",
+                  productId: hits[active].id,
+                  query: "",
+                }).catch(() => {});
               setFocused(false);
               router.push(
                 active >= 0 && hits[active]
@@ -124,6 +130,11 @@ export function Header() {
                     key={p.id}
                     href={"/products/" + p.slug}
                     onClick={() => {
+                      void api("/events", "POST", {
+                        kind: "click",
+                        productId: p.id,
+                        query: "",
+                      }).catch(() => {});
                       if (q.trim())
                         void api("/events", "POST", {
                           kind: "search",

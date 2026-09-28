@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import { ProductClickLink } from "./product-click-link";
 import { ArrowUpLeft } from "lucide-react";
 import type { Product } from "@/lib/types";
 import { priceRange, inStock, fa } from "@/lib/format";
@@ -26,7 +26,7 @@ export function ProductImage({
 }
 export function ProductCard({ product }: { product: Product }) {
   return (
-    <Link href={`/products/${product.slug}`} className="product-card">
+    <ProductClickLink id={product.id} slug={product.slug}>
       <ProductImage product={product} />
       <div className="product-card-content">
         <span className="eyebrow">
@@ -53,6 +53,6 @@ export function ProductCard({ product }: { product: Product }) {
         </div>
         {!inStock(product) ? <span className="muted">ناموجود</span> : null}
       </div>
-    </Link>
+    </ProductClickLink>
   );
 }

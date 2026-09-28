@@ -5,7 +5,14 @@ export default function robots(): MetadataRoute.Robots {
         rules: {
           userAgent: "*",
           allow: "/",
-          disallow: ["/staff", "/account", "/checkout", "/login", "/api"],
+          disallow: [
+            "/omnisire",
+            "/staff",
+            "/account",
+            "/checkout",
+            "/login",
+            "/api",
+          ],
         },
         sitemap:
           (process.env.SITE_URL || "http://localhost:3000") + "/sitemap.xml",

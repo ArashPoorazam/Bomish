@@ -32,7 +32,21 @@ export default async function Post({
   } catch {
     notFound();
   }
-  const products = await serverApi<Product[]>("/products");
+  const products: Product[] = [];
+  if (a.productIds?.length) {
+    for (let page = 1; ; page++) {
+      const data = await serverApi<{ items: Product[]; total: number }>(
+        "/products?" +
+          new URLSearchParams({
+            ids: a.productIds.join(","),
+            page: String(page),
+            pageSize: "100",
+          }),
+      );
+      products.push(...data.items);
+      if (products.length >= data.total || !data.items.length) break;
+    }
+  }
   return (
     <article className="container section">
       <header className="article-header">
@@ -56,7 +70,7 @@ export default async function Post({
         <h2 style={{ marginBottom: 24 }}>طعم‌های این نوشته</h2>
         <div className="product-grid">
           {products
-            .filter((p) => a.productIds.includes(p.id))
+            .filter((p) => (a.productIds || []).includes(p.id))
             .map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}

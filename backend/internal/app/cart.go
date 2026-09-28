@@ -15,19 +15,20 @@ type querier interface {
 
 func loadCart(ctx context.Context, q querier, s string) (domain.Cart, error) {
 	out := domain.Cart{Items: []domain.CartItem{}}
-	rows, e := q.Query(ctx, `SELECT p.id,p.slug,p.name,p.category_id,p.status,p.price_rials,p.min_grams,p.step_grams,p.max_grams,p.content,i.stock_grams-i.reserved_grams,c.package_id,c.quantity FROM carts c JOIN products p ON p.id=c.product_id JOIN inventory i ON i.product_id=p.id WHERE c.session_hash=$1 ORDER BY p.id,c.package_id`, s)
+	rows, e := q.Query(ctx, `SELECT p.id,p.slug,p.name,p.category_id,p.status,p.price_rials,p.min_grams,p.step_grams,p.max_grams,p.content,coalesce((p.content->>'outOfStock')::boolean,false),c.package_id,c.quantity FROM carts c JOIN products p ON p.id=c.product_id WHERE c.session_hash=$1 ORDER BY p.id,c.package_id`, s)
 	if e != nil {
 		return out, e
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var p db.Product
-		var stock, quantity int64
+		var quantity int64
+		var outOfStock bool
 		var id string
-		if e = rows.Scan(&p.ID, &p.Slug, &p.Name, &p.CategoryID, &p.Status, &p.PriceRials, &p.MinGrams, &p.StepGrams, &p.MaxGrams, &p.Content, &stock, &id, &quantity); e != nil {
+		if e = rows.Scan(&p.ID, &p.Slug, &p.Name, &p.CategoryID, &p.Status, &p.PriceRials, &p.MinGrams, &p.StepGrams, &p.MaxGrams, &p.Content, &outOfStock, &id, &quantity); e != nil {
 			return out, e
 		}
-		v := productFrom(p, stock)
+		v := productFrom(p, outOfStock)
 		pack, ok := v.Package(id)
 		if !ok {
 			pack = domain.Package{ID: id, Unit: "g", MaxQuantity: 0}
@@ -69,25 +70,14 @@ func (a *App) setCartItem(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "محصول در دسترس نیست")
 		return
 	}
-	v := productFrom(db.Product{ID: p.ID, Slug: p.Slug, Name: p.Name, CategoryID: p.CategoryID, Status: p.Status, PriceRials: p.PriceRials, MinGrams: p.MinGrams, StepGrams: p.StepGrams, MaxGrams: p.MaxGrams, Content: p.Content}, p.AvailableGrams)
+	v := productFrom(db.Product{ID: p.ID, Slug: p.Slug, Name: p.Name, CategoryID: p.CategoryID, Status: p.Status, PriceRials: p.PriceRials, MinGrams: p.MinGrams, StepGrams: p.StepGrams, MaxGrams: p.MaxGrams, Content: p.Content}, p.OutOfStock)
 	pack, ok := v.Package(in.PackageID)
 	if !ok || in.Quantity < 1 || in.Quantity > pack.MaxQuantity {
 		fail(w, 400, "بسته یا تعداد انتخاب‌شده مجاز نیست")
 		return
 	}
-	cart, e := loadCart(r.Context(), tx, current(r).Hash)
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	grams := pack.Weight() * in.Quantity
-	for _, item := range cart.Items {
-		if item.Product.ID == v.ID && item.Package.ID != pack.ID {
-			grams += item.Grams
-		}
-	}
-	if grams > v.AvailableGrams {
-		fail(w, 409, "موجودی کافی نیست")
+	if v.OutOfStock {
+		fail(w, 409, "این محصول ناموجود است")
 		return
 	}
 	_, e = tx.Exec(r.Context(), `INSERT INTO carts(session_hash,product_id,package_id,quantity,grams) VALUES($1,$2,$3,$4,$5) ON CONFLICT(session_hash,product_id,package_id) DO UPDATE SET quantity=excluded.quantity,grams=excluded.grams`, current(r).Hash, v.ID, pack.ID, in.Quantity, pack.Weight()*in.Quantity)

@@ -382,10 +382,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Product"
-                  }
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Product"
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/PagedProducts"
+                    }
+                  ]
                 }
               }
             }
@@ -424,6 +431,45 @@
           {
             "name": "category",
             "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "Comma-separated product IDs; all other filters and pagination still apply.",
             "schema": {
               "type": "string"
             }
@@ -1138,182 +1184,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Product"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Login required"
-          },
-          "403": {
-            "description": "Not allowed"
-          },
-          "409": {
-            "description": "State changed"
-          },
-          "429": {
-            "description": "Rate limited"
-          }
-        }
-      }
-    },
-    "/staff/articles": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Article"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Login required"
-          },
-          "403": {
-            "description": "Not allowed"
-          },
-          "409": {
-            "description": "State changed"
-          },
-          "429": {
-            "description": "Rate limited"
-          }
-        }
-      }
-    },
-    "/staff/orders": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Order"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Login required"
-          },
-          "403": {
-            "description": "Not allowed"
-          },
-          "409": {
-            "description": "State changed"
-          },
-          "429": {
-            "description": "Rate limited"
-          }
-        }
-      }
-    },
-    "/staff/members": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Member"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Login required"
-          },
-          "403": {
-            "description": "Not allowed"
-          },
-          "409": {
-            "description": "State changed"
-          },
-          "429": {
-            "description": "Rate limited"
-          }
-        }
-      },
-      "post": {
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Product"
+                      }
                     },
-                    "totpSecret": {
-                      "type": "string"
+                    {
+                      "$ref": "#/components/schemas/PagedProducts"
                     }
-                  },
-                  "required": [
-                    "id",
-                    "totpSecret"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -1343,49 +1224,228 @@
         },
         "parameters": [
           {
-            "name": "X-CSRF-Token",
-            "in": "header",
-            "required": true,
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "Comma-separated product IDs; all other filters and pagination still apply.",
             "schema": {
               "type": "string"
             }
           }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "username": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string"
-                  },
-                  "role": {
-                    "type": "string"
-                  },
-                  "active": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "id",
-                  "username",
-                  "password",
-                  "role",
-                  "active"
-                ],
-                "additionalProperties": false
+        ]
+      }
+    },
+    "/staff/articles": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Article"
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/PagedArticles"
+                    }
+                  ]
+                }
               }
             }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
           }
-        }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      }
+    },
+    "/staff/orders": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Order"
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/PagedOrders"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
       }
     },
     "/staff/products/{id}": {
@@ -1564,86 +1624,6 @@
             }
           }
         ]
-      }
-    },
-    "/staff/products/{id}/inventory": {
-      "post": {
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OK"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Login required"
-          },
-          "403": {
-            "description": "Not allowed"
-          },
-          "409": {
-            "description": "State changed"
-          },
-          "429": {
-            "description": "Rate limited"
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-CSRF-Token",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "deltaGrams": {
-                    "type": "integer",
-                    "format": "int64"
-                  },
-                  "reason": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "deltaGrams",
-                  "reason"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        }
       }
     },
     "/staff/categories/{id}": {
@@ -2019,68 +1999,6 @@
                 "$ref": "#/components/schemas/ShippingConfig"
               }
             }
-          }
-        }
-      }
-    },
-    "/staff/audit": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "action": {
-                        "type": "string"
-                      },
-                      "entityId": {
-                        "type": "string"
-                      },
-                      "createdAt": {
-                        "type": "string"
-                      },
-                      "username": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "action",
-                      "entityId",
-                      "createdAt",
-                      "username"
-                    ],
-                    "additionalProperties": false
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Login required"
-          },
-          "403": {
-            "description": "Not allowed"
-          },
-          "409": {
-            "description": "State changed"
-          },
-          "429": {
-            "description": "Rate limited"
           }
         }
       }
@@ -2560,59 +2478,6 @@
         }
       }
     },
-    "/staff/analytics": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Analytics"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Login required"
-          },
-          "403": {
-            "description": "Not allowed"
-          },
-          "409": {
-            "description": "State changed"
-          },
-          "429": {
-            "description": "Rate limited"
-          }
-        },
-        "parameters": [
-          {
-            "name": "days",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "enum": [
-                7,
-                30,
-                90,
-                365
-              ]
-            }
-          }
-        ]
-      }
-    },
     "/staff/discount-codes": {
       "get": {
         "responses": {
@@ -2792,6 +2657,1205 @@
           }
         }
       }
+    },
+    "/omnisire/members": {
+      "get": {
+        "summary": "/omnisire/members",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedMembers"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "/omnisire/members",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCreated"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/omnisire/members/{id}": {
+      "get": {
+        "summary": "/omnisire/members/{id}",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Member"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "summary": "/omnisire/members/{id}",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRow"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "/omnisire/members/{id}",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRow"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/omnisire/members/{id}/credentials": {
+      "post": {
+        "summary": "/omnisire/members/{id}/credentials",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRow"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberCredentials"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/omnisire/members/{id}/sales": {
+      "get": {
+        "summary": "/omnisire/members/{id}/sales",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SalesSummary"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PagedResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "part",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "customers",
+                "orders",
+                "ledger"
+              ]
+            }
+          },
+          {
+            "name": "customer",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter attributed purchases to one referred customer."
+          }
+        ]
+      }
+    },
+    "/omnisire/members/{id}/payments": {
+      "post": {
+        "summary": "/omnisire/members/{id}/payments",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRow"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberPayment"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/omnisire/members/{id}/payments/{entry}/reverse": {
+      "post": {
+        "summary": "/omnisire/members/{id}/payments/{entry}/reverse",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRow"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entry",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentReversal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/omnisire/members/{id}/refunds": {
+      "post": {
+        "summary": "/omnisire/members/{id}/refunds",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRow"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommissionRefund"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/omnisire/events": {
+      "get": {
+        "summary": "/omnisire/events",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      }
+    },
+    "/omnisire/analytics": {
+      "get": {
+        "summary": "/omnisire/analytics",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "section",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ids",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "metric",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/omnisire/analytics/series": {
+      "get": {
+        "summary": "/omnisire/analytics/series",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsSeries"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "section",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ids",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "metric",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/omnisire/exports": {
+      "post": {
+        "summary": "/omnisire/exports",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRow"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/omnisire/exports/{id}": {
+      "get": {
+        "summary": "/omnisire/exports/{id}",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportJob"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/omnisire/exports/{id}/download": {
+      "get": {
+        "summary": "/omnisire/exports/{id}/download",
+        "responses": {
+          "200": {
+            "description": "Excel workbook, numeric currency columns in toman",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/omnisire/exports/{id}/retry": {
+      "post": {
+        "summary": "/omnisire/exports/{id}/retry",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRow"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/sales": {
+      "get": {
+        "summary": "/staff/sales",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SalesSummary"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PagedResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "part",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "customers",
+                "orders",
+                "ledger"
+              ]
+            }
+          },
+          {
+            "name": "customer",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter attributed purchases to one referred customer."
+          }
+        ]
+      }
+    },
+    "/referral": {
+      "post": {
+        "summary": "/referral",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRow"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/omnisire/summary": {
+      "get": {
+        "summary": "Owner overview totals",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OmnisireSummary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner access required"
+          }
+        }
+      }
+    },
+    "/staff/product-options": {
+      "get": {
+        "summary": "Searchable product choices for permitted content tools",
+        "responses": {
+          "200": {
+            "description": "Product choices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Product"
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/PagedProducts"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "Comma-separated product IDs; all other filters and pagination still apply.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/staff/category-counts": {
+      "get": {
+        "summary": "Count all products per category for authorized staff",
+        "responses": {
+          "200": {
+            "description": "Category ID to product count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/products/{id}/availability": {
+      "post": {
+        "operationId": "setProductAvailability",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "outOfStock"
+                ],
+                "properties": {
+                  "outOfStock": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Manual availability saved"
+          },
+          "403": {
+            "description": "Product permission required"
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        }
+      }
+    },
+    "/omnisire/analytics/charts": {
+      "get": {
+        "operationId": "reportCharts",
+        "parameters": [
+          {
+            "name": "section",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "overview, products, packages, prices, customers, categories, or searches"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "First Tehran date, YYYY-MM-DD; defaults to six days ago"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Last Tehran date inclusive, YYYY-MM-DD; defaults to today"
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Up to twelve comma-separated comparison IDs"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name filter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Calendar days, daily points, complete share totals, and package sales"
+          },
+          "400": {
+            "description": "Invalid report, date range, or selection"
+          },
+          "403": {
+            "description": "Owner permission required"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2851,10 +3915,6 @@
             "format": "int64"
           },
           "maxGrams": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "availableGrams": {
             "type": "integer",
             "format": "int64"
           },
@@ -2920,6 +3980,10 @@
           "popularity": {
             "type": "integer",
             "format": "int64"
+          },
+          "outOfStock": {
+            "type": "boolean",
+            "default": false
           }
         },
         "required": [
@@ -2940,7 +4004,7 @@
           "minGrams",
           "stepGrams",
           "maxGrams",
-          "availableGrams",
+          "outOfStock",
           "images",
           "tags",
           "aliases",
@@ -3233,17 +4297,36 @@
             "type": "boolean"
           },
           "role": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "",
+              "owner",
+              "manager",
+              "editor",
+              "operator",
+              "salesperson"
+            ]
           },
           "development": {
             "type": "boolean"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "staffId": {
+            "type": "string"
           }
         },
         "required": [
           "csrf",
           "authenticated",
           "role",
-          "development"
+          "development",
+          "permissions",
+          "staffId"
         ],
         "additionalProperties": false
       },
@@ -3341,6 +4424,18 @@
       },
       "Member": {
         "type": "object",
+        "required": [
+          "id",
+          "username",
+          "fullName",
+          "phone",
+          "role",
+          "active",
+          "restrictions",
+          "referralCode",
+          "balanceRials",
+          "profileIncomplete"
+        ],
         "properties": {
           "id": {
             "type": "string"
@@ -3348,20 +4443,46 @@
           "username": {
             "type": "string"
           },
+          "fullName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
           "role": {
             "type": "string"
           },
           "active": {
             "type": "boolean"
+          },
+          "referralCode": {
+            "type": "string"
+          },
+          "bankCard": {
+            "type": "string"
+          },
+          "balanceRials": {
+            "type": "integer"
+          },
+          "profileIncomplete": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "restrictions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
-        },
-        "required": [
-          "id",
-          "username",
-          "role",
-          "active"
-        ],
-        "additionalProperties": false
+        }
       },
       "Error": {
         "type": "object",
@@ -3817,6 +4938,631 @@
           "createdAt",
           "usedCount",
           "reservedCount"
+        ],
+        "additionalProperties": false
+      },
+      "ReportColumn": {
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "kind"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportRow": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "PagedResult": {
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportRow"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportColumn"
+            }
+          }
+        }
+      },
+      "SalesSummary": {
+        "type": "object",
+        "required": [
+          "referralCode",
+          "referralLink",
+          "customers",
+          "salesRials",
+          "earnedRials",
+          "paidRials",
+          "balanceRials"
+        ],
+        "properties": {
+          "referralCode": {
+            "type": "string"
+          },
+          "referralLink": {
+            "type": "string"
+          },
+          "customers": {
+            "type": "integer"
+          },
+          "salesRials": {
+            "type": "integer"
+          },
+          "earnedRials": {
+            "type": "integer"
+          },
+          "paidRials": {
+            "type": "integer"
+          },
+          "balanceRials": {
+            "type": "integer"
+          }
+        }
+      },
+      "ExportJob": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "progress",
+          "error"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "ready",
+              "failed"
+            ]
+          },
+          "progress": {
+            "type": "integer"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "MemberInput": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "bankCard": {
+            "type": "string",
+            "pattern": "^[0-9۰-۹٠-٩ -]+$"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "manager",
+              "editor",
+              "operator",
+              "salesperson"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "restrictions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "products",
+                "articles",
+                "categories",
+                "pricing",
+                "orders",
+                "shipping",
+                "sales"
+              ]
+            }
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fullName",
+          "username",
+          "phone",
+          "bankCard",
+          "role",
+          "active",
+          "restrictions"
+        ],
+        "additionalProperties": false
+      },
+      "MemberCredentials": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string"
+          },
+          "resetTotp": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "MemberCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "totpSecret": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "totpSecret"
+        ],
+        "additionalProperties": false
+      },
+      "MemberPayment": {
+        "type": "object",
+        "properties": {
+          "amountRials": {
+            "type": "integer",
+            "minimum": 10,
+            "multipleOf": 10
+          },
+          "transactionNumber": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amountRials",
+          "transactionNumber",
+          "occurredAt",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "PaymentReversal": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "CommissionRefund": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "amountRials": {
+            "type": "integer",
+            "minimum": 10,
+            "multipleOf": 10
+          },
+          "reason": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderId",
+          "amountRials",
+          "reason",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "MemberLedgerEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "commission",
+              "payment",
+              "payment_reversal",
+              "commission_correction"
+            ]
+          },
+          "amountRials": {
+            "type": "integer"
+          },
+          "orderId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reversesId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "transactionNumber": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reversed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "amountRials",
+          "orderId",
+          "reversesId",
+          "transactionNumber",
+          "note",
+          "occurredAt",
+          "createdAt",
+          "reversed"
+        ],
+        "additionalProperties": false
+      },
+      "ReferralCustomer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "orders": {
+            "type": "integer"
+          },
+          "salesRials": {
+            "type": "integer"
+          },
+          "commissionRials": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "phone",
+          "createdAt",
+          "expiresAt",
+          "orders",
+          "salesRials",
+          "commissionRials"
+        ],
+        "additionalProperties": false
+      },
+      "AuditEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "action": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "staffId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "entityId",
+          "detail",
+          "createdAt",
+          "actorName",
+          "staffId"
+        ],
+        "additionalProperties": false
+      },
+      "ExportRequest": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "q": {
+            "type": "string"
+          },
+          "ids": {
+            "type": "string"
+          },
+          "sort": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "customer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "section"
+        ],
+        "additionalProperties": false
+      },
+      "AnalyticsSeries": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "combined": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "metric": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "combined",
+          "count",
+          "metric"
+        ],
+        "additionalProperties": false
+      },
+      "OmnisireSummary": {
+        "type": "object",
+        "properties": {
+          "revenue": {
+            "type": "integer"
+          },
+          "orders": {
+            "type": "integer"
+          },
+          "members": {
+            "type": "integer"
+          },
+          "payable": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revenue",
+          "orders",
+          "members",
+          "payable"
+        ],
+        "additionalProperties": false
+      },
+      "PagedMembers": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "PagedProducts": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "PagedOrders": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Order"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "PagedArticles": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Article"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
         ],
         "additionalProperties": false
       }

@@ -1,8 +1,8 @@
 import type { Page } from "@playwright/test";
 import { createHmac } from "node:crypto";
-function totp() {
+export function totp(secret = "JBSWY3DPEHPK3PXP") {
   let bits = "";
-  for (const c of "JBSWY3DPEHPK3PXP")
+  for (const c of secret)
     bits += "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
       .indexOf(c)
       .toString(2)
@@ -15,7 +15,10 @@ function totp() {
     (digest.readUInt32BE(digest[19] & 15) & 0x7fffffff) % 1000000,
   ).padStart(6, "0");
 }
-export async function loginStaff(page: Page, role: "owner" | "editor") {
+export async function loginStaff(
+  page: Page,
+  role: "owner" | "editor" | "operator",
+) {
   await page.getByLabel("نام کاربری", { exact: true }).fill(role);
   await page.getByLabel("گذرواژه", { exact: true }).fill("Bomish-demo-2026!");
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -26,7 +29,11 @@ export async function loginStaff(page: Page, role: "owner" | "editor") {
     );
     await page.getByRole("button", { name: "ورود به فضای کار" }).click();
     const result = await response;
-    if (result.ok()) return;
+    if (result.ok()) {
+      await page.waitForURL(role === "owner" ? "**/omnisire" : "**/staff");
+      if (role === "owner") await page.goto("/staff");
+      return;
+    }
     const body = await result.json();
     if (
       result.status() !== 401 ||

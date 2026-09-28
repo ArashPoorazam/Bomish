@@ -8,21 +8,32 @@ import { ArticleEditor, newArticle } from "./article-editor";
 
 type EditorState = { dirty: boolean; busy: boolean };
 export function ArticleManager({
+  initialQuery = "",
   articles,
   products,
   owner,
+  onFilters,
   reload,
   onEditorStateChange,
 }: {
+  initialQuery?: string;
   articles: Article[];
   products: Product[];
   owner: boolean;
+  onFilters?: (filters: Record<string, string>) => void;
   reload: () => Promise<void>;
   onEditorStateChange: (state: EditorState) => void;
 }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [status, setStatus] = useState("");
   const [sort, setSort] = useState("newest");
+  useEffect(() => {
+    const timer = setTimeout(
+      () => onFilters?.({ q: query, status, sort }),
+      250,
+    );
+    return () => clearTimeout(timer);
+  }, [query, status, sort, onFilters]);
   const [selected, setSelected] = useState<Article | null>(null);
   const [editorState, setEditorState] = useState<EditorState>({
     dirty: false,
@@ -44,20 +55,22 @@ export function ArticleManager({
     setEditorState({ dirty: false, busy: false });
     setSelected(article);
   }
-  const visible = articles
-    .filter(
-      (a) =>
-        (!status || a.status === status) &&
-        `${a.title} ${a.excerpt} ${a.slug}`
-          .toLocaleLowerCase()
-          .includes(query.trim().toLocaleLowerCase()),
-    )
-    .sort((a, b) =>
-      sort === "title"
-        ? a.title.localeCompare(b.title, "fa")
-        : (sort === "oldest" ? 1 : -1) *
-          ((Date.parse(a.updatedAt) || 0) - (Date.parse(b.updatedAt) || 0)),
-    );
+  const visible = onFilters
+    ? articles
+    : articles
+        .filter(
+          (a) =>
+            (!status || a.status === status) &&
+            `${a.title} ${a.excerpt} ${a.slug}`
+              .toLocaleLowerCase()
+              .includes(query.trim().toLocaleLowerCase()),
+        )
+        .sort((a, b) =>
+          sort === "title"
+            ? a.title.localeCompare(b.title, "fa")
+            : (sort === "oldest" ? 1 : -1) *
+              ((Date.parse(a.updatedAt) || 0) - (Date.parse(b.updatedAt) || 0)),
+        );
   return (
     <div className="staff-workspace journal-workspace">
       <aside className="staff-tools stack">

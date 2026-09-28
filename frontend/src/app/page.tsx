@@ -27,9 +27,8 @@ export default async function Home() {
     <>
       <section className="hero container">
         <div className="hero-copy">
-          
           <h1>
-           دنیایی از عطر
+            دنیایی از عطر
             <br />
             دنیایی از <em>طعم</em>
           </h1>

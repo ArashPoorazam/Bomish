@@ -21,24 +21,15 @@ export function ProductPurchase({ product: p }: { product: Product }) {
   const existing =
     cart.items.find((x) => x.product.id === p.id && x.package.id === id)
       ?.quantity || 0;
-  const otherWeight = cart.items
-    .filter((x) => x.product.id === p.id && x.package.id !== id)
-    .reduce((n, x) => n + x.grams, 0);
-  const max = pack
-    ? Math.max(
-        0,
-        Math.min(
-          pack.maxQuantity,
-          Math.floor((p.availableGrams - otherWeight) / packageWeight(pack)),
-        ) - existing,
-      )
-    : 0;
+  const max =
+    pack && !p.outOfStock ? Math.max(0, pack.maxQuantity - existing) : 0;
   async function add(trigger: HTMLButtonElement) {
     if (!pack) return;
     setBusy(true);
     setError("");
     try {
       await setItem(p, pack.id, existing + quantity);
+      setQuantity(1);
       openCart(trigger);
     } catch (e) {
       setError((e as Error).message);
@@ -64,7 +55,7 @@ export function ProductPurchase({ product: p }: { product: Product }) {
               key={x.id}
               aria-pressed={id === x.id}
               className={id === x.id ? "selected" : ""}
-              disabled={packageWeight(x) > p.availableGrams}
+              disabled={p.outOfStock}
               onClick={() => {
                 setID(x.id);
                 setQuantity(1);
@@ -129,7 +120,11 @@ export function ProductPurchase({ product: p }: { product: Product }) {
             </button>
           </div>
           {max === 0 && (
-            <p className="muted">موجودی یا سقف خرید این بسته تکمیل شده است.</p>
+            <p className="muted">
+              {p.outOfStock
+                ? "این محصول ناموجود است."
+                : "سقف خرید این بسته تکمیل شده است."}
+            </p>
           )}
         </>
       )}

@@ -11,7 +11,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Open [the store](http://localhost:3000) or [the employee dashboard](http://localhost:3000/staff). The database and API are private to the Compose network. Persistent volumes retain the database and uploaded images. This Compose profile is local HTTP development only.
+Open [the store](http://localhost:3000) , [the employee dashboard](http://localhost:3000/staff), or [Omnisire](http://localhost:3000/omnisire). The database and API are private to the Compose network. Persistent volumes retain the database and uploaded images. This Compose profile is local HTTP development only.
 
 ### Native development
 
@@ -52,9 +52,11 @@ Development fixtures create these three separate accounts:
 
 | Username | Permission |
 |---|---|
-| `owner` | Publishing, prices, stock, delivery, staff and orders |
-| `editor` | Product, category and article drafts |
-| `operator` | Order preparation and tracking |
+| `owner` | All staff tools and the independent Omnisire owner workspace |
+| `editor` | Products, availability, publishing, magazine, categories, pricing and personal sales |
+| `operator` | Order preparation, tracking and personal sales |
+
+Owners can also create managers (all staff tools) and salespersons (personal sales only) in Omnisire, with individual section restrictions or account suspension. Members receive referral links, a permanent commission/payment ledger and audited activity.
 
 All three use the development password `Bomish-demo-2026!` and authenticator setup key `JBSWY3DPEHPK3PXP`. Add that key to a TOTP authenticator, or print the current local development code with the same environment as the API:
 
@@ -74,7 +76,9 @@ A TOTP cannot be reused for the same account. Customer login instead displays a 
 - Product-specific gram/kilogram/milliliter/liter packages, per-package prices and purchase limits, separate cart lines, and price ranges.
 - Kavenegar-ready SMS account verification, map-assisted saved addresses, and four-stage order tracking with queued notifications.
 - Regional/weight-based delivery, server-authoritative checkout, 15-minute reservations, repeat-safe simulated payments and late-payment review.
-- Separate password/TOTP staff login, backend-enforced roles, draft preview, uploads, owner publication, stock adjustments, delivery editing and audit records.
+- Separate password/TOTP staff login, backend-enforced roles, draft preview, uploads, editor publication, manual availability and delivery editing.
+- Owner-only Omnisire with member management, referral commission accounting, searchable event history, paginated analytics, cross-page comparison and background Excel exports.
+- Referral commissions: 7% of discounted merchandise within 30 days of signup, rounded upward to 1,000 toman per paid order; external payout recording, reversals and partial-refund corrections.
 - OpenAPI contract, generated TypeScript types, sqlc queries, migrations, containers, CI, and backup/restore helpers.
 
 ## Verify

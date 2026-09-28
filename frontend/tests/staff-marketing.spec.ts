@@ -15,7 +15,7 @@ const product = {
   nutrients: [],
   relatedIds: [],
   discountPercent: 10,
-  availableGrams: 1000,
+  outOfStock: false,
   packages: [
     {
       id: "small",
@@ -60,23 +60,68 @@ async function mockedStaff(page: Page) {
       return route.fulfill({ json: { count: 1 } });
     }
     const data: Record<string, unknown> = {
-      "/session": { csrf: "test", role: "owner", staffId: "owner" },
+      "/session": {
+        csrf: "test",
+        role: "owner",
+        staffId: "owner",
+        permissions: [
+          "products",
+          "articles",
+          "categories",
+          "pricing",
+          "orders",
+          "shipping",
+          "sales",
+          "omnisire",
+        ],
+      },
       "/cart": { items: [], subtotalRials: 0 },
-      "/staff/products": [product],
+      "/staff/products": { items: [product], total: 1, page: 1, pageSize: 25 },
+      "/staff/product-options": new URL(route.request().url()).searchParams.has(
+        "page",
+      )
+        ? { items: [product], total: 1, page: 1, pageSize: 25 }
+        : [product],
       "/categories": [{ id: "spices", name: "ادویه‌ها" }],
-      "/staff/articles": articles,
+      "/staff/articles": {
+        items: articles,
+        total: articles.length,
+        page: 1,
+        pageSize: 25,
+      },
       "/staff/orders": [],
       "/staff/members": [],
       "/staff/audit": [],
       "/staff/shipping": {},
       "/staff/discount-codes": [],
     };
+    const params = new URL(route.request().url()).searchParams;
+    const response = data[path];
+    if (
+      params.has("page") &&
+      response &&
+      typeof response === "object" &&
+      "items" in response
+    ) {
+      const paged = response as {
+        items: Record<string, unknown>[];
+        total: number;
+      };
+      const query = params.get("q") || "",
+        status = params.get("status") || "";
+      const items = paged.items.filter(
+        (item) =>
+          (!query || JSON.stringify(item).includes(query)) &&
+          (!status || item.status === status),
+      );
+      return route.fulfill({ json: { ...paged, items, total: items.length } });
+    }
     return route.fulfill({ json: data[path] ?? { ok: true } });
   });
   await page.goto("/staff");
   return changes;
 }
-test("journal library uses right-side controls, filters articles, and edits legacy records", async ({
+test("journal library uses top controls, filters articles, and edits legacy records", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -90,12 +135,15 @@ test("journal library uses right-side controls, filters articles, and edits lega
   const content = await page
     .locator(".journal-workspace .staff-main")
     .boundingBox();
-  expect(sidebar!.x).toBeGreaterThan(content!.x + content!.width);
+  expect(sidebar!.y + sidebar!.height).toBeLessThan(content!.y);
+  expect(sidebar!.height).toBeLessThan(210);
   await page.getByLabel("وضعیت مقاله").selectOption("draft");
   await expect(page.locator(".journal-card")).toHaveCount(1);
   await expect(page.locator(".journal-card")).toContainText("روش نگهداری سبزی");
   await page.getByRole("button", { name: "پاک کردن فیلترها" }).click();
   await page.getByLabel("جستجوی مقاله").fill("ادویه");
+  await expect(page.locator(".journal-card")).toHaveCount(1);
+  await expect(page.locator(".journal-card")).toContainText("راهنمای ادویه");
   await page.getByRole("button", { name: "ویرایش مقاله", exact: true }).click();
   await expect(page.getByLabel("عنوان", { exact: true })).toHaveValue(
     "راهنمای ادویه",
@@ -211,8 +259,7 @@ test("staff creates a discount code and customer applies it through a paid order
       await customer.request.get("/api/v1/products")
     ).json();
     const inStock = publicProducts.find(
-      (p) =>
-        p.packages[0]?.unit === "g" && p.packages[0].amount <= p.availableGrams,
+      (p) => p.packages[0]?.unit === "g" && !p.outOfStock,
     );
     expect(
       inStock,

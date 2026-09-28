@@ -34,7 +34,11 @@ export default async function Detail({
     notFound();
   }
   const [products, articles] = await Promise.all([
-    serverApi<Product[]>("/products"),
+    serverApi<Product[]>(
+      "/products?available=true&category=" +
+        encodeURIComponent(p.categoryId) +
+        "&pageSize=5",
+    ),
     serverApi<Article[]>("/articles"),
   ]);
   const available = products.filter((x) => x.id !== p.id && inStock(x));
