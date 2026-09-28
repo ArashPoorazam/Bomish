@@ -17,7 +17,7 @@ import {
 import { useStore } from "@/components/store-provider";
 import { StaffLogin } from "@/components/staff/staff-login";
 import { api } from "@/lib/api";
-import { money, fa, date, statuses } from "@/lib/format";
+import { money, fa, statuses } from "@/lib/format";
 import type { components } from "@/lib/api-types";
 export type Row = Record<string, unknown>;
 export type Column = components["schemas"]["ReportColumn"];
@@ -100,6 +100,8 @@ export function Workspace({
   onSectionChange,
   navigationLocked = false,
   actions,
+  titleDetail,
+  description,
 }: {
   children: ReactNode;
   owner?: boolean;
@@ -108,6 +110,8 @@ export function Workspace({
   onSectionChange?: (section: string) => void;
   navigationLocked?: boolean;
   actions?: ReactNode;
+  titleDetail?: ReactNode;
+  description?: string;
 }) {
   const { user, refresh, sessionError } = useStore();
   const path = usePathname();
@@ -304,7 +308,17 @@ export function Workspace({
             >
               <Menu />
             </button>
-            <h1>{title}</h1>
+            {titleDetail || description ? (
+              <div className="workspace-heading-copy">
+                <div className="workspace-heading-title">
+                  <h1>{title}</h1>
+                  {titleDetail}
+                </div>
+                {description && <p>{description}</p>}
+              </div>
+            ) : (
+              <h1>{title}</h1>
+            )}
             {actions}
           </div>
           {error && (

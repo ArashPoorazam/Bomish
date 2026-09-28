@@ -6,7 +6,6 @@ import {
   money,
   packageLabel,
   packagePrice,
-  packageWeight,
   priceRange,
 } from "@/lib/format";
 import { useStore } from "./store-provider";

@@ -16,7 +16,7 @@ export const total = (price: number, grams: number) =>
   Number(((BigInt(price) * BigInt(grams) + 5000n) / 10000n) * 10n);
 export const statuses: Record<string, string> = {
   draft: "پیش‌نویس",
-  published: "منتشرشده",
+  published: "منتشر شده",
   archived: "بایگانی",
   pending: "در انتظار پرداخت",
   paid: "خرید ثبت شد",

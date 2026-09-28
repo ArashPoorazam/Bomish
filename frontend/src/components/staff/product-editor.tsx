@@ -15,7 +15,7 @@ import {
 import { api } from "@/lib/api";
 import type { Product, Category } from "@/lib/types";
 import { RichText } from "@/components/rich-text";
-import { digits, fa, money, packageLabel, statuses } from "@/lib/format";
+import { fa, money, packageLabel, statuses } from "@/lib/format";
 import { normalizeProduct, productIssues, productSteps } from "./product-form";
 import { ProductBasics, ProductDetails } from "./product-content-fields";
 import { ProductImages } from "./product-images";
@@ -236,9 +236,6 @@ export function ProductEditor({
       >
         <fieldset disabled={locked} className="product-step-fields">
           <div className="product-step-heading">
-            <span className="eyebrow">
-              مرحله {fa(step + 1)} از {fa(productSteps.length)}
-            </span>
             <h3 ref={heading} tabIndex={-1}>
               {productSteps[step].title}
             </h3>

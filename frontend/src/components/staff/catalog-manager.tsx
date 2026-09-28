@@ -69,70 +69,90 @@ export function CatalogManager({
           (!stock || (stock === "in" ? inStock(p) : !inStock(p))),
       );
   return (
-    <div className={`staff-workspace ${selected ? "catalog-editing" : ""}`}>
-      <aside className="staff-tools stack">
-        <button
-          className="button"
-          disabled={editorState.busy}
-          onClick={() => selectProduct(newProduct())}
-        >
-          <Plus size={18} aria-hidden="true" /> افزودن محصول
-        </button>
-        <label>
-          جستجوی محصول
-          <input
-            type="search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="نام یا نشانی محصول"
-          />
-        </label>
-        <label>
-          دسته‌بندی
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
+    <div
+      className={`staff-workspace catalog-workspace ${selected ? "catalog-editing" : ""}`}
+    >
+      {!selected && (
+        <div className="catalog-toolbar-area">
+          <button
+            className="button catalog-add-product"
+            disabled={editorState.busy}
+            onClick={() => selectProduct(newProduct())}
           >
-            <option value="">همه دسته‌ها</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          وضعیت
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">همه وضعیت‌ها</option>
-            {["published", "draft", "archived"].map((x) => (
-              <option key={x} value={x}>
-                {statuses[x]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          وضعیت فروش
-          <select value={stock} onChange={(e) => setStock(e.target.value)}>
-            <option value="">همه محصولات</option>
-            <option value="in">موجود</option>
-            <option value="out">ناموجود</option>
-          </select>
-        </label>
-        <button
-          className="button filter-reset"
-          disabled={!q && !category && !status && !stock}
-          onClick={() => {
-            setQ("");
-            setCategory("");
-            setStatus("");
-            setStock("");
-          }}
-        >
-          <RotateCcw size={16} aria-hidden="true" /> پاک کردن فیلترها
-        </button>
-      </aside>
+            <Plus size={18} aria-hidden="true" /> افزودن محصول
+          </button>
+          <section
+            className="catalog-toolbar"
+            aria-label="جستجو و فیلتر محصولات"
+          >
+            <div className="catalog-toolbar-heading">
+              <strong>جستجو و فیلتر</strong>
+              <button
+                className="button secondary filter-reset"
+                disabled={!q && !category && !status && !stock}
+                onClick={() => {
+                  setQ("");
+                  setCategory("");
+                  setStatus("");
+                  setStock("");
+                }}
+              >
+                <RotateCcw size={16} aria-hidden="true" /> پاک کردن فیلترها
+              </button>
+            </div>
+            <div className="catalog-filters">
+              <label>
+                جستجوی محصول
+                <input
+                  type="search"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="نام یا نشانی محصول"
+                />
+              </label>
+              <label>
+                دسته‌بندی
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  <option value="">همه دسته‌ها</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                وضعیت
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="">همه وضعیت‌ها</option>
+                  {["published", "draft", "archived"].map((x) => (
+                    <option key={x} value={x}>
+                      {statuses[x]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                وضعیت فروش
+                <select
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                >
+                  <option value="">همه محصولات</option>
+                  <option value="in">موجود</option>
+                  <option value="out">ناموجود</option>
+                </select>
+              </label>
+            </div>
+          </section>
+        </div>
+      )}
       <main className="staff-main">
         {selected ? (
           <>
@@ -158,10 +178,6 @@ export function CatalogManager({
           </>
         ) : (
           <div className="form-card">
-            <div className="between">
-              <h2>محصولات</h2>
-              <span>{fa(visible.length)} محصول</span>
-            </div>
             <div className="table-scroll">
               <table>
                 <thead>
@@ -185,8 +201,12 @@ export function CatalogManager({
                       <td>{fa(p.packages?.length || 0)} اندازه</td>
                       {owner && <td>{priceRange(p)}</td>}
                       <td>
-                        <span className="badge">{statuses[p.status]}</span>
-                        {p.outOfStock && <span className="badge">ناموجود</span>}
+                        <div className="catalog-statuses">
+                          <span className="badge">{statuses[p.status]}</span>{" "}
+                          {p.outOfStock && (
+                            <span className="badge">ناموجود</span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <button

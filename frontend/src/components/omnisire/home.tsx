@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Users, ArrowUpLeft, ChartNoAxesCombined, History } from "lucide-react";
-import { Workspace, Stats, Panel, Feedback, useLoad } from "./shared";
+import { Workspace, Stats, Feedback, useLoad } from "./shared";
 export function OmnisireHome() {
   const { data, error, loading } = useLoad<{
     revenue: number;

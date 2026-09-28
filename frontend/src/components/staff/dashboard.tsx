@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useStore } from "@/components/store-provider";
 import { api } from "@/lib/api";
+import { fa } from "@/lib/format";
 import type {
   Product,
   Category,
@@ -122,6 +123,16 @@ export function Dashboard({
   return (
     <Workspace
       title={sectionLabels[tab] || "مدیریت فروشگاه"}
+      titleDetail={
+        tab === "products" && listData ? (
+          <span className="badge">{fa(listData.total)} محصول</span>
+        ) : undefined
+      }
+      description={
+        tab === "products"
+          ? "محصولات فروشگاه را جستجو و مدیریت کنید؛ محصول جدید اضافه کنید و اطلاعات، تصاویر، بسته‌ها و وضعیت انتشار و موجودی آن‌ها را ویرایش کنید."
+          : undefined
+      }
       activeSection={tab}
       navigationLocked={editor.busy}
       onSectionChange={(p) => {

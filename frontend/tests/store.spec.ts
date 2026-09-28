@@ -202,14 +202,18 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
     .getByRole("navigation", { name: "مراحل محصول" })
     .getByRole("button", { name: "بسته‌ها و قیمت" })
     .click();
-  await owner.getByText("موجودی و انبار", { exact: true }).click();
-  await owner.getByLabel("تغییر موجودی به گرم (مثبت یا منفی)").fill("10000");
-  await owner.getByLabel("دلیل تغییر").fill("موجودی آزمایشی");
-  await owner.getByRole("button", { name: "ثبت تغییر موجودی" }).click();
+  await owner.getByRole("button", { name: "ناموجود", exact: true }).click();
   await expect(
-    owner.getByRole("status").filter({ hasText: "موجودی به‌روز شد" }),
-  ).toBeVisible();
-  await expect(owner.getByText("موجودی قابل فروش: ۱۰٬۰۰۰ گرم")).toBeVisible();
+    owner.getByRole("button", { name: "ناموجود", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const unavailable = await (
+    await owner.request.get("/api/v1/products/" + slug)
+  ).json();
+  expect(unavailable.outOfStock).toBe(true);
+  await owner.getByRole("button", { name: "موجود", exact: true }).click();
+  await expect(
+    owner.getByRole("button", { name: "موجود", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await owner.goto("/products/" + slug);
   await expect(owner.getByRole("heading", { level: 1 })).toHaveText(
     productName,
