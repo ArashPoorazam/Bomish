@@ -100,11 +100,11 @@ export function ArticleProducts({
         محصولاتی را که در مقاله معرفی شده‌اند جستجو و اضافه کنید.
       </p>
       <label className="related-search">
-        جستجوی محصول
         <span>
           <Search size={20} aria-hidden="true" />
           <input
             type="search"
+            aria-label="جستجوی محصول"
             value={query}
             placeholder="نام یا نشانی محصول را بنویسید…"
             onChange={(e) => {
@@ -116,11 +116,6 @@ export function ArticleProducts({
           />
         </span>
       </label>
-      {!query.trim() && (
-        <p className="related-hint">
-          برای پیدا کردن محصول، از جستجو شروع کنید.
-        </p>
-      )}
       {query.trim() && (
         <div className="related-results" aria-busy={loading}>
           <p role="status" className="muted">

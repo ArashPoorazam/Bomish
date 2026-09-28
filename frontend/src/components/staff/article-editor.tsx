@@ -7,6 +7,7 @@ import type { Article } from "@/lib/types";
 import { statuses } from "@/lib/format";
 import { RichText } from "@/components/rich-text";
 import { ArticleProducts } from "./article-products";
+import { ArticleMarkdownHelp } from "./article-markdown-help";
 export const newArticle = (): Article => ({
   id: crypto.randomUUID(),
   slug: "",
@@ -151,11 +152,12 @@ export function ArticleEditor({
           <div className="article-writing-column">
             <section
               className="article-section stack"
-              aria-labelledby="article-basics-title"
+              aria-label="اطلاعات مقاله"
             >
-              <h3 id="article-basics-title">اطلاعات مقاله</h3>
               <label>
-                عنوان مقاله <span className="muted">(ضروری)</span>
+                <span>
+                  عنوان مقاله <span className="muted">(ضروری)</span>
+                </span>
                 <input
                   ref={titleInput}
                   value={a.title}
@@ -173,7 +175,9 @@ export function ArticleEditor({
                 </small>
               )}
               <label>
-                نشانی صفحه <span className="muted">(ضروری)</span>
+                <span>
+                  نشانی صفحه <span className="muted">(ضروری)</span>
+                </span>
                 <input
                   ref={slugInput}
                   dir="auto"
@@ -250,21 +254,15 @@ export function ArticleEditor({
               ) : (
                 <>
                   <label className="article-body-label">
-                    محتوای مقاله
                     <textarea
+                      aria-labelledby="article-body-title"
                       className="article-body-input"
                       value={a.body}
                       placeholder="متن مقاله را اینجا بنویسید…"
                       onChange={(e) => field("body", e.target.value)}
                     />
                   </label>
-                  <details className="article-format-help">
-                    <summary>راهنمای قالب‌بندی متن</summary>
-                    <p>
-                      برای تیتر از ##، برای متن پررنگ از **متن** و برای فهرست از
-                      خط تیره در ابتدای هر سطر استفاده کنید.
-                    </p>
-                  </details>
+                  <ArticleMarkdownHelp />
                 </>
               )}
             </section>
@@ -333,8 +331,8 @@ export function ArticleEditor({
                   : "تغییر ذخیره‌نشده‌ای ندارید."}
               </p>
               <p className="muted">
-                برای ذخیره پیش‌نویس، عنوان و نشانی کافی است. انتشار به متن،
-                خلاصه و تصویر هم نیاز دارد.
+                برای ذخیره پیش‌نویس، عنوان و نشانی کافی است. برای انتشار مقاله
+                باید متن، خلاصه و تصویر هم پر شود.
               </p>
               <button
                 type="button"

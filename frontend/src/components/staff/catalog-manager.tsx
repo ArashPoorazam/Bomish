@@ -258,21 +258,39 @@ export function CategoryManager({
     [busy, setBusy] = useState(false);
   return (
     <div className="staff-workspace">
-      <aside className="staff-tools stack">
-        <Link className="button" href="/staff/categories/new">
-          + دسته‌بندی جدید
+      <div className="catalog-toolbar-area">
+        <Link
+          className="button catalog-add-product"
+          href="/staff/categories/new"
+        >
+          <Plus size={18} aria-hidden="true" /> دسته‌بندی جدید
         </Link>
-        <label>
-          جستجوی دسته
-          <input
-            type="search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </label>
-      </aside>
+        <section className="catalog-toolbar" aria-label="جستجوی دسته‌بندی‌ها">
+          <div className="catalog-toolbar-heading">
+            <strong>جستجو</strong>
+            <button
+              type="button"
+              className="button secondary filter-reset"
+              disabled={!q}
+              onClick={() => setQ("")}
+            >
+              <RotateCcw size={16} aria-hidden="true" /> پاک کردن جستجو
+            </button>
+          </div>
+          <div className="catalog-filters category-filters">
+            <label>
+              <input
+                type="search"
+                aria-label="جستجوی دسته‌بندی"
+                placeholder="نام دسته‌بندی را بنویسید"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </label>
+          </div>
+        </section>
+      </div>
       <main className="staff-main">
-        <h2>دسته‌بندی‌ها</h2>
         {error && (
           <p className="error" role="alert">
             {error}
