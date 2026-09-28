@@ -321,7 +321,7 @@ func TestReportPaginationAndPriceCapture(t *testing.T) {
 	if len(page.Items) != 14 || page.Total != 39 {
 		t.Fatalf("pagination %+v", page)
 	}
-	owner.ok(t, "POST", "/staff/pricing", map[string]any{"productId": "turmeric", "mode": "adjust", "amount": 10000}, nil)
+	owner.ok(t, "POST", "/staff/pricing", map[string]any{"productIds": []string{"turmeric"}, "amount": 10000}, nil)
 	var actor string
 	var old, new int64
 	e := a.Pool.QueryRow(ctx, "SELECT old_rials,new_rials,actor_id FROM price_history WHERE product_id='turmeric' ORDER BY id DESC LIMIT 1").Scan(&old, &new, &actor)

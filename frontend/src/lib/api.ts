@@ -5,8 +5,7 @@ export async function session(): Promise<Session> {
   if (!pendingSession)
     pendingSession = fetch("/api/v1/session", { cache: "no-store" })
       .then(async (r) => {
-        if (!r.ok) throw new Error("ارتباط با فروشگاه برقرار نشد");
-        const s: Session = await r.json();
+        const s = await readResponse<Session>(r);
         csrf = s.csrf;
         return s;
       })
@@ -33,9 +32,30 @@ export async function api<T>(
     },
     body: body === undefined ? undefined : form ? body : JSON.stringify(body),
   });
-  const data = await r.json();
-  if (!r.ok)
-    throw new Error(data.error || "درخواست انجام نشد؛ دوباره تلاش کنید");
+  return readResponse<T>(r);
+}
+async function readResponse<T>(response: Response): Promise<T> {
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(
+      response.status === 404
+        ? "این بخش در سرویس فروشگاه در دسترس نیست. سرویس را به‌روز کنید و دوباره تلاش کنید."
+        : "پاسخ معتبر از فروشگاه دریافت نشد. دوباره تلاش کنید.",
+    );
+  }
+  if (!response.ok) {
+    const message =
+      data && typeof data === "object" && "error" in data
+        ? data.error
+        : undefined;
+    throw new Error(
+      typeof message === "string" && message
+        ? message
+        : "درخواست انجام نشد؛ دوباره تلاش کنید.",
+    );
+  }
   return data as T;
 }
 export async function serverApi<T>(path: string): Promise<T> {

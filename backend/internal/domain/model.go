@@ -119,6 +119,7 @@ type Cart struct {
 	SubtotalRials int64      `json:"subtotalRials"`
 }
 type OrderItem struct {
+	Packed       bool   `json:"packed"`
 	PackageID    string `json:"packageId"`
 	PackageLabel string `json:"packageLabel"`
 	Quantity     int64  `json:"quantity"`

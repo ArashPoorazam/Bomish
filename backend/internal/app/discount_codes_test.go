@@ -58,7 +58,7 @@ func TestDiscountCodeValidationAndQuote(t *testing.T) {
 			t.Fatalf("invalid accepted %v: %d", body, status)
 		}
 	}
-	owner.ok(t, "POST", "/staff/pricing", map[string]any{"productId": "turmeric", "mode": "discount", "amount": 20}, nil)
+	owner.ok(t, "POST", "/staff/product-discounts", map[string]any{"id": "single-sale", "name": "Single sale", "productIds": []string{"turmeric"}, "percent": 20}, nil)
 	plain := couponQuote(t, c, "")
 	q := couponQuote(t, c, "welcome10")
 	if q.DiscountRials != (plain.SubtotalRials*10/1000)*10 || q.TotalRials != plain.TotalRials-q.DiscountRials || q.ShippingRials != plain.ShippingRials || q.DiscountCode != "WELCOME10" {

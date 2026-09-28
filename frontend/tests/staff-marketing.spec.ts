@@ -55,7 +55,10 @@ async function mockedStaff(page: Page) {
   const changes: Record<string, unknown>[] = [];
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace("/api/v1", "");
-    if (path === "/staff/pricing" && route.request().method() === "POST") {
+    if (
+      ["/staff/pricing", "/staff/product-discounts"].includes(path) &&
+      route.request().method() === "POST"
+    ) {
       changes.push(route.request().postDataJSON());
       return route.fulfill({ json: { count: 1 } });
     }
@@ -94,6 +97,7 @@ async function mockedStaff(page: Page) {
       "/staff/audit": [],
       "/staff/shipping": {},
       "/staff/discount-codes": [],
+      "/staff/product-discounts": [],
     };
     const params = new URL(route.request().url()).searchParams;
     const response = data[path];
@@ -170,33 +174,42 @@ test("pricing shows before/after values, validates reductions, and preserves uni
 }) => {
   const changes = await mockedStaff(page);
   await page.getByRole("button", { name: "قیمت و تخفیف", exact: true }).click();
-  await page.getByLabel("انتخاب محصول").selectOption("sample");
+  await page.getByLabel("جستجوی محصولات").fill("زردچوبه");
+  await page
+    .getByRole("button", { name: "انتخاب زردچوبه نمونه", exact: true })
+    .click();
+  await page.getByLabel("نام تخفیف", { exact: true }).fill("تخفیف نمونه");
   await page.getByLabel("درصد تخفیف", { exact: true }).fill("۲۰");
   await expect(page.locator(".pricing-preview")).toContainText("۸۰٬۰۰۰ تومان");
   await page
-    .getByRole("button", { name: "اعمال تخفیف روی ۱ محصول", exact: true })
+    .getByRole("button", { name: "ساخت تخفیف برای ۱ محصول", exact: true })
     .click();
   await expect(
     page.locator(".pricing-workspace").getByRole("status"),
-  ).toContainText("به‌روز شد");
+  ).toContainText("ساخته شد");
   expect(changes[0]).toEqual({
-    productId: "sample",
-    mode: "discount",
-    amount: 20,
+    id: expect.any(String),
+    name: "تخفیف نمونه",
+    all: false,
+    productIds: ["sample"],
+    percent: 20,
   });
   await page
     .getByRole("tab", { name: "اصلاح قیمت پایه", exact: false })
     .click();
-  await page.getByLabel("انتخاب محصول").selectOption("sample");
+  await page.getByLabel("جستجوی محصولات").fill("زردچوبه");
+  await page
+    .getByRole("button", { name: "انتخاب زردچوبه نمونه", exact: true })
+    .click();
   await page.getByLabel("نوع تغییر").selectOption("decrease");
   await page
     .getByLabel("میزان تغییر هر بسته (تومان)", { exact: true })
     .fill("۱۰۰۰۰۰");
   await expect(
     page.locator(".pricing-workspace").getByRole("alert"),
-  ).toContainText("صفر یا منفی");
+  ).toContainText("خارج از محدوده مجاز");
   await expect(
-    page.getByRole("button", { name: "اعمال تغییر قیمت روی ۱ محصول" }),
+    page.getByRole("button", { name: "اعمال تغییر قیمت برای ۱ محصول" }),
   ).toBeDisabled();
   await page
     .getByLabel("میزان تغییر هر بسته (تومان)", { exact: true })
@@ -208,12 +221,11 @@ test("pricing shows before/after values, validates reductions, and preserves uni
     .locator(".pricing-workspace")
     .screenshot({ path: "test-results/pricing-desktop.png" });
   await page
-    .getByRole("button", { name: "اعمال تغییر قیمت روی ۱ محصول" })
+    .getByRole("button", { name: "اعمال تغییر قیمت برای ۱ محصول" })
     .click();
   await expect.poll(() => changes.length).toBe(2);
   expect(changes[1]).toEqual({
-    productId: "sample",
-    mode: "adjust",
+    productIds: ["sample"],
     amount: -200000,
   });
   await page.setViewportSize({ width: 390, height: 844 });

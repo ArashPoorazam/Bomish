@@ -99,16 +99,16 @@ func TestPackagesOperations(t *testing.T) {
 	if code, _ := outsider.call("GET", "/orders/"+id, nil); code != 404 {
 		t.Fatal("order leaked")
 	}
-	if code, _ := editor.call("POST", "/staff/pricing", map[string]any{"mode": "discount", "amount": 10}); code != 200 {
+	if code, _ := editor.call("POST", "/staff/product-discounts", map[string]any{"id": "all-sale", "name": "Store sale", "all": true, "percent": 10}); code != 201 {
 		t.Fatal("editor could not modify pricing")
 	}
-	owner.ok(t, "POST", "/staff/pricing", map[string]any{"productId": "turmeric", "mode": "discount", "amount": 10}, nil)
-	owner.ok(t, "POST", "/staff/pricing", map[string]any{"productId": "turmeric", "mode": "adjust", "amount": 100000}, nil)
+	owner.ok(t, "POST", "/staff/product-discounts", map[string]any{"id": "single-sale", "name": "Single sale", "productIds": []string{"turmeric"}, "percent": 10}, nil)
+	owner.ok(t, "POST", "/staff/pricing", map[string]any{"productIds": []string{"turmeric"}, "amount": 100000}, nil)
 	c.ok(t, "GET", "/products/turmeric", nil, &p)
 	if p.DiscountPercent != 10 || p.Packages[0].PriceRials != 2100000 || p.PackagePrice(p.Packages[0]) != 1890000 {
 		t.Fatal("price control wrong")
 	}
-	if code, _ := owner.call("POST", "/staff/pricing", map[string]any{"mode": "adjust", "amount": -10000000000}); code != 400 {
+	if code, _ := owner.call("POST", "/staff/pricing", map[string]any{"all": true, "amount": -10000000000}); code != 400 {
 		t.Fatal("negative price allowed")
 	}
 	c.ok(t, "GET", "/products/turmeric", nil, &p)

@@ -9,15 +9,19 @@ import (
 
 func (a *App) adjustPrices(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		ProductID string `json:"productId"`
-		Mode      string `json:"mode"`
-		Amount    int64  `json:"amount"`
+		ProductIDs []string `json:"productIds"`
+		All        bool     `json:"all"`
+		Amount     int64    `json:"amount"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	if (in.Mode != "discount" && in.Mode != "adjust") || (in.Mode == "discount" && (in.Amount < 0 || in.Amount > 90)) || (in.Mode == "adjust" && (in.Amount < -100000000000 || in.Amount > 100000000000 || in.Amount%10 != 0)) {
+	if in.Amount == 0 || in.Amount < -100000000000 || in.Amount > 100000000000 || in.Amount%10 != 0 {
 		fail(w, 400, "مقدار معتبر نیست")
+		return
+	}
+	if (!in.All && len(in.ProductIDs) == 0) || (in.All && len(in.ProductIDs) > 0) {
+		fail(w, 400, "یک یا چند محصول، یا همه محصولات را انتخاب کنید")
 		return
 	}
 	tx, e := a.Pool.Begin(r.Context())
@@ -30,7 +34,11 @@ func (a *App) adjustPrices(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	rows, e := tx.Query(r.Context(), "SELECT id,content,price_rials,min_grams FROM products WHERE ($1='' OR id=$1) ORDER BY id FOR UPDATE", in.ProductID)
+	selected := in.ProductIDs
+	if selected == nil {
+		selected = []string{}
+	}
+	rows, e := tx.Query(r.Context(), "SELECT id,content,price_rials,min_grams FROM products WHERE $1 OR id=ANY($2::text[]) ORDER BY id FOR UPDATE", in.All, selected)
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -65,11 +73,11 @@ func (a *App) adjustPrices(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "محصول پیدا نشد")
 		return
 	}
+	if !in.All && len(items) != len(in.ProductIDs) {
+		fail(w, 400, "محصولات انتخاب‌شده معتبر نیستند")
+		return
+	}
 	apply := func(p *domain.Product) bool {
-		if in.Mode == "discount" {
-			p.DiscountPercent = in.Amount
-			return true
-		}
 		for i := range p.Packages {
 			n := p.Packages[i].PriceRials + in.Amount
 			if n <= 0 || n > 100000000000 {
@@ -110,7 +118,7 @@ func (a *App) adjustPrices(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if e = auditDetail(r.Context(), tx, current(r).StaffID, "pricing."+in.Mode, in.ProductID, map[string]any{"mode": in.Mode, "amount": in.Amount, "products": len(items)}); e == nil {
+	if e = auditDetail(r.Context(), tx, current(r).StaffID, "pricing.adjust", "", map[string]any{"amount": in.Amount, "products": len(items), "productIds": selected, "all": in.All}); e == nil {
 		e = tx.Commit(r.Context())
 	}
 	if e != nil {

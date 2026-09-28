@@ -21,7 +21,8 @@ import {
 import { CatalogManager, CategoryManager } from "./catalog-manager";
 import { ArticleManager } from "./article-manager";
 import { PriceManager } from "./price-manager";
-import { OrderManager, ShippingEditor } from "./operations";
+import { ShippingEditor } from "./operations";
+import { OrderManager } from "./order-manager";
 export function Dashboard({
   initialSection = "",
   initialQuery = "",
@@ -138,7 +139,11 @@ export function Dashboard({
             ? "مقاله‌های مجله را بنویسید و ویرایش کنید؛ تصویر و محصولات مرتبط را انتخاب کنید و نوشته‌ها را به‌صورت پیش‌نویس ذخیره یا منتشر کنید."
             : tab === "categories"
               ? "دسته‌بندی‌های فروشگاه را جستجو و مدیریت کنید؛ دسته‌بندی جدید بسازید، نام و توضیحات آن‌ها را ویرایش کنید و تعداد محصولات هر دسته را ببینید."
-              : undefined
+              : tab === "pricing"
+                ? "قیمت پایه بسته‌ها را اصلاح کنید، برای یک یا چند محصول تخفیف بسازید و تخفیف‌های فعال و کدهای خرید را مدیریت کنید."
+                : tab === "orders"
+                  ? "سفارش‌ها را پیگیری کنید؛ برای مشاهده اقلام و نشانی، روی هر سفارش بزنید و مراحل بسته‌بندی، ارسال و تحویل را مدیریت کنید."
+                  : undefined
       }
       activeSection={tab}
       navigationLocked={editor.busy}
@@ -201,6 +206,7 @@ export function Dashboard({
           onFilters={onFilters}
           orders={orders}
           reload={reload}
+          onStateChange={setEditor}
         />
       )}
       {tab === "shipping" && shipping && <ShippingEditor initial={shipping} />}{" "}

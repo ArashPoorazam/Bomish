@@ -176,44 +176,73 @@ export function DiscountCodeManager({
                         موقتاً از ظرفیت کم شده است.
                       </small>
                     )}
-                    <button
-                      className={`button ${c.active ? "secondary" : ""}`}
-                      disabled={!!busy || !!expired}
-                      onClick={async () => {
-                        setBusy(c.code);
-                        setError("");
-                        setMessage("");
-                        try {
-                          await api(
-                            `/staff/discount-codes/${encodeURIComponent(c.code)}`,
-                            "PATCH",
-                            { active: !c.active },
-                          );
-                          setCodes((items) =>
-                            items.map((item) =>
-                              item.code === c.code
-                                ? { ...item, active: !item.active }
-                                : item,
-                            ),
-                          );
-                          setMessage(
-                            c.active
-                              ? "کد غیرفعال شد؛ سفارش‌های ثبت‌شده تغییری نمی‌کنند."
-                              : "کد فعال شد.",
-                          );
-                        } catch (e) {
-                          setError((e as Error).message);
-                        } finally {
-                          setBusy("");
-                        }
-                      }}
-                    >
-                      {busy === c.code
-                        ? "در حال ذخیره…"
-                        : c.active
-                          ? "غیرفعال کردن کد"
-                          : "فعال کردن کد"}
-                    </button>
+                    <div className="discount-code-actions">
+                      <button
+                        className={`button ${c.active ? "secondary" : ""}`}
+                        disabled={!!busy || !!expired}
+                        onClick={async () => {
+                          setBusy(c.code);
+                          setError("");
+                          setMessage("");
+                          try {
+                            await api(
+                              `/staff/discount-codes/${encodeURIComponent(c.code)}`,
+                              "PATCH",
+                              { active: !c.active },
+                            );
+                            setCodes((items) =>
+                              items.map((item) =>
+                                item.code === c.code
+                                  ? { ...item, active: !item.active }
+                                  : item,
+                              ),
+                            );
+                            setMessage(
+                              c.active
+                                ? "کد غیرفعال شد؛ سفارش‌های ثبت‌شده تغییری نمی‌کنند."
+                                : "کد فعال شد.",
+                            );
+                          } catch (e) {
+                            setError((e as Error).message);
+                          } finally {
+                            setBusy("");
+                          }
+                        }}
+                      >
+                        {busy === c.code
+                          ? "در حال ذخیره…"
+                          : c.active
+                            ? "غیرفعال کردن کد"
+                            : "فعال کردن کد"}
+                      </button>
+                      <button
+                        className="button secondary"
+                        disabled={!!busy}
+                        onClick={async () => {
+                          setBusy(c.code);
+                          setError("");
+                          setMessage("");
+                          try {
+                            await api(
+                              `/staff/discount-codes/${encodeURIComponent(c.code)}`,
+                              "DELETE",
+                            );
+                            setCodes((items) =>
+                              items.filter((item) => item.code !== c.code),
+                            );
+                            setMessage(
+                              "کد تخفیف حذف شد؛ سفارش‌های ثبت‌شده تغییری نمی‌کنند.",
+                            );
+                          } catch (e) {
+                            setError((e as Error).message);
+                          } finally {
+                            setBusy("");
+                          }
+                        }}
+                      >
+                        حذف کد تخفیف
+                      </button>
+                    </div>
                   </article>
                 );
               })}

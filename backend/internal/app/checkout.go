@@ -217,14 +217,14 @@ func loadOrderPage(ctx context.Context, q querier, user, id, status, search stri
 	if len(ids) == 0 {
 		return out, nil
 	}
-	items, e := q.Query(ctx, `SELECT order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity FROM order_items WHERE order_id=ANY($1::text[]) ORDER BY product_id,package_id`, ids)
+	items, e := q.Query(ctx, `SELECT order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity,packed FROM order_items WHERE order_id=ANY($1::text[]) ORDER BY product_id,package_id`, ids)
 	if e != nil {
 		return nil, e
 	}
 	for items.Next() {
 		var order string
 		var it domain.OrderItem
-		if e = items.Scan(&order, &it.ProductID, &it.Name, &it.Grams, &it.PriceRials, &it.TotalRials, &it.PackageID, &it.PackageLabel, &it.Quantity); e != nil {
+		if e = items.Scan(&order, &it.ProductID, &it.Name, &it.Grams, &it.PriceRials, &it.TotalRials, &it.PackageID, &it.PackageLabel, &it.Quantity, &it.Packed); e != nil {
 			items.Close()
 			return nil, e
 		}

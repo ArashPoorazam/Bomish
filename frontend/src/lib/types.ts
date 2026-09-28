@@ -14,3 +14,5 @@ export type Package = components["schemas"]["Package"];
 
 export type DiscountCode = components["schemas"]["DiscountCode"];
 export type DiscountCodeInput = components["schemas"]["DiscountCodeInput"];
+
+export type ProductDiscount = components["schemas"]["ProductDiscount"];

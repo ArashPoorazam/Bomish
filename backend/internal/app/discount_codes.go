@@ -44,7 +44,7 @@ func (a *App) listDiscountCodes(w http.ResponseWriter, r *http.Request) {
 	rows, e := a.Pool.Query(r.Context(), `SELECT `+codeColumns+`,
  (SELECT count(*) FROM orders o WHERE o.discount_code=d.code AND o.status IN ('paid','packing','shipped','received','review')),
  (SELECT count(*) FROM orders o WHERE o.discount_code=d.code AND o.status='pending')
- FROM discount_codes d ORDER BY created_at DESC`)
+ FROM discount_codes d WHERE deleted_at IS NULL ORDER BY created_at DESC`)
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -134,7 +134,7 @@ func (a *App) toggleDiscountCode(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	code := normalizeCode(r.PathValue("code"))
-	result, e := tx.Exec(r.Context(), "UPDATE discount_codes SET active=$2 WHERE code=$1", code, *in.Active)
+	result, e := tx.Exec(r.Context(), "UPDATE discount_codes SET active=$2 WHERE code=$1 AND deleted_at IS NULL", code, *in.Active)
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -160,7 +160,7 @@ func applyDiscount(ctx context.Context, q querier, v *quoteResult, code string, 
 	if code == "" {
 		return nil
 	}
-	query := `SELECT ` + codeColumns + ` FROM discount_codes WHERE code=$1`
+	query := `SELECT ` + codeColumns + ` FROM discount_codes WHERE code=$1 AND deleted_at IS NULL`
 	if lock {
 		query += " FOR UPDATE"
 	}
@@ -223,4 +223,32 @@ func reclaimDiscount(ctx context.Context, tx pgx.Tx, code string) (bool, error) 
 	}
 	e := tx.QueryRow(ctx, `SELECT count(*) FROM orders WHERE discount_code=$1 AND status NOT IN ('cancelled','expired')`, code).Scan(&count)
 	return count < limit, e
+}
+
+// Keep the row for historic orders and pending payment capacity checks.
+func (a *App) deleteDiscountCode(w http.ResponseWriter, r *http.Request) {
+	tx, e := a.Pool.Begin(r.Context())
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	code := normalizeCode(r.PathValue("code"))
+	result, e := tx.Exec(r.Context(), "UPDATE discount_codes SET active=false,deleted_at=now() WHERE code=$1 AND deleted_at IS NULL", code)
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+	if result.RowsAffected() == 0 {
+		fail(w, 404, "کد پیدا نشد")
+		return
+	}
+	if e = audit(r, tx, "discount.delete", code); e == nil {
+		e = tx.Commit(r.Context())
+	}
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+	write(w, 200, map[string]bool{"ok": true})
 }

@@ -1,6 +1,6 @@
 # Discount codes
 
-Owners manage codes from **قیمت و تخفیف → کدهای تخفیف**. Codes can be created and enabled/disabled; their financial terms are immutable after creation. Create a new code for a different offer. Every change is audited.
+Staff with pricing permission manage codes from **قیمت و تخفیف → کدهای تخفیف**. Codes can be created, enabled/disabled, and deleted; their financial terms are immutable after creation. Create a new code for a different offer. Every change is audited.
 
 - Codes are case-insensitive, 3–32 English letters, digits, hyphens or underscores, starting with a letter or digit.
 - Offers are either 1–90% or a fixed amount. Staff enter money in tomans; the API stores rials.
@@ -12,4 +12,12 @@ Owners manage codes from **قیمت و تخفیف → کدهای تخفیف**. C
 - Checkout revalidates the code and locks its row before reserving a usage slot. Concurrent purchases cannot reserve the same final slot. Idempotent retries return the existing order.
 - Orders retain the applied code and discount amount. Disabling a code does not change existing order totals. A late successful payment after expiry must reclaim usage capacity; otherwise the order enters payment review.
 
-API endpoints: `GET/POST /staff/discount-codes`, `PATCH /staff/discount-codes/{code}`. Both `/checkout/quote` and `/checkout` accept an optional `discountCode`. Quotes and orders return `discountCode` and `discountRials`. All amounts are revalidated on the server; no client-supplied discount amount is accepted.
+API endpoints: `GET/POST /staff/discount-codes`, `PATCH/DELETE /staff/discount-codes/{code}`. Both `/checkout/quote` and `/checkout` accept an optional `discountCode`. Quotes and orders return `discountCode` and `discountRials`. All amounts are revalidated on the server; no client-supplied discount amount is accepted.
+
+Deleting a code hides it from management, disables it for new purchases, and prevents reactivation. Its database record remains solely to preserve order references and payment reservations. Deleted code names cannot be reused.
+
+## Product discounts
+
+Named discount groups are managed through `GET/POST /staff/product-discounts` and `PATCH/DELETE /staff/product-discounts/{id}`. A group contains a percentage (1–90) and one or more product IDs. Creating with `all: true` snapshots all current products; later products are not automatically included. Overlapping active groups use the highest percentage, never a sum. Disabling or deleting a group immediately recalculates live and draft prices using the remaining groups. Existing percentages are imported into manageable groups when the migration runs.
+
+`POST /staff/pricing` only changes base package prices. Send a nonzero `amount` in rials and either `productIds` or explicit `all: true`. A batch updates live and draft packages atomically; an invalid package price rejects the entire batch. There is no single-product or discount-mode compatibility API.
