@@ -5,7 +5,7 @@ import type { Product } from "@/lib/types";
 export function ProductGallery({ product: p }: { product: Product }) {
   const [index, setIndex] = useState(0);
   return (
-    <div>
+    <div className="product-gallery">
       <div
         className={
           "detail-image " +
@@ -17,7 +17,7 @@ export function ProductGallery({ product: p }: { product: Product }) {
           alt={p.name}
           fill
           priority
-          sizes="(max-width: 760px) 100vw, 50vw"
+          sizes="(max-width: 760px) 90vw, 420px"
         />
       </div>
       {p.images.length > 1 ? (

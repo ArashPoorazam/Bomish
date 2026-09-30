@@ -106,6 +106,10 @@ test("SMS login, shipping quote, payment and order history", async ({
   await expect(page.locator(".order-card").first()).toContainText(
     "خرید ثبت شد",
   );
+  await page
+    .getByRole("navigation", { name: "حساب کاربری" })
+    .getByRole("link", { name: "نشانی‌ها" })
+    .click();
   await expect(
     page.getByText("تهران، تهران، خیابان نمونه پلاک ۱۲ واحد ۲"),
   ).toBeVisible();

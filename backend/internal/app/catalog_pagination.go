@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // List responses are bounded; explicit pagination returns an envelope.
@@ -42,7 +43,10 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 		status = "CASE WHEN p.status='archived' THEN 'archived' WHEN d.product_id IS NOT NULL THEN 'draft' ELSE p.status END"
 		where = "true"
 	}
-	base := `WITH catalog AS (SELECT p.id,p.slug,p.name,p.search_text,p.category_id,p.status AS published_status,` + status + ` AS status,p.price_rials,p.min_grams,` + content + ` AS content,coalesce((p.content->>'outOfStock')::boolean,false) AS out_of_stock,prices.min_price,prices.min_weight FROM products p ` + join + ` LEFT JOIN LATERAL (SELECT min(floor(((pack->>'priceRials')::numeric*(100-coalesce((` + content + `->>'discountPercent')::numeric,0))+500)/1000)*10) min_price,min(CASE pack->>'unit' WHEN 'g' THEN (pack->>'amount')::numeric WHEN 'kg' THEN (pack->>'amount')::numeric*1000 ELSE (pack->>'shippingGrams')::numeric END) min_weight FROM jsonb_array_elements(coalesce(nullif(` + content + `->'packages','null'::jsonb),'[]')) pack) prices ON true WHERE ` + where + `) SELECT * FROM catalog WHERE ($1='' OR id=$1 OR search_text LIKE '%'||$1||'%' OR name||' '||slug||' '||content::text ILIKE '%'||$1||'%' OR similarity(search_text,$1)>0.12) AND ($2='' OR category_id=$2) AND ($3='' OR status=$3) AND ($4='' OR ($4 IN ('true','in') AND NOT out_of_stock) OR ($4='out' AND out_of_stock)) AND ($5::bigint=0 OR min_price<=$5) AND ($6::text[]='{}' OR id=ANY($6::text[]))`
+	base := `WITH catalog AS (SELECT p.id,p.first_published_at,p.slug,p.name,p.search_text,p.category_id,p.status AS published_status,` + status + ` AS status,p.price_rials,p.min_grams,` + content + ` AS content,coalesce((p.content->>'outOfStock')::boolean,false) AS out_of_stock,prices.min_price,prices.min_weight FROM products p ` + join + ` LEFT JOIN LATERAL (SELECT min(CASE WHEN coalesce((` + content + `->>'discountPercent')::numeric,0)>0 THEN least((pack->>'priceRials')::numeric,ceil((pack->>'priceRials')::numeric*(100-(` + content + `->>'discountPercent')::numeric)/1000000)*10000) ELSE (pack->>'priceRials')::numeric END) min_price,min(CASE pack->>'unit' WHEN 'g' THEN (pack->>'amount')::numeric WHEN 'kg' THEN (pack->>'amount')::numeric*1000 ELSE (pack->>'shippingGrams')::numeric END) min_weight FROM jsonb_array_elements(coalesce(nullif(` + content + `->'packages','null'::jsonb),'[]')) pack) prices ON true WHERE ` + where + `) SELECT * FROM catalog WHERE ($1='' OR id=$1 OR search_text LIKE '%'||$1||'%' OR name||' '||slug||' '||content::text ILIKE '%'||$1||'%' OR similarity(search_text,$1)>0.12) AND ($2='' OR category_id=$2) AND ($3='' OR status=$3) AND ($4='' OR ($4 IN ('true','in') AND NOT out_of_stock) OR ($4='out' AND out_of_stock)) AND ($5::bigint=0 OR min_price<=$5) AND ($6::text[]='{}' OR id=ANY($6::text[]))`
+	if q.Get("discounted") == "true" {
+		base += " AND coalesce((content->>'discountPercent')::numeric,0)>0"
+	}
 	ids := []string{}
 	if q.Get("ids") != "" {
 		ids = strings.Split(q.Get("ids"), ",")
@@ -55,6 +59,8 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 	}
 	sort := "name,id"
 	switch q.Get("sort") {
+	case "newest":
+		sort = "first_published_at DESC NULLS LAST,id"
 	case "price-asc":
 		sort = "min_price,id"
 	case "price-desc":
@@ -76,6 +82,10 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 		var p domain.Product
 		b, _ := json.Marshal(row["content"])
 		_ = json.Unmarshal(b, &p)
+		p.FirstPublishedAt = ""
+		if published, ok := row["first_published_at"].(time.Time); ok {
+			p.FirstPublishedAt = published.Format(time.RFC3339Nano)
+		}
 		p.ID = row["id"].(string)
 		p.Status = row["status"].(string)
 		if p.Name == "" {

@@ -52,9 +52,13 @@ export const packagePrice = (
   p: import("./types").Product,
   pack: import("./types").Package,
 ) =>
-  Math.floor(
-    (pack.priceRials * (100 - (p.discountPercent || 0)) + 500) / 1000,
-  ) * 10;
+  p.discountPercent > 0
+    ? Math.min(
+        pack.priceRials,
+        Math.ceil((pack.priceRials * (100 - p.discountPercent)) / 1000000) *
+          10000,
+      )
+    : pack.priceRials;
 export function priceBounds(p: import("./types").Product) {
   const prices = (p.packages || []).map((x) => packagePrice(p, x));
   return prices.length ? [Math.min(...prices), Math.max(...prices)] : [0, 0];

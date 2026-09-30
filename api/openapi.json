@@ -439,7 +439,14 @@
             "in": "query",
             "name": "sort",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "relevant",
+                "name",
+                "price-asc",
+                "price-desc",
+                "newest"
+              ]
             }
           },
           {
@@ -473,6 +480,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "discounted",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Only products with a positive discount."
           }
         ]
       }
@@ -4323,6 +4338,124 @@
           }
         }
       }
+    },
+    "/addresses/{id}": {
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Address"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Not allowed"
+          },
+          "409": {
+            "description": "State changed"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "404": {
+            "description": "Address missing or owned by another customer"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Address"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Invalid CSRF token"
+          },
+          "404": {
+            "description": "Address missing or owned by another customer"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4451,6 +4584,12 @@
           "outOfStock": {
             "type": "boolean",
             "default": false
+          },
+          "firstPublishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "description": "First recorded publication; omitted when historical date is unknown."
           }
         },
         "required": [

@@ -40,7 +40,7 @@ export function Header() {
     <>
       <div className="top-strip">
         <span>از عطر خاک، تا طعم زندگی</span>
-        <span>به اندازه نیازتان انتخاب کنید</span>
+        <span>بسته‌های مشخص، قیمت روشن</span>
       </div>
       <header className="site-header">
         <div className="header-main container">

@@ -8,7 +8,11 @@ The development API runs on 8080 and the frontend on 3000. Next rewrites and the
 
 ## Money and product availability
 
-Products define their own package IDs, amounts, units, prices and purchase limits (default 5). Prices are integer rials per package; the UI edits toman. Percentage discounts are rounded to the nearest toman per package before multiplying by quantity. Flat price adjustments modify the base price without a discount label. Checkout recomputes prices and rejects stale quotes.
+Products define their own package IDs, amounts, units, prices and purchase limits (default 5). Prices are integer rials per package; the UI edits toman. Prices after a product percentage discount round upward to the next 1,000 toman per package before multiplying by quantity, without exceeding the original package price. Exact multiples and undiscounted prices remain unchanged; order-level discount codes retain their existing calculation rules. Flat price adjustments modify the base price without a discount label. Checkout recomputes prices and rejects stale quotes. Catalog price filters and sorting use the same rounded package prices.
+
+Homepage collections use published, available products. Newest sorting uses the first recorded publication date, preserved across edits and republication; migration 008 backfills only recorded publication audit events. Unknown historical dates stay null and are excluded from the homepage new-products collection.
+
+Customer address updates and deletion require the owning customer and a valid CSRF token. Existing orders retain their address snapshots.
 
 Package quantities are integers. Gram/kilogram sizes and the explicit weight of volume packages determine shipping fees only. Cart and order keys include product plus package. Purchase limits remain per package; the store does not count, reserve, or deduct stock.
 

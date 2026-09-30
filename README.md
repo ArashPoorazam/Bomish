@@ -73,8 +73,8 @@ A TOTP cannot be reused for the same account. Customer login instead displays a 
 
 - Responsive Persian storefront, local Vazirmatn font, specified cream/green palette, product guides and blog.
 - Category filtering, normalized Persian search, typo similarity, aliases and related products.
-- Product-specific gram/kilogram/milliliter/liter packages, per-package prices and purchase limits, separate cart lines, and price ranges.
-- Kavenegar-ready SMS account verification, map-assisted saved addresses, and four-stage order tracking with queued notifications.
+- Product-specific gram/kilogram/milliliter/liter packages, per-package prices and purchase limits, separate cart lines, and price ranges. Discounted package prices round upward to 1,000 toman, capped at the original package price; undiscounted prices and coupon rules remain unchanged.
+- Kavenegar-ready SMS account verification, a customer overview, order history, map-assisted address creation/editing/deletion, and four-stage order tracking with queued notifications. Saved-address changes never alter existing order snapshots.
 - Regional/weight-based delivery, server-authoritative checkout, 15-minute reservations, repeat-safe simulated payments and late-payment review.
 - Separate password/TOTP staff login, backend-enforced roles, draft preview, uploads, editor publication, manual availability and delivery editing.
 - Owner-only Omnisire with member management, referral commission accounting, searchable event history, paginated analytics, cross-page comparison and background Excel exports.

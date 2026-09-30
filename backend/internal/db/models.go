@@ -9,14 +9,41 @@ import (
 )
 
 type Address struct {
-	ID         string `json:"id"`
-	UserID     string `json:"user_id"`
-	Recipient  string `json:"recipient"`
-	Phone      string `json:"phone"`
-	Province   string `json:"province"`
-	City       string `json:"city"`
-	Street     string `json:"street"`
-	PostalCode string `json:"postal_code"`
+	ID         string        `json:"id"`
+	UserID     string        `json:"user_id"`
+	Recipient  string        `json:"recipient"`
+	Phone      string        `json:"phone"`
+	Province   string        `json:"province"`
+	City       string        `json:"city"`
+	Street     string        `json:"street"`
+	PostalCode string        `json:"postal_code"`
+	Latitude   pgtype.Float8 `json:"latitude"`
+	Longitude  pgtype.Float8 `json:"longitude"`
+}
+
+type AnalyticsEvent struct {
+	ID          int64              `json:"id"`
+	Kind        string             `json:"kind"`
+	ProductID   pgtype.Text        `json:"product_id"`
+	Query       string             `json:"query"`
+	SessionHash string             `json:"session_hash"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+type AnalyticsOrderLine struct {
+	OrderID      string             `json:"order_id"`
+	ProductID    string             `json:"product_id"`
+	Name         string             `json:"name"`
+	Grams        int64              `json:"grams"`
+	PriceRials   int64              `json:"price_rials"`
+	TotalRials   int64              `json:"total_rials"`
+	PackageID    string             `json:"package_id"`
+	PackageLabel string             `json:"package_label"`
+	Quantity     int64              `json:"quantity"`
+	UserID       string             `json:"user_id"`
+	PaidAt       pgtype.Timestamptz `json:"paid_at"`
+	Status       string             `json:"status"`
+	NetRials     int32              `json:"net_rials"`
 }
 
 type Article struct {
@@ -47,12 +74,44 @@ type Cart struct {
 	SessionHash string `json:"session_hash"`
 	ProductID   string `json:"product_id"`
 	Grams       int64  `json:"grams"`
+	PackageID   string `json:"package_id"`
+	Quantity    int64  `json:"quantity"`
 }
 
 type Category struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+}
+
+type CommissionSale struct {
+	OrderID         string             `json:"order_id"`
+	StaffID         string             `json:"staff_id"`
+	UserID          string             `json:"user_id"`
+	NetRials        int64              `json:"net_rials"`
+	CommissionRials int64              `json:"commission_rials"`
+	RefundedRials   int64              `json:"refunded_rials"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+type CustomerReferral struct {
+	UserID    string             `json:"user_id"`
+	StaffID   string             `json:"staff_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+}
+
+type DiscountCode struct {
+	Code             string             `json:"code"`
+	Kind             string             `json:"kind"`
+	Value            int64              `json:"value"`
+	MinSubtotalRials int64              `json:"min_subtotal_rials"`
+	MaxDiscountRials int64              `json:"max_discount_rials"`
+	MaxUses          int64              `json:"max_uses"`
+	ExpiresAt        pgtype.Timestamptz `json:"expires_at"`
+	Active           bool               `json:"active"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type Inventory struct {
@@ -70,6 +129,21 @@ type Job struct {
 	AvailableAt pgtype.Timestamptz `json:"available_at"`
 }
 
+type MemberLedger struct {
+	ID                string             `json:"id"`
+	StaffID           string             `json:"staff_id"`
+	Kind              string             `json:"kind"`
+	AmountRials       int64              `json:"amount_rials"`
+	OrderID           pgtype.Text        `json:"order_id"`
+	ReversesID        pgtype.Text        `json:"reverses_id"`
+	TransactionNumber string             `json:"transaction_number"`
+	Note              string             `json:"note"`
+	OccurredAt        pgtype.Timestamptz `json:"occurred_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	ActorID           pgtype.Text        `json:"actor_id"`
+	IdempotencyKey    string             `json:"idempotency_key"`
+}
+
 type Order struct {
 	ID                   string             `json:"id"`
 	UserID               string             `json:"user_id"`
@@ -82,15 +156,28 @@ type Order struct {
 	ReservationExpiresAt pgtype.Timestamptz `json:"reservation_expires_at"`
 	Tracking             string             `json:"tracking"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	DiscountCode         pgtype.Text        `json:"discount_code"`
+	DiscountRials        int64              `json:"discount_rials"`
+	PaidAt               pgtype.Timestamptz `json:"paid_at"`
+}
+
+type OrderEvent struct {
+	OrderID   string             `json:"order_id"`
+	Status    string             `json:"status"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type OrderItem struct {
-	OrderID    string `json:"order_id"`
-	ProductID  string `json:"product_id"`
-	Name       string `json:"name"`
-	Grams      int64  `json:"grams"`
-	PriceRials int64  `json:"price_rials"`
-	TotalRials int64  `json:"total_rials"`
+	OrderID      string `json:"order_id"`
+	ProductID    string `json:"product_id"`
+	Name         string `json:"name"`
+	Grams        int64  `json:"grams"`
+	PriceRials   int64  `json:"price_rials"`
+	TotalRials   int64  `json:"total_rials"`
+	PackageID    string `json:"package_id"`
+	PackageLabel string `json:"package_label"`
+	Quantity     int64  `json:"quantity"`
+	Packed       bool   `json:"packed"`
 }
 
 type OtpChallenge struct {
@@ -110,19 +197,43 @@ type PaymentAttempt struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type PriceHistory struct {
+	ID           int64              `json:"id"`
+	ProductID    string             `json:"product_id"`
+	PackageID    string             `json:"package_id"`
+	PackageLabel string             `json:"package_label"`
+	OldRials     pgtype.Int8        `json:"old_rials"`
+	NewRials     pgtype.Int8        `json:"new_rials"`
+	OldDiscount  pgtype.Int8        `json:"old_discount"`
+	NewDiscount  pgtype.Int8        `json:"new_discount"`
+	ActorID      pgtype.Text        `json:"actor_id"`
+	Baseline     bool               `json:"baseline"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
 type Product struct {
+	ID               string             `json:"id"`
+	Slug             string             `json:"slug"`
+	Name             string             `json:"name"`
+	CategoryID       string             `json:"category_id"`
+	Status           string             `json:"status"`
+	PriceRials       int64              `json:"price_rials"`
+	MinGrams         int64              `json:"min_grams"`
+	StepGrams        int64              `json:"step_grams"`
+	MaxGrams         int64              `json:"max_grams"`
+	SearchText       string             `json:"search_text"`
+	Content          []byte             `json:"content"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	FirstPublishedAt pgtype.Timestamptz `json:"first_published_at"`
+}
+
+type ProductDiscount struct {
 	ID         string             `json:"id"`
-	Slug       string             `json:"slug"`
 	Name       string             `json:"name"`
-	CategoryID string             `json:"category_id"`
-	Status     string             `json:"status"`
-	PriceRials int64              `json:"price_rials"`
-	MinGrams   int64              `json:"min_grams"`
-	StepGrams  int64              `json:"step_grams"`
-	MaxGrams   int64              `json:"max_grams"`
-	SearchText string             `json:"search_text"`
-	Content    []byte             `json:"content"`
-	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	Percent    int64              `json:"percent"`
+	ProductIds []string           `json:"product_ids"`
+	Active     bool               `json:"active"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type ProductDraft struct {
@@ -137,17 +248,34 @@ type RateLimit struct {
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 }
 
+type ReportExport struct {
+	ID        string             `json:"id"`
+	OwnerID   string             `json:"owner_id"`
+	Params    []byte             `json:"params"`
+	Status    string             `json:"status"`
+	Progress  int32              `json:"progress"`
+	Attempts  int32              `json:"attempts"`
+	Content   []byte             `json:"content"`
+	Error     string             `json:"error"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Session struct {
-	TokenHash string             `json:"token_hash"`
-	Csrf      string             `json:"csrf"`
-	UserID    pgtype.Text        `json:"user_id"`
-	StaffID   pgtype.Text        `json:"staff_id"`
-	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	TokenHash       string             `json:"token_hash"`
+	Csrf            string             `json:"csrf"`
+	UserID          pgtype.Text        `json:"user_id"`
+	StaffID         pgtype.Text        `json:"staff_id"`
+	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
+	ReferralStaffID pgtype.Text        `json:"referral_staff_id"`
+	ReferralSeenAt  pgtype.Timestamptz `json:"referral_seen_at"`
 }
 
 type Setting struct {
-	ID             bool  `json:"id"`
-	PackagingGrams int64 `json:"packaging_grams"`
+	ID                bool   `json:"id"`
+	PackagingGrams    int64  `json:"packaging_grams"`
+	FreeShippingRials int64  `json:"free_shipping_rials"`
+	SupportUrl        string `json:"support_url"`
 }
 
 type ShippingRule struct {
@@ -158,13 +286,20 @@ type ShippingRule struct {
 }
 
 type Staff struct {
-	ID           string `json:"id"`
-	Username     string `json:"username"`
-	PasswordHash string `json:"password_hash"`
-	TotpSecret   string `json:"totp_secret"`
-	LastTotpStep int64  `json:"last_totp_step"`
-	Role         string `json:"role"`
-	Active       bool   `json:"active"`
+	ID           string             `json:"id"`
+	Username     string             `json:"username"`
+	PasswordHash string             `json:"password_hash"`
+	TotpSecret   string             `json:"totp_secret"`
+	LastTotpStep int64              `json:"last_totp_step"`
+	Role         string             `json:"role"`
+	Active       bool               `json:"active"`
+	FullName     string             `json:"full_name"`
+	Phone        string             `json:"phone"`
+	BankCard     string             `json:"bank_card"`
+	Restrictions []string           `json:"restrictions"`
+	ReferralCode string             `json:"referral_code"`
+	ArchivedAt   pgtype.Timestamptz `json:"archived_at"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
 
 type StockMovement struct {

@@ -12,23 +12,24 @@ import (
 )
 
 const getPublicProduct = `-- name: GetPublicProduct :one
-SELECT p.id, p.slug, p.name, p.category_id, p.status, p.price_rials, p.min_grams, p.step_grams, p.max_grams, p.search_text, p.content, p.updated_at, coalesce((p.content->>'outOfStock')::boolean,false) AS out_of_stock FROM products p WHERE (p.slug=$1 OR p.id=$1) AND p.status='published'
+SELECT p.id, p.slug, p.name, p.category_id, p.status, p.price_rials, p.min_grams, p.step_grams, p.max_grams, p.search_text, p.content, p.updated_at, p.first_published_at, coalesce((p.content->>'outOfStock')::boolean,false)::boolean AS out_of_stock FROM products p WHERE (p.slug=$1 OR p.id=$1) AND p.status='published'
 `
 
 type GetPublicProductRow struct {
-	ID         string             `json:"id"`
-	Slug       string             `json:"slug"`
-	Name       string             `json:"name"`
-	CategoryID string             `json:"category_id"`
-	Status     string             `json:"status"`
-	PriceRials int64              `json:"price_rials"`
-	MinGrams   int64              `json:"min_grams"`
-	StepGrams  int64              `json:"step_grams"`
-	MaxGrams   int64              `json:"max_grams"`
-	SearchText string             `json:"search_text"`
-	Content    []byte             `json:"content"`
-	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
-	OutOfStock bool               `json:"out_of_stock"`
+	ID               string             `json:"id"`
+	Slug             string             `json:"slug"`
+	Name             string             `json:"name"`
+	CategoryID       string             `json:"category_id"`
+	Status           string             `json:"status"`
+	PriceRials       int64              `json:"price_rials"`
+	MinGrams         int64              `json:"min_grams"`
+	StepGrams        int64              `json:"step_grams"`
+	MaxGrams         int64              `json:"max_grams"`
+	SearchText       string             `json:"search_text"`
+	Content          []byte             `json:"content"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	FirstPublishedAt pgtype.Timestamptz `json:"first_published_at"`
+	OutOfStock       bool               `json:"out_of_stock"`
 }
 
 func (q *Queries) GetPublicProduct(ctx context.Context, slug string) (GetPublicProductRow, error) {
@@ -47,6 +48,7 @@ func (q *Queries) GetPublicProduct(ctx context.Context, slug string) (GetPublicP
 		&i.SearchText,
 		&i.Content,
 		&i.UpdatedAt,
+		&i.FirstPublishedAt,
 		&i.OutOfStock,
 	)
 	return i, err
@@ -108,7 +110,7 @@ func (q *Queries) ListPublicArticles(ctx context.Context) ([]Article, error) {
 }
 
 const listPublicProducts = `-- name: ListPublicProducts :many
-SELECT p.id, p.slug, p.name, p.category_id, p.status, p.price_rials, p.min_grams, p.step_grams, p.max_grams, p.search_text, p.content, p.updated_at, coalesce((p.content->>'outOfStock')::boolean,false) AS out_of_stock FROM products p
+SELECT p.id, p.slug, p.name, p.category_id, p.status, p.price_rials, p.min_grams, p.step_grams, p.max_grams, p.search_text, p.content, p.updated_at, p.first_published_at, coalesce((p.content->>'outOfStock')::boolean,false)::boolean AS out_of_stock FROM products p
 WHERE p.status='published' AND ($1::text='' OR p.category_id=$1)
 AND ($2::text='' OR p.search_text LIKE '%'||$2||'%' OR similarity(p.search_text,$2)>0.12)
 ORDER BY CASE WHEN p.search_text=$2 THEN 0 WHEN p.search_text LIKE $2||'%' THEN 1 ELSE 2 END, similarity(p.search_text,$2) DESC, p.name LIMIT 200
@@ -120,19 +122,20 @@ type ListPublicProductsParams struct {
 }
 
 type ListPublicProductsRow struct {
-	ID         string             `json:"id"`
-	Slug       string             `json:"slug"`
-	Name       string             `json:"name"`
-	CategoryID string             `json:"category_id"`
-	Status     string             `json:"status"`
-	PriceRials int64              `json:"price_rials"`
-	MinGrams   int64              `json:"min_grams"`
-	StepGrams  int64              `json:"step_grams"`
-	MaxGrams   int64              `json:"max_grams"`
-	SearchText string             `json:"search_text"`
-	Content    []byte             `json:"content"`
-	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
-	OutOfStock bool               `json:"out_of_stock"`
+	ID               string             `json:"id"`
+	Slug             string             `json:"slug"`
+	Name             string             `json:"name"`
+	CategoryID       string             `json:"category_id"`
+	Status           string             `json:"status"`
+	PriceRials       int64              `json:"price_rials"`
+	MinGrams         int64              `json:"min_grams"`
+	StepGrams        int64              `json:"step_grams"`
+	MaxGrams         int64              `json:"max_grams"`
+	SearchText       string             `json:"search_text"`
+	Content          []byte             `json:"content"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	FirstPublishedAt pgtype.Timestamptz `json:"first_published_at"`
+	OutOfStock       bool               `json:"out_of_stock"`
 }
 
 func (q *Queries) ListPublicProducts(ctx context.Context, arg ListPublicProductsParams) ([]ListPublicProductsRow, error) {
@@ -157,6 +160,7 @@ func (q *Queries) ListPublicProducts(ctx context.Context, arg ListPublicProducts
 			&i.SearchText,
 			&i.Content,
 			&i.UpdatedAt,
+			&i.FirstPublishedAt,
 			&i.OutOfStock,
 		); err != nil {
 			return nil, err

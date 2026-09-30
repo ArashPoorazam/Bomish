@@ -6,7 +6,7 @@ import { serverApi } from "@/lib/api";
 import type { Product, Article } from "@/lib/types";
 import { ProductPurchase } from "@/components/product-purchase";
 import { ProductGallery } from "@/components/product-gallery";
-import { ProductCard } from "@/components/product-card";
+import { ProductRail } from "@/components/product-rail";
 import { RichText } from "@/components/rich-text";
 export async function generateMetadata({
   params,
@@ -52,8 +52,21 @@ export default async function Detail({
     )
     .slice(0, 4);
   const guides = articles.filter((a) => a.productIds.includes(p.id));
+  const sections = [
+    { body: p.description, title: "داستان این طعم", id: "intro" },
+    { body: p.uses, title: "برای چه غذاهایی مناسب است؟", id: "uses" },
+    { body: p.preparation, title: "چطور استفاده کنیم؟", id: "preparation" },
+    { body: p.storage, title: "چطور نگهداری کنیم؟", id: "storage" },
+    { body: p.ingredients, title: "ترکیبات", id: "ingredients" },
+    { body: p.allergens, title: "اطلاعات حساسیت‌زا", id: "allergens" },
+    ...(p.sections || []).map((section, i) => ({
+      body: section.body,
+      title: section.title,
+      id: `section-${i}`,
+    })),
+  ].filter((s) => s.body.trim());
   return (
-    <div className="container section">
+    <div className="container section shop-detail">
       <ProductEvent productId={p.id} />
       <nav className="breadcrumbs">
         <Link href="/">خانه</Link>
@@ -67,9 +80,9 @@ export default async function Detail({
           <span className="eyebrow">عطری برای آشپزخانه شما</span>
           <h1>{p.name}</h1>
           <p className="lead">{p.summary}</p>
-          <ProductPurchase product={p} />
         </div>
         <ProductGallery product={p} />
+        <ProductPurchase product={p} />
       </div>
       <div className="product-story">
         <aside>
@@ -80,44 +93,24 @@ export default async function Detail({
             تا نگهداری درست.
           </p>
           <nav>
-            {[
-              [p.description, "معرفی", "intro"],
-              [p.uses, "کاربردها", "uses"],
-              [p.preparation, "روش استفاده", "preparation"],
-              [p.storage, "نگهداری", "storage"],
-            ]
-              .filter(([text]) => text)
-              .map(([, title, id]) => (
-                <a key={id} href={"#" + id}>
-                  {title}
-                </a>
-              ))}
+            {sections.map((s) => (
+              <a key={s.id} href={"#" + s.id}>
+                {s.title}
+              </a>
+            ))}
+            {p.nutrients.length > 0 && <a href="#nutrition">ارزش غذایی</a>}
+            {guides.length > 0 && <a href="#guides">در مجله بخوانید</a>}
           </nav>
         </aside>
         <div>
-          {[
-            [p.description, "داستان این طعم", "intro"],
-            [p.uses, "برای چه غذاهایی مناسب است؟", "uses"],
-            [p.preparation, "چطور استفاده کنیم؟", "preparation"],
-            [p.storage, "چطور نگهداری کنیم؟", "storage"],
-            [p.ingredients, "ترکیبات", "ingredients"],
-            [p.allergens, "اطلاعات حساسیت‌زا", "allergens"],
-          ]
-            .filter(([text]) => text)
-            .map(([text, title, id]) => (
-              <section key={id} id={id}>
-                <h2>{title}</h2>
-                <RichText text={text} />
-              </section>
-            ))}
-          {(p.sections || []).map((section, i) => (
-            <section key={i}>
-              <h2>{section.title}</h2>
-              <RichText text={section.body} />
+          {sections.map((s) => (
+            <section key={s.id} id={s.id}>
+              <h2>{s.title}</h2>
+              <RichText text={s.body} />
             </section>
           ))}
           {p.nutrients.length > 0 ? (
-            <section>
+            <section id="nutrition">
               <h2>ارزش غذایی در ۱۰۰ گرم</h2>
               <table>
                 <tbody>
@@ -133,7 +126,7 @@ export default async function Detail({
             </section>
           ) : null}
           {guides.length ? (
-            <section>
+            <section id="guides">
               <h2>در مجله بخوانید</h2>
               {guides.map((a) => (
                 <Link
@@ -148,21 +141,12 @@ export default async function Detail({
           ) : null}
         </div>
       </div>
-      {related.length ? (
-        <section className="section">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">طعم‌هایی در همین حوالی</span>
-              <h2>شاید این‌ها را هم دوست داشته باشید</h2>
-            </div>
-          </div>
-          <div className="product-grid">
-            {related.map((x) => (
-              <ProductCard key={x.id} product={x} />
-            ))}
-          </div>
-        </section>
-      ) : null}
+      <ProductRail
+        products={related}
+        title="شاید این‌ها را هم دوست داشته باشید"
+        eyebrow="طعم‌هایی در همین حوالی"
+        href={"/products?category=" + p.categoryId}
+      />
     </div>
   );
 }

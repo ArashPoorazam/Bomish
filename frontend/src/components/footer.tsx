@@ -36,13 +36,13 @@ export function Footer() {
           </Link>
         </div>
         <div className="footer-note">
-          <span className="eyebrow">خرید به اندازه شما</span>
+          <span className="eyebrow">بسته‌های متنوع بومیش</span>
           <h3>
-            اندازه مناسب شما،
+            بسته‌های مشخص،
             <br />
             برای هر روز آشپزی.
           </h3>
-          <p>بسته و تعداد مورد نیازتان را انتخاب کنید.</p>
+          <p>از بسته‌های موجود انتخاب کنید و قیمت هر بسته را ببینید.</p>
         </div>
       </div>
       <div className="container footer-bottom">

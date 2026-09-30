@@ -14,7 +14,7 @@ export function ProductClickLink({
   return (
     <Link
       href={`/products/${slug}`}
-      className="product-card"
+      className="product-card compact-product"
       onClick={() => {
         void api("/events", "POST", {
           kind: "click",

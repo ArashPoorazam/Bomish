@@ -128,7 +128,7 @@ func (a *App) publishProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	p.Status = "published"
 	raw, _ = json.Marshal(p)
-	_, e = tx.Exec(r.Context(), `UPDATE products SET slug=$1,name=$2,category_id=$3,status='published',price_rials=$4,min_grams=$5,step_grams=$6,max_grams=$7,content=$8,search_text=$9,updated_at=now() WHERE id=$10`, p.Slug, p.Name, p.CategoryID, p.PriceRials, p.MinGrams, p.StepGrams, p.MaxGrams, raw, searchText(p), id)
+	_, e = tx.Exec(r.Context(), `UPDATE products SET slug=$1,name=$2,category_id=$3,first_published_at=CASE WHEN status='draft' THEN coalesce(first_published_at,now()) ELSE first_published_at END,status='published',price_rials=$4,min_grams=$5,step_grams=$6,max_grams=$7,content=$8,search_text=$9,updated_at=now() WHERE id=$10`, p.Slug, p.Name, p.CategoryID, p.PriceRials, p.MinGrams, p.StepGrams, p.MaxGrams, raw, searchText(p), id)
 	if e == nil {
 		_, e = tx.Exec(r.Context(), "DELETE FROM product_drafts WHERE product_id=$1", id)
 	}

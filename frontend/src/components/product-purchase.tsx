@@ -39,14 +39,18 @@ export function ProductPurchase({ product: p }: { product: Product }) {
   return (
     <div className="purchase-panel">
       <div className="product-price">
-        <strong>{priceRange(p)}</strong> <small>تومان</small>
+        <span className="purchase-price-caption">
+          {pack ? `قیمت بسته ${packageLabel(pack)}` : "قیمت بسته‌ها"}
+        </span>
+        <strong>{pack ? money(packagePrice(p, pack)) : priceRange(p)}</strong>{" "}
+        <small>تومان</small>
       </div>
       {p.discountPercent > 0 && (
         <span className="badge">{fa(p.discountPercent)}٪ تخفیف</span>
       )}
       <hr />
       <fieldset className="package-picker">
-        <legend>اندازه بسته را انتخاب کنید</legend>
+        <legend>از بسته‌های موجود انتخاب کنید</legend>
         <div className="package-options">
           {p.packages?.map((x) => (
             <button

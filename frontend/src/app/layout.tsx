@@ -5,6 +5,7 @@ import { WorkspaceFrame } from "@/components/workspace-frame";
 
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
+import "./storefront.css";
 const vazir = localFont({
   src: "../../public/fonts/Vazirmatn.woff2",
   variable: "--font-vazir",

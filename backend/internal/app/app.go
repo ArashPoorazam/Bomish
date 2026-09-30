@@ -96,6 +96,8 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("DELETE /api/v1/cart/items/{id}", a.removeCartItem)
 	m.HandleFunc("GET /api/v1/addresses", a.addresses)
 	m.HandleFunc("POST /api/v1/addresses", a.saveAddress)
+	m.HandleFunc("PUT /api/v1/addresses/{id}", a.updateAddress)
+	m.HandleFunc("DELETE /api/v1/addresses/{id}", a.deleteAddress)
 	m.HandleFunc("POST /api/v1/checkout/quote", a.quote)
 	m.HandleFunc("POST /api/v1/checkout", a.checkout)
 	m.HandleFunc("GET /api/v1/orders", a.orders)

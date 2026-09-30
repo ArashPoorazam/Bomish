@@ -1,16 +1,14 @@
 "use client";
-import { AddressBook } from "./address-book";
 import { AddressMap } from "./address-map";
-import { OrderProgress } from "./order-progress";
 import { useRouter } from "next/navigation";
 import { packageLabel, fa } from "@/lib/format";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import type { Address, Quote, Order } from "@/lib/types";
+import type { Address, Quote } from "@/lib/types";
 import { useStore } from "./store-provider";
 import { LoginForm } from "./login-form";
-import { money, weight, digits } from "@/lib/format";
+import { money, digits } from "@/lib/format";
 import { CheckCircle2, ArrowLeft, TicketPercent } from "lucide-react";
 const blank: Address = {
   id: "",
@@ -500,157 +498,5 @@ export function Checkout() {
         </aside>
       </div>
     </div>
-  );
-}
-export function Account() {
-  const { user, refresh } = useStore();
-  const [orders, setOrders] = useState<Order[]>([]),
-    [addresses, setAddresses] = useState<Address[]>([]),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  async function load() {
-    const [o, a] = await Promise.all([
-      api<Order[]>("/orders"),
-      api<Address[]>("/addresses"),
-    ]);
-    setOrders(o);
-    setAddresses(a);
-  }
-  useEffect(() => {
-    if (user?.authenticated) load().catch((e) => setError(e.message));
-  }, [user?.authenticated]);
-  async function pay(id: string) {
-    setBusy(true);
-    try {
-      await api(`/orders/${id}/simulate`, "POST", { success: true });
-      await load();
-      await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  if (!user) return <div className="loading">در حال دریافت حساب…</div>;
-  if (!user.authenticated)
-    return (
-      <div className="auth-layout">
-        <LoginForm onSuccess={() => {}} />
-      </div>
-    );
-  return (
-    <div className="container section">
-      <div className="section-heading">
-        <h1>حساب من</h1>
-        <button
-          className="button secondary"
-          onClick={async () => {
-            try {
-              await api("/logout", "POST");
-              await refresh();
-            } catch (e) {
-              setError((e as Error).message);
-            }
-          }}
-        >
-          خروج از حساب
-        </button>
-      </div>
-      {error ? (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      ) : null}
-      <h2 style={{ marginBottom: 20 }}>سفارش‌های شما</h2>
-      {orders.length ? (
-        orders.map((o) => (
-          <OrderView key={o.id} order={o}>
-            {o.status === "pending" && user.development ? (
-              <button
-                className="button secondary"
-                disabled={busy}
-                onClick={() => pay(o.id)}
-              >
-                ادامه پرداخت آزمایشی
-              </button>
-            ) : null}
-          </OrderView>
-        ))
-      ) : (
-        <div className="empty-state">
-          <p>هنوز سفارشی ثبت نکرده‌اید.</p>
-          <Link className="button" href="/products">
-            شروع خرید
-          </Link>
-        </div>
-      )}
-      <h2 style={{ margin: "32px 0 20px" }}>نشانی‌های ذخیره‌شده</h2>
-      <AddressBook onSaved={load} />
-      {addresses.length ? (
-        addresses.map((a) => (
-          <div className="order-card" key={a.id}>
-            <strong>{a.recipient}</strong>
-            <p>
-              {a.province}، {a.city}، {a.street}
-            </p>
-            <p>{a.postalCode}</p>
-          </div>
-        ))
-      ) : (
-        <p>نشانی خانه را برای خرید سریع‌تر ذخیره کنید.</p>
-      )}
-    </div>
-  );
-}
-import { date, statuses } from "@/lib/format";
-export function OrderView({
-  order: o,
-  children,
-  trackingUrl,
-}: {
-  order: Order;
-  trackingUrl?: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <article className="order-card">
-      <div className="between">
-        <h3>سفارش {o.id.slice(0, 8)}</h3>
-        <span className="badge">{statuses[o.status] || o.status}</span>
-      </div>
-      <p className="muted">{date(o.createdAt)}</p>
-      <OrderProgress order={o} trackingUrl={trackingUrl} />
-      <Link className="text-link" href={"/account/orders/" + o.id}>
-        صفحه پیگیری سفارش ←
-      </Link>
-      <ul>
-        {o.items.map((i) => (
-          <li key={i.productId + i.packageId}>
-            <span>
-              {i.name} · {i.packageLabel || weight(i.grams)} · {fa(i.quantity)}{" "}
-              بسته
-            </span>
-            <span>{money(i.totalRials)} تومان</span>
-          </li>
-        ))}
-      </ul>
-      {o.discountRials > 0 && (
-        <div className="summary-line coupon-saving">
-          <span>
-            تخفیف کد <bdi>{o.discountCode}</bdi>
-          </span>
-          <strong>−{money(o.discountRials)} تومان</strong>
-        </div>
-      )}
-      <div className="between">
-        <strong>جمع با ارسال: {money(o.totalRials)} تومان</strong>
-        {children}
-      </div>
-      {o.tracking ? (
-        <p>
-          کد رهگیری: <bdi>{o.tracking}</bdi>
-        </p>
-      ) : null}
-    </article>
   );
 }

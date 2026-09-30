@@ -1,25 +1,33 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import type { Order } from "@/lib/types";
 import { useStore } from "./store-provider";
-import { LoginForm } from "./login-form";
-import { OrderView } from "./checkout";
+import { AccountShell } from "./account-shell";
+import { OrderView, PendingPayment } from "./customer-order";
 export function OrderTracking({ id }: { id: string }) {
   const { user } = useStore();
   const [result, setResult] = useState<{
       order: Order;
       trackingUrl: string;
     } | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [retry, setRetry] = useState(0);
+  const fetchOrder = useCallback(
+    () =>
+      api<{ order: Order; trackingUrl: string }>(
+        "/orders/" + encodeURIComponent(id),
+      ),
+    [id],
+  );
   useEffect(() => {
+    setResult(null);
+    setError("");
     if (!user?.authenticated) return;
     let active = true;
     const load = () =>
-      api<{ order: Order; trackingUrl: string }>(
-        "/orders/" + encodeURIComponent(id),
-      )
+      fetchOrder()
         .then((v) => {
           if (active) {
             setResult(v);
@@ -37,29 +45,34 @@ export function OrderTracking({ id }: { id: string }) {
       active = false;
       clearInterval(timer);
     };
-  }, [id, user?.authenticated]);
-  if (user && !user.authenticated)
-    return (
-      <div className="auth-layout">
-        <LoginForm onSuccess={() => {}} />
-      </div>
-    );
+  }, [fetchOrder, user?.authenticated, retry]);
   return (
-    <div className="container section">
-      <Link className="text-link" href="/account">
+    <AccountShell section="orders" title="سفارش شما، قدم به قدم">
+      <Link className="text-link account-back" href="/account">
         ← حساب من
       </Link>
-      <h1>سفارش شما، قدم به قدم</h1>
       {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
+        <div className="account-panel" role="alert">
+          <p className="error">{error}</p>
+          <button
+            className="button secondary"
+            onClick={() => setRetry((n) => n + 1)}
+          >
+            تلاش دوباره
+          </button>
+        </div>
       )}
       {result ? (
-        <OrderView order={result.order} trackingUrl={result.trackingUrl} />
+        <>
+          <PendingPayment
+            order={result.order}
+            onPaid={async () => setResult(await fetchOrder())}
+          />
+          <OrderView order={result.order} trackingUrl={result.trackingUrl} />
+        </>
       ) : (
         !error && <p role="status">در حال دریافت وضعیت سفارش…</p>
       )}
-    </div>
+    </AccountShell>
   );
 }

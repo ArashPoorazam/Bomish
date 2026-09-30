@@ -45,7 +45,12 @@ func (p Product) Package(id string) (Package, bool) {
 	return Package{}, false
 }
 func (p Product) PackagePrice(v Package) int64 {
-	return ((v.PriceRials*(100-p.DiscountPercent) + 500) / 1000) * 10
+	if p.DiscountPercent <= 0 {
+		return v.PriceRials
+	}
+	// A discounted package rounds up to 1,000 toman (10,000 rials), once per package.
+	rounded := ((v.PriceRials*(100-p.DiscountPercent) + 999999) / 1000000) * 10000
+	return min(v.PriceRials, rounded)
 }
 
 // Existing catalogs receive one explicit package based on their previous minimum, never a global list.
@@ -56,10 +61,11 @@ func (p *Product) EnsurePackages() {
 }
 
 type Product struct {
-	Packages        []Package `json:"packages"`
-	Sections        []Section `json:"sections"`
-	DiscountPercent int64     `json:"discountPercent"`
-	Popularity      int64     `json:"popularity"`
+	FirstPublishedAt string    `json:"firstPublishedAt,omitempty"`
+	Packages         []Package `json:"packages"`
+	Sections         []Section `json:"sections"`
+	DiscountPercent  int64     `json:"discountPercent"`
+	Popularity       int64     `json:"popularity"`
 
 	ID             string     `json:"id"`
 	Slug           string     `json:"slug"`

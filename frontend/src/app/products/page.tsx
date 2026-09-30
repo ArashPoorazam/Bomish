@@ -1,5 +1,7 @@
-import { ProductEvent } from "@/components/product-event";
 import Link from "next/link";
+import { X } from "lucide-react";
+import { ProductEvent } from "@/components/product-event";
+import { CatalogFilters, CatalogSort } from "@/components/catalog-controls";
 import { serverApi } from "@/lib/api";
 import type { Product, Category } from "@/lib/types";
 import { ProductCard } from "@/components/product-card";
@@ -11,131 +13,83 @@ export default async function Products({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const q = await searchParams;
+  const params = new URLSearchParams();
+  for (const name of [
+    "q",
+    "category",
+    "page",
+    "max",
+    "available",
+    "sort",
+    "discounted",
+  ])
+    if (q[name]) params.set(name, q[name]!);
+  params.set("page", q.page || "1");
   const [all, categories] = await Promise.all([
     serverApi<{
       items: Product[];
       total: number;
       page: number;
       pageSize: number;
-    }>(
-      "/products?" +
-        new URLSearchParams({
-          q: q.q || "",
-          category: q.category || "",
-          page: q.page || "1",
-          max: q.max || "",
-          available: q.available === "true" ? "true" : "",
-          sort: q.sort || "",
-        }),
-    ),
+    }>("/products?" + params),
     serverApi<Category[]>("/categories"),
   ]);
-  const products = all.items;
   const title =
     categories.find((c) => c.id === q.category)?.name || "همه محصولات";
+  function url(change: Record<string, string | null>) {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(change)) {
+      if (value === null) next.delete(key);
+      else next.set(key, value);
+    }
+    return "/products?" + next;
+  }
+  const chips = [
+    { key: "q", label: q.q && `جستجو: ${q.q}` },
+    { key: "category", label: q.category && title },
+    { key: "max", label: q.max && `تا ${q.max} تومان` },
+    { key: "available", label: q.available === "true" && "فقط موجود" },
+    { key: "discounted", label: q.discounted === "true" && "تخفیف‌دارها" },
+  ].filter((c) => c.label);
   return (
-    <div className="container section">
+    <div className="container section shop-catalog">
       <ProductEvent query={q.q} />
       <div className="page-heading">
-        <span className="eyebrow">از طبیعت، برای آشپزخانه شما</span>
+        <span className="eyebrow">قفسه‌ای از عطر و طعم</span>
         <h1>{q.q ? `نتایج جستجو برای «${q.q}»` : title}</h1>
-        <p>
-          طعم مورد علاقه‌تان را پیدا کنید و اندازه و تعداد بسته‌ها را انتخاب
-          کنید.
-        </p>
+        <p>محصول را بشناسید، از بسته‌های موجود انتخاب کنید.</p>
       </div>
       <div className="catalog-layout">
-        <form className="filter-panel">
-          <h3>انتخاب دقیق‌تر</h3>
-          {q.q ? <input type="hidden" name="q" value={q.q} /> : null}
-          <label>
-            دسته‌بندی
-            <select name="category" defaultValue={q.category || ""}>
-              <option value="">همه دسته‌ها</option>
-              {categories.map((c) => (
-                <option value={c.id} key={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            حداکثر قیمت بسته (تومان)
-            <input
-              name="max"
-              inputMode="numeric"
-              min="0"
-              defaultValue={q.max}
-              placeholder="بدون محدودیت"
-            />
-          </label>
-          <label>
-            مرتب‌سازی
-            <select name="sort" defaultValue={q.sort || "relevant"}>
-              <option value="relevant">مرتبط‌ترین</option>
-              <option value="price-asc">ارزان‌ترین</option>
-              <option value="price-desc">گران‌ترین</option>
-            </select>
-          </label>
-          <label className="check-label">
-            <input
-              type="checkbox"
-              name="available"
-              value="true"
-              defaultChecked={q.available === "true"}
-            />
-            فقط محصولات موجود
-          </label>
-          <button className="button full">اعمال فیلتر</button>
-          <Link className="text-link" href="/products">
-            پاک کردن فیلترها
-          </Link>
-        </form>
-        <div>
-          <div className="between catalog-count">
-            <span>{fa(all.total)} محصول</span>
-            <span className="muted">بازه قیمت بسته‌های هر محصول</span>
-          </div>
-          <div className="omni-pager">
-            <span>صفحه {fa(all.page)}</span>
+        <CatalogFilters
+          key={params.toString()}
+          categories={categories}
+          query={q}
+        />
+        <div className="catalog-results">
+          <div className="store-toolbar">
             <div>
-              {all.page > 1 && (
-                <Link
-                  className="button secondary"
-                  href={
-                    "/products?" +
-                    new URLSearchParams({
-                      ...(Object.fromEntries(
-                        Object.entries(q).filter(([, v]) => v !== undefined),
-                      ) as Record<string, string>),
-                      page: String(all.page - 1),
-                    })
-                  }
-                >
-                  قبلی
-                </Link>
-              )}
-              {all.page * all.pageSize < all.total && (
-                <Link
-                  className="button secondary"
-                  href={
-                    "/products?" +
-                    new URLSearchParams({
-                      ...(Object.fromEntries(
-                        Object.entries(q).filter(([, v]) => v !== undefined),
-                      ) as Record<string, string>),
-                      page: String(all.page + 1),
-                    })
-                  }
-                >
-                  بعدی
-                </Link>
-              )}
+              <strong>{fa(all.total)} محصول</strong>
+              <span className="muted">قیمت‌ها برای بسته‌های هر محصول است</span>
             </div>
+            <CatalogSort key={params.toString()} value={q.sort || "relevant"} />
           </div>
-          {products.length ? (
+          {chips.length > 0 && (
+            <div className="filter-chips" aria-label="فیلترهای فعال">
+              {chips.map((c) => (
+                <Link
+                  key={c.key}
+                  href={url({ [c.key]: null, page: null })}
+                  aria-label={`حذف فیلتر ${c.label}`}
+                >
+                  {c.label}
+                  <X size={14} />
+                </Link>
+              ))}
+            </div>
+          )}
+          {all.items.length ? (
             <div className="product-grid catalog-grid">
-              {products.map((p) => (
+              {all.items.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
             </div>
@@ -148,6 +102,30 @@ export default async function Products({
               </Link>
             </div>
           )}
+          <nav className="catalog-pagination" aria-label="صفحه‌های محصولات">
+            <span>
+              صفحه {fa(all.page)} از{" "}
+              {fa(Math.max(1, Math.ceil(all.total / all.pageSize)))}
+            </span>
+            <div>
+              {all.page > 1 && (
+                <Link
+                  className="button secondary"
+                  href={url({ page: String(all.page - 1) })}
+                >
+                  قبلی
+                </Link>
+              )}
+              {all.page * all.pageSize < all.total && (
+                <Link
+                  className="button secondary"
+                  href={url({ page: String(all.page + 1) })}
+                >
+                  بعدی
+                </Link>
+              )}
+            </div>
+          </nav>
         </div>
       </div>
     </div>

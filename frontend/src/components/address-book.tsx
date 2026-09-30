@@ -13,17 +13,18 @@ const blank: Address = {
   street: "",
   postalCode: "",
 };
-export function AddressBook({ onSaved }: { onSaved: () => Promise<void> }) {
-  const [open, setOpen] = useState(false),
-    [address, setAddress] = useState(blank),
+export function AddressEditor({
+  initial,
+  onSaved,
+  onCancel,
+}: {
+  initial?: Address;
+  onSaved: (saved: Address) => void;
+  onCancel: () => void;
+}) {
+  const [address, setAddress] = useState(initial || blank),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  if (!open)
-    return (
-      <button className="button secondary" onClick={() => setOpen(true)}>
-        + ذخیره نشانی خانه
-      </button>
-    );
   return (
     <form
       className="form-card stack"
@@ -32,14 +33,18 @@ export function AddressBook({ onSaved }: { onSaved: () => Promise<void> }) {
         setBusy(true);
         setError("");
         try {
-          await api("/addresses", "POST", {
-            ...address,
-            phone: digits(address.phone),
-            postalCode: digits(address.postalCode),
-          });
-          await onSaved();
-          setAddress(blank);
-          setOpen(false);
+          const saved = await api<Address>(
+            initial
+              ? `/addresses/${encodeURIComponent(initial.id)}`
+              : "/addresses",
+            initial ? "PUT" : "POST",
+            {
+              ...address,
+              phone: digits(address.phone),
+              postalCode: digits(address.postalCode),
+            },
+          );
+          onSaved(saved);
         } catch (e) {
           setError((e as Error).message);
         } finally {
@@ -47,7 +52,7 @@ export function AddressBook({ onSaved }: { onSaved: () => Promise<void> }) {
         }
       }}
     >
-      <h3>نشانی جدید</h3>
+      <h3>{initial ? "ویرایش نشانی" : "نشانی جدید"}</h3>
       <AddressMap address={address} onChange={setAddress} />
       <div className="form-grid">
         {(
@@ -76,13 +81,13 @@ export function AddressBook({ onSaved }: { onSaved: () => Promise<void> }) {
       </div>
       <div className="inline-actions">
         <button className="button" disabled={busy}>
-          ذخیره نشانی
+          {busy ? "در حال ذخیره…" : "ذخیره نشانی"}
         </button>
         <button
           type="button"
           className="button secondary"
           disabled={busy}
-          onClick={() => setOpen(false)}
+          onClick={onCancel}
         >
           انصراف
         </button>
