@@ -22,6 +22,7 @@ export default async function Products({
     "available",
     "sort",
     "discounted",
+    "collection",
   ])
     if (q[name]) params.set(name, q[name]!);
   params.set("page", q.page || "1");

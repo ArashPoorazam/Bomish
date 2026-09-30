@@ -6,7 +6,7 @@
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "api:generate": "openapi-typescript ../api/openapi.json -o src/lib/api-types.ts",
     "test:e2e": "playwright test",
     "format": "prettier --write src tests *.ts *.json",

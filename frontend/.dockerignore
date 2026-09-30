@@ -1,5 +1,8 @@
 node_modules
 .next
+.next-*
+next-env.d.ts
+*.tsbuildinfo
 .env*
 test-results
 playwright-report

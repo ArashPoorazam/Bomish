@@ -232,11 +232,9 @@ export function CatalogManager({
 }
 export function CategoryManager({
   categories,
-  products,
   reload,
 }: {
   categories: Category[];
-  products: Product[];
   reload: () => Promise<void>;
 }) {
   const [counts, setCounts] = useState<Record<string, number>>({});

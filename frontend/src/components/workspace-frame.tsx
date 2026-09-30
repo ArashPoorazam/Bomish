@@ -2,6 +2,7 @@
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, type ReactNode } from "react";
 import { Header } from "./header";
+import { SupportButton } from "./requests/support-button";
 import { Footer } from "./footer";
 import { api } from "@/lib/api";
 export function WorkspaceFrame({ children }: { children: ReactNode }) {
@@ -18,7 +19,12 @@ export function WorkspaceFrame({ children }: { children: ReactNode }) {
         </>
       )}
       <main id="main">{children}</main>
-      {!admin && <Footer />}
+      {!admin && (
+        <>
+          <Footer />
+          <SupportButton />
+        </>
+      )}
     </>
   );
 }

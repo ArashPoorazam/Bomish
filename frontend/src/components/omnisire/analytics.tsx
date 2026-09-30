@@ -1,4 +1,5 @@
 "use client";
+import { reportSections } from "./workspace-navigation";
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { api } from "@/lib/api";
@@ -10,7 +11,6 @@ import {
   Pager,
   DataTable,
   useLoad,
-  reportSections,
   type PageData,
 } from "./shared";
 import { LineChart, PieChart, type ChartData } from "./charts";

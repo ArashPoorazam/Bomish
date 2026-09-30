@@ -44,6 +44,12 @@ export function StaffOrderDetail({
       .then((v) => {
         if (live) {
           setOrder(v);
+          void api(
+            `/staff/orders/${encodeURIComponent(initial.id)}/read`,
+            "POST",
+          )
+            .then(() => window.dispatchEvent(new Event("bomish:notifications")))
+            .catch(() => {});
           setTracking(v.tracking);
         }
       })

@@ -122,10 +122,15 @@ test("owner creates salesperson, referral earns commission, payout appears in sa
       operator.getByRole("button", { name: "محصولات", exact: true }),
     ).toHaveCount(0);
     await operator
+      .getByRole("button", {
+        name: new RegExp(`جزئیات سفارش ${orderId.slice(0, 8)}`),
+      })
+      .click();
+    await operator
       .getByRole("button", { name: "تأیید بسته‌بندی", exact: true })
       .click();
     await operator
-      .getByLabel("کد رهگیری", { exact: true })
+      .getByLabel("کد رهگیری مرسوله", { exact: true })
       .fill("۱۲۳۴۵۶۷۸۹۰۱۲۳۴۵۶۷۸۹۰");
     await operator
       .getByRole("button", { name: "ثبت ارسال و اطلاع‌رسانی", exact: true })

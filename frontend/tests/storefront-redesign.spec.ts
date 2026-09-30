@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import type { Address, Order, Product } from "../src/lib/types";
 import { packagePrice } from "../src/lib/format";
-import { totp } from "./staff-login";
+import { loginStaffAPI } from "./staff-login";
 
 const address: Address = {
   id: "home",
@@ -208,34 +208,51 @@ test("catalog filters preserve query and sorting while clearing pagination", asy
   await expect(
     page.locator('.catalog-grid a[href="/products/turmeric"]'),
   ).toHaveCount(1);
+  await expect(page).not.toHaveURL(/available=/);
   url = new URL(page.url());
   expect(url.searchParams.get("sort")).toBe("price-desc");
   expect(url.searchParams.has("available")).toBe(false);
 });
 
-test("homepage copy and keyboard carousel navigation", async ({ page }) => {
+test("homepage copy and conditional bestseller carousel navigation", async ({
+  page,
+  request,
+}) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  const products = await (
+    await request.get(
+      "/api/v1/products?available=true&collection=bestsellers&pageSize=12",
+    )
+  ).json();
   await page.goto("/");
-  await expect(
-    page.getByRole("heading", { name: "انتخاب‌های بومیش", exact: true }),
-  ).toBeVisible();
   await expect(page.locator("main")).not.toContainText("انتخاب آزادانه وزن");
   await expect(page.locator(".principle-card").last()).toContainText(
     "جنس درجه ۱، ۲ و ۳ را قاطی نمی‌کنیم",
   );
-  const track = page.locator(".rail-track").first();
   await expect(
-    page.getByRole("button", { name: "قبلی در انتخاب‌های بومیش" }),
-  ).toBeDisabled();
-  await track.focus();
-  await page.keyboard.press("ArrowLeft");
-  await expect(
-    page.getByRole("button", { name: "قبلی در انتخاب‌های بومیش" }),
-  ).toBeEnabled();
-  await page.getByRole("button", { name: "قبلی در انتخاب‌های بومیش" }).click();
-  await expect(
-    page.getByRole("button", { name: "قبلی در انتخاب‌های بومیش" }),
-  ).toBeDisabled();
+    page.getByRole("heading", { name: "انتخاب‌های بومیش", exact: true }),
+  ).toHaveCount(0);
+  const heading = page.getByRole("heading", {
+    name: "پرفروش ترین‌های بومیش",
+    exact: true,
+  });
+  if (!products.length) {
+    await expect(heading).toHaveCount(0);
+    return;
+  }
+  await expect(heading).toBeVisible();
+  const track = page.locator('.rail-track[aria-label="پرفروش ترین‌های بومیش"]');
+  const previous = page.getByRole("button", {
+    name: "قبلی در پرفروش ترین‌های بومیش",
+  });
+  await expect(previous).toBeDisabled();
+  if (await track.evaluate((el) => el.scrollWidth > el.clientWidth + 2)) {
+    await track.focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(previous).toBeEnabled();
+    await previous.click();
+    await expect(previous).toBeDisabled();
+  }
 });
 
 test("discounted package rounds to 1000 toman in listing, purchase, cart, and checkout", async ({
@@ -243,16 +260,11 @@ test("discounted package rounds to 1000 toman in listing, purchase, cart, and ch
   request,
   baseURL,
 }) => {
-  const session = await (await request.get("/api/v1/session")).json();
-  const headers = {
-    Origin: new URL(baseURL!).origin,
-    "X-CSRF-Token": session.csrf,
-  };
-  const login = await request.post("/api/v1/staff/login", {
-    headers,
-    data: { username: "owner", password: "Bomish-demo-2026!", code: totp() },
-  });
-  expect(login.ok()).toBe(true);
+  const headers = await loginStaffAPI(
+    request,
+    new URL(baseURL!).origin,
+    "owner",
+  );
   const id = `rounding-${Date.now()}`;
   const source = (await (
     await request.get("/api/v1/products/turmeric")
@@ -304,9 +316,12 @@ test("discounted package rounds to 1000 toman in listing, purchase, cart, and ch
     await expect(
       page.getByRole("heading", { name: "تازه‌های بومیش", exact: true }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "پیشنهادهای بومیش", exact: true }),
-    ).toBeVisible();
+    const manual = await (
+      await request.get(
+        "/api/v1/products?collection=suggestions&available=true",
+      )
+    ).json();
+    expect(manual.some((p: Product) => p.id === id)).toBe(false);
     await page.goto(`/products?q=${id}&discounted=true`);
     await expect(page.locator(".catalog-grid")).toContainText("۴۳٬۰۰۰");
     await page.locator(".catalog-grid .product-card").click();

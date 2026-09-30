@@ -27,19 +27,6 @@ export const statuses: Record<string, string> = {
   expired: "مهلت پرداخت تمام شده",
   review: "نیازمند بررسی فروشگاه",
 };
-export function parseGrams(input: string, unit: "g" | "kg"): number {
-  const v = digits(input).trim();
-  if (!/^\d+(\.\d+)?$/.test(v)) return NaN;
-  const [whole, fraction = ""] = v.split(".");
-  const precision = unit === "kg" ? 3 : 0;
-  if (fraction.length > precision && !/^0*$/.test(fraction.slice(precision)))
-    return NaN;
-  return (
-    Number(whole) * (unit === "kg" ? 1000 : 1) +
-    Number(fraction.slice(0, precision).padEnd(precision, "0") || 0)
-  );
-}
-
 export const packageLabel = (p: { amount: number; unit: string }) =>
   `${fa(p.amount)} ${{ g: "گرم", kg: "کیلوگرم", ml: "میلی‌لیتر", l: "لیتر" }[p.unit] || p.unit}`;
 export const packageWeight = (p: import("./types").Package) =>

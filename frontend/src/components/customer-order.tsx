@@ -49,6 +49,7 @@ export function OrderSummary({ order: o }: { order: Order }) {
           )
           .join("، ")}
       </p>
+      <OrderProgress order={o} />
       <div className="order-summary-bottom">
         <strong>
           {money(o.totalRials)} <small>تومان</small>

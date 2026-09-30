@@ -1,15 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Check, Package, Truck, House, ShoppingBag } from "lucide-react";
+import { useState } from "react";
+import { Check } from "lucide-react";
 import type { Order } from "@/lib/types";
 import { date } from "@/lib/format";
-import { api } from "@/lib/api";
-export const stages = [
-  { id: "paid", label: "خرید ثبت شد", icon: ShoppingBag },
-  { id: "packing", label: "بسته‌بندی شد", icon: Package },
-  { id: "shipped", label: "ارسال شد", icon: Truck },
-  { id: "received", label: "تحویل شد", icon: House },
-];
+import { orderStages as stages } from "@/lib/order-stages";
 export function OrderProgress({
   order,
   trackingUrl,
@@ -17,14 +11,8 @@ export function OrderProgress({
   order: Order;
   trackingUrl?: string;
 }) {
-  const [support, setSupport] = useState(""),
-    [copied, setCopied] = useState("");
+  const [copied, setCopied] = useState("");
   const index = stages.findIndex((x) => x.id === order.status);
-  useEffect(() => {
-    api<{ supportUrl: string }>("/settings")
-      .then((x) => setSupport(x.supportUrl))
-      .catch(() => {});
-  }, []);
   if (index < 0) return null;
   return (
     <div className="order-progress">
@@ -82,16 +70,6 @@ export function OrderProgress({
           </div>
           <small role="status">{copied}</small>
         </div>
-      )}
-      {support && (
-        <a
-          className="support-link"
-          href={support}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          برای این سفارش کمک می‌خواهید؟ گفتگو با پشتیبانی ←
-        </a>
       )}
     </div>
   );

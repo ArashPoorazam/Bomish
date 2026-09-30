@@ -89,6 +89,12 @@ export function AccountShell({
                 Icon: ShoppingBag,
               },
               {
+                id: "custom",
+                title: "سفارش اختصاصی",
+                href: "/account?section=custom",
+                Icon: ShoppingBag,
+              },
+              {
                 id: "addresses",
                 title: "نشانی‌ها",
                 href: "/account?section=addresses",

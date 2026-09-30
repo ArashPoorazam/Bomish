@@ -11,9 +11,11 @@ test("live pricing supports group lifecycle, price changes, and code action layo
   await page.goto("/staff");
   await loginStaff(page, "owner");
   await page.goto("/staff?section=pricing");
-  const session = await (await page.request.get("/api/v1/session")).json();
+  const session = await (
+    await page.request.get("/api/v1/session?workspace=staff")
+  ).json();
   const headers = {
-    Origin: "http://localhost:3000",
+    Origin: new URL(page.url()).origin,
     "X-CSRF-Token": session.csrf,
   };
   const options = await (

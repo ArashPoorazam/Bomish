@@ -1,37 +1,63 @@
 import type { Session } from "./types";
-let csrf = "";
-let pendingSession: Promise<Session> | null = null;
-export async function session(): Promise<Session> {
-  if (!pendingSession)
-    pendingSession = fetch("/api/v1/session", { cache: "no-store" })
+const csrf: Record<string, string> = {};
+const pendingSession: Record<string, Promise<Session> | undefined> = {};
+function workspace() {
+  return typeof window !== "undefined" &&
+    /^\/(staff|omnisire)(\/|$)/.test(window.location.pathname)
+    ? "staff"
+    : "customer";
+}
+export async function session(scope = workspace()): Promise<Session> {
+  if (!pendingSession[scope])
+    pendingSession[scope] = fetch(
+      "/api/v1/session" + (scope === "staff" ? "?workspace=staff" : ""),
+      { cache: "no-store" },
+    )
       .then(async (r) => {
         const s = await readResponse<Session>(r);
-        csrf = s.csrf;
+        csrf[scope] = s.csrf;
         return s;
       })
       .finally(() => {
-        pendingSession = null;
+        delete pendingSession[scope];
       });
-  return pendingSession;
+  return pendingSession[scope]!;
 }
 export async function api<T>(
   path: string,
   method = "GET",
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
-  if (method !== "GET" && !csrf) await session();
+  const scope = /^\/(staff|omnisire)(\/|$)/.test(path)
+    ? "staff"
+    : path === "/logout"
+      ? workspace()
+      : "customer";
+  if (method !== "GET" && !csrf[scope]) await session(scope);
+  if (path === "/logout" && scope === "staff") path += "?workspace=staff";
   const form = body instanceof FormData;
   const r = await fetch("/api/v1" + path, {
     method,
+    signal,
     cache: "no-store",
     headers: {
-      ...(method !== "GET" ? { "X-CSRF-Token": csrf } : {}),
+      ...(method !== "GET" ? { "X-CSRF-Token": csrf[scope] } : {}),
       ...(!form && body !== undefined
         ? { "Content-Type": "application/json" }
         : {}),
     },
     body: body === undefined ? undefined : form ? body : JSON.stringify(body),
   });
+  if (
+    r.status === 401 &&
+    !path.includes("/login") &&
+    !path.startsWith("/auth/")
+  ) {
+    window.dispatchEvent(
+      new CustomEvent("bomish:session-expired", { detail: scope }),
+    );
+  }
   return readResponse<T>(r);
 }
 async function readResponse<T>(response: Response): Promise<T> {

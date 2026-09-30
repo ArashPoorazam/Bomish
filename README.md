@@ -74,7 +74,7 @@ A TOTP cannot be reused for the same account. Customer login instead displays a 
 - Responsive Persian storefront, local Vazirmatn font, specified cream/green palette, product guides and blog.
 - Category filtering, normalized Persian search, typo similarity, aliases and related products.
 - Product-specific gram/kilogram/milliliter/liter packages, per-package prices and purchase limits, separate cart lines, and price ranges. Discounted package prices round upward to 1,000 toman, capped at the original package price; undiscounted prices and coupon rules remain unchanged.
-- Kavenegar-ready SMS account verification, a customer overview, order history, map-assisted address creation/editing/deletion, and four-stage order tracking with queued notifications. Saved-address changes never alter existing order snapshots.
+- Kavenegar-ready SMS account verification, a customer overview, order history, map-assisted address creation/editing/deletion, and five-stage order tracking with automatic and manual refresh with queued notifications. Saved-address changes never alter existing order snapshots.
 - Regional/weight-based delivery, server-authoritative checkout, 15-minute reservations, repeat-safe simulated payments and late-payment review.
 - Separate password/TOTP staff login, backend-enforced roles, draft preview, uploads, editor publication, manual availability and delivery editing.
 - Owner-only Omnisire with member management, referral commission accounting, searchable event history, paginated analytics, cross-page comparison and background Excel exports.
@@ -107,6 +107,14 @@ Browser tests require both local servers and development fixtures. To use an ins
 Regenerate database access after changing queries: `cd backend && sqlc generate`. Regenerate the frontend contract after editing `api/openapi.json`: `cd frontend && npm run api:generate`.
 
 ## Store management
+
+Staff can curate home-page suggestions and use the Requests section for orders, support conversations, and personalized product requests. The storefront includes a floating support button and customer-visible request decisions.
+
+Chat opens the latest 100 messages, supports loading older history without losing scroll position, and polls for new replies only while visible. Orders refresh independently of addresses and retain their last successful status during temporary failures.
+
+Customer and staff cookies remain independent; only genuine session expiry invokes sign-in. Notification badges track unread counts, while optional sound detects new event markers even when counts stay unchanged.
+
+Suggestion loading and product search have separate retries that preserve edits. Migrations 009 and 010 apply automatically at startup. See [architecture and behavior](docs/architecture.md) for permissions, polling, session isolation, and collection rules.
 
 The staff panel includes searchable products, flexible package and Markdown section editors, category and fulfillment workflows, owner price/discount controls, free-shipping settings, and a dedicated business analytics page.
 

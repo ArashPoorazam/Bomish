@@ -70,7 +70,7 @@ func (a *App) setCartItem(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "محصول در دسترس نیست")
 		return
 	}
-	v := productFrom(db.Product{ID: p.ID, Slug: p.Slug, Name: p.Name, CategoryID: p.CategoryID, Status: p.Status, PriceRials: p.PriceRials, MinGrams: p.MinGrams, StepGrams: p.StepGrams, MaxGrams: p.MaxGrams, Content: p.Content}, p.OutOfStock)
+	v := productFrom(p.Product, p.OutOfStock)
 	pack, ok := v.Package(in.PackageID)
 	if !ok || in.Quantity < 1 || in.Quantity > pack.MaxQuantity {
 		fail(w, 400, "بسته یا تعداد انتخاب‌شده مجاز نیست")

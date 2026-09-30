@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Page, APIRequestContext } from "@playwright/test";
 import { createHmac } from "node:crypto";
 export function totp(secret = "JBSWY3DPEHPK3PXP") {
   let bits = "";
@@ -46,4 +46,33 @@ export async function loginStaff(
       setTimeout(resolve, 30100 - (Date.now() % 30000)),
     );
   }
+}
+
+export async function loginStaffAPI(
+  request: APIRequestContext,
+  origin: string,
+  role: "owner" | "editor" | "operator",
+) {
+  const session = await (
+    await request.get("/api/v1/session?workspace=staff")
+  ).json();
+  const headers = { Origin: origin, "X-CSRF-Token": session.csrf };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await request.post("/api/v1/staff/login", {
+      headers,
+      data: { username: role, password: "Bomish-demo-2026!", code: totp() },
+    });
+    if (result.ok()) return headers;
+    const body = await result.json();
+    if (
+      result.status() !== 401 ||
+      !String(body.error).includes("قبلاً") ||
+      attempt > 0
+    )
+      throw new Error(body.error || "Staff login failed");
+    await new Promise((resolve) =>
+      setTimeout(resolve, 30100 - (Date.now() % 30000)),
+    );
+  }
+  throw new Error("Staff login failed");
 }

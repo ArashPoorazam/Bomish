@@ -39,7 +39,16 @@ func (c *client) call(method, path string, body any) (int, []byte) {
 	w := httptest.NewRecorder()
 	c.h.ServeHTTP(w, r)
 	for _, cookie := range w.Result().Cookies() {
-		c.cookies = []*http.Cookie{cookie}
+		found := false
+		for i, old := range c.cookies {
+			if old.Name == cookie.Name {
+				c.cookies[i] = cookie
+				found = true
+			}
+		}
+		if !found {
+			c.cookies = append(c.cookies, cookie)
+		}
 	}
 	return w.Code, w.Body.Bytes()
 }
@@ -75,6 +84,11 @@ func (c *client) login(t *testing.T, phone string) {
 }
 func (c *client) staff(t *testing.T, role string) {
 	t.Helper()
+	var s struct {
+		CSRF string `json:"csrf"`
+	}
+	c.ok(t, "GET", "/session?workspace=staff", nil, &s)
+	c.csrf = s.CSRF
 	c.ok(t, "POST", "/staff/login", map[string]string{"username": role, "password": "Bomish-demo-2026!", "code": TOTP(DemoTOTP, time.Now().Unix()/30)}, nil)
 }
 func setup(t *testing.T) *App {

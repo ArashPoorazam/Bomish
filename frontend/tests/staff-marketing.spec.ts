@@ -134,7 +134,7 @@ test("journal library uses top controls, filters articles, and edits legacy reco
   await page.getByRole("button", { name: "مجله", exact: true }).click();
   await expect(page.locator(".journal-card")).toHaveCount(2);
   const sidebar = await page
-    .locator(".journal-workspace .staff-tools")
+    .locator(".journal-workspace .catalog-toolbar")
     .boundingBox();
   const content = await page
     .locator(".journal-workspace .staff-main")
@@ -149,10 +149,12 @@ test("journal library uses top controls, filters articles, and edits legacy reco
   await expect(page.locator(".journal-card")).toHaveCount(1);
   await expect(page.locator(".journal-card")).toContainText("راهنمای ادویه");
   await page.getByRole("button", { name: "ویرایش مقاله", exact: true }).click();
-  await expect(page.getByLabel("عنوان", { exact: true })).toHaveValue(
-    "راهنمای ادویه",
-  );
-  await expect(page.getByLabel("زردچوبه نمونه")).not.toBeChecked();
+  await expect(
+    page.getByLabel("عنوان مقاله (ضروری)", { exact: true }),
+  ).toHaveValue("راهنمای ادویه");
+  await expect(
+    page.getByText("هنوز محصولی انتخاب نشده است.", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "بازگشت به مقاله‌ها" }).click();
   await page.getByRole("button", { name: "پاک کردن فیلترها" }).click();
   await page
@@ -185,7 +187,10 @@ test("pricing shows before/after values, validates reductions, and preserves uni
     .getByRole("button", { name: "ساخت تخفیف برای ۱ محصول", exact: true })
     .click();
   await expect(
-    page.locator(".pricing-workspace").getByRole("status"),
+    page
+      .locator(".pricing-workspace")
+      .getByRole("status")
+      .filter({ hasText: "ساخته شد" }),
   ).toContainText("ساخته شد");
   expect(changes[0]).toEqual({
     id: expect.any(String),
@@ -354,10 +359,12 @@ test("staff creates a discount code and customer applies it through a paid order
     await expect(customer).toHaveURL(/account\/orders\//);
     await expect(customer.locator(".coupon-saving")).toContainText(code);
   } finally {
-    const session = await (await owner.request.get("/api/v1/session")).json();
+    const session = await (
+      await owner.request.get("/api/v1/session?workspace=staff")
+    ).json();
     await owner.request.patch(`/api/v1/staff/discount-codes/${code}`, {
       headers: {
-        Origin: "http://localhost:3000",
+        Origin: new URL(owner.url()).origin,
         "X-CSRF-Token": session.csrf,
       },
       data: { active: false },

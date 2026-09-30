@@ -3,7 +3,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import Image from "next/image";
 import { useEffect, useState, useRef } from "react";
-import { Search, ShoppingBag, UserRound, Leaf, ArrowLeft } from "lucide-react";
+import { Search, ShoppingBag, UserRound, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useStore } from "./store-provider";
 import type { Product } from "@/lib/types";

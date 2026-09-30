@@ -14,7 +14,6 @@ import type {
 import {
   Workspace,
   Feedback,
-  sectionLabels,
   Pager,
   type PageData,
 } from "@/components/omnisire/shared";
@@ -22,6 +21,12 @@ import { CatalogManager, CategoryManager } from "./catalog-manager";
 import { ArticleManager } from "./article-manager";
 import { PriceManager } from "./price-manager";
 import { ShippingEditor } from "./operations";
+import {
+  sectionLabels,
+  sectionPermission,
+} from "../omnisire/workspace-navigation";
+import { StaffRequests } from "../requests/staff-requests";
+import { SuggestionsEditor } from "./suggestions";
 import { OrderManager } from "./order-manager";
 export function Dashboard({
   initialSection = "",
@@ -59,12 +64,17 @@ export function Dashboard({
   }, []);
   useEffect(() => {
     if (!user?.role) return;
-    if (!permissions.includes(tab))
-      setTab(permissions.find((x) => x !== "omnisire") || "");
+    if (!permissions.includes(sectionPermission(tab)))
+      setTab(
+        (permissions.find((x) => x !== "omnisire") || "").replace(
+          /^requests$/,
+          "support",
+        ),
+      );
   }, [key, tab]);
   const reload = useCallback(async () => {
     const request = ++requestVersion.current;
-    if (!tab || tab === "sales") return;
+    if (!user?.role || !tab || tab === "sales") return;
     setBusy(true);
     setError("");
     try {
@@ -123,6 +133,13 @@ export function Dashboard({
       requestVersion.current++;
     };
   }, [reload]);
+  useEffect(() => {
+    if (tab !== "orders" || viewingOrder || editor.busy) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void reload();
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [tab, viewingOrder, editor.busy, reload]);
   return (
     <Workspace
       title={sectionLabels[tab] || "مدیریت فروشگاه"}
@@ -189,11 +206,7 @@ export function Dashboard({
         />
       )}
       {tab === "categories" && (
-        <CategoryManager
-          categories={categories}
-          products={products}
-          reload={reload}
-        />
+        <CategoryManager categories={categories} reload={reload} />
       )}
       {tab === "pricing" && (
         <PriceManager
@@ -212,7 +225,12 @@ export function Dashboard({
           onStateChange={setEditor}
         />
       )}
-      {tab === "shipping" && shipping && <ShippingEditor initial={shipping} />}{" "}
+      {tab === "support" && <StaffRequests kind="support" />}
+      {tab === "custom" && <StaffRequests kind="custom" />}
+      {tab === "suggestions" && <SuggestionsEditor />}
+      {tab === "shipping" && shipping && (
+        <ShippingEditor initial={shipping} />
+      )}{" "}
       {tab === "sales" && (
         <div className="omni-welcome">
           <h2>فروش‌های شما، دستاورد شما</h2>

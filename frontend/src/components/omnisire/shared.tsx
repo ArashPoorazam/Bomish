@@ -1,19 +1,12 @@
 "use client";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { ArrowUpLeft, LogOut, Menu, X } from "lucide-react";
+import { WorkspaceNavigation } from "./workspace-navigation";
 import {
-  LayoutDashboard,
-  Users,
-  ChartNoAxesCombined,
-  History,
-  ArrowUpLeft,
-  LogOut,
-  Store,
-  Wallet,
-  Menu,
-  X,
-} from "lucide-react";
+  useRequestNotifications,
+  NotificationSound,
+} from "../requests/notifications";
 import { useStore } from "@/components/store-provider";
 import { StaffLogin } from "@/components/staff/staff-login";
 import { api } from "@/lib/api";
@@ -28,24 +21,6 @@ export type PageData = {
   pageSize: number;
   columns?: Column[];
 };
-export const sectionLabels: Record<string, string> = {
-  products: "محصولات",
-  articles: "مجله",
-  categories: "دسته‌بندی‌ها",
-  pricing: "قیمت و تخفیف",
-  orders: "سفارش‌ها",
-  shipping: "ارسال",
-  sales: "فروش من",
-};
-export const reportSections = [
-  ["overview", "نمای کلی فروش"],
-  ["products", "عملکرد محصولات"],
-  ["packages", "فروش بسته‌ها"],
-  ["prices", "تاریخچه قیمت"],
-  ["customers", "مشتریان"],
-  ["categories", "دسته‌بندی‌ها"],
-  ["searches", "جستجوها"],
-];
 export const roleLabels: Record<string, string> = {
   owner: "مالک",
   manager: "مدیر",
@@ -114,7 +89,7 @@ export function Workspace({
   description?: string;
 }) {
   const { user, refresh, sessionError } = useStore();
-  const path = usePathname();
+  const notifications = useRequestNotifications();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -168,17 +143,6 @@ export function Workspace({
         </div>
       </div>
     );
-  const nav = owner
-    ? ([
-        ["/omnisire", "نمای کلی", LayoutDashboard],
-        ["/omnisire/members", "همکاران", Users],
-        ["/omnisire/analytics", "تحلیل داده‌ها", ChartNoAxesCombined],
-        ["/omnisire/events", "رویدادها", History],
-      ] as const)
-    : ([
-        ["/staff", "مدیریت فروشگاه", Store],
-        ["/staff/sales", "فروش من", Wallet],
-      ] as const);
   return (
     <div className="omni-shell">
       <aside
@@ -200,78 +164,22 @@ export function Workspace({
           <span className="omni-mark">O</span>
           <span>{owner ? "Omnisire" : "Staff Interface"}</span>
         </Link>
-        <nav aria-label="ناوبری فضای کار">
-          {nav
-            .filter(
-              ([href]) =>
-                href != "/staff/sales" || user.permissions?.includes("sales"),
-            )
-            .map(([href, label, Icon]) => (
-              <div key={href} className="omni-nav-group">
-                <Link
-                  href={href}
-                  aria-current={
-                    path === href && !activeSection ? "page" : undefined
-                  }
-                  onClick={(event) => {
-                    if (onSectionChange && path === href) {
-                      event.preventDefault();
-                      if (navigationLocked) return;
-                      onSectionChange(
-                        href === "/omnisire/analytics"
-                          ? "overview"
-                          : user.permissions?.find((p) => p !== "omnisire") ||
-                              "",
-                      );
-                    }
-                    setOpen(false);
-                  }}
-                >
-                  <Icon size={20} />
-                  {label}
-                </Link>
-                {(href === "/staff" || href === "/omnisire/analytics") && (
-                  <div className="omni-nav-children">
-                    {(href === "/staff"
-                      ? Object.entries(sectionLabels).filter(
-                          ([key]) =>
-                            key !== "sales" && user.permissions?.includes(key),
-                        )
-                      : reportSections
-                    ).map(([key, text]) =>
-                      onSectionChange && path === href ? (
-                        <button
-                          key={key}
-                          disabled={navigationLocked}
-                          aria-current={
-                            activeSection === key ? "page" : undefined
-                          }
-                          onClick={() => {
-                            onSectionChange(key);
-                            setOpen(false);
-                          }}
-                        >
-                          {text}
-                        </button>
-                      ) : (
-                        <Link
-                          key={key}
-                          href={`${href}?section=${key}`}
-                          aria-current={
-                            activeSection === key ? "page" : undefined
-                          }
-                          onClick={() => setOpen(false)}
-                        >
-                          {text}
-                        </Link>
-                      ),
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-        </nav>
+        <WorkspaceNavigation
+          owner={owner}
+          permissions={user.permissions || []}
+          activeSection={activeSection}
+          onSectionChange={onSectionChange}
+          locked={navigationLocked}
+          onNavigate={() => setOpen(false)}
+          counts={notifications.data}
+        />
         <div className="omni-side-bottom">
+          {notifications.allowed && (
+            <NotificationSound counts={notifications.data} />
+          )}
+          {notifications.error && (
+            <small role="status">دریافت اعلان‌ها موقتاً انجام نشد.</small>
+          )}
           {owner && (
             <Link href="/staff">
               Staff Interface <ArrowUpLeft size={18} />

@@ -15,6 +15,7 @@ import (
 
 	"bomish/internal/db"
 	"bomish/internal/storage"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -118,6 +119,9 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("PUT /api/v1/staff/shipping", a.permit(a.saveShipping, "shipping"))
 	m.HandleFunc("POST /api/v1/staff/uploads", a.permitAny(a.upload, "products", "articles"))
 	m.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(os.Getenv("UPLOAD_DIR")))))
+	a.requestRoutes(m)
+	m.HandleFunc("GET /api/v1/staff/suggestions", a.permit(a.suggestions, "products"))
+	m.HandleFunc("PUT /api/v1/staff/suggestions", a.permit(a.saveSuggestions, "products"))
 	a.omnisireRoutes(m)
 	return a.middleware(m)
 }
@@ -138,7 +142,7 @@ func (a *App) middleware(next http.Handler) http.Handler {
 		// Public catalog reads do not allocate anonymous sessions (including SSR fetches).
 		if r.Method == http.MethodGet || r.Method == http.MethodHead {
 			path := r.URL.Path
-			if path == "/api/v1/health" || path == "/api/v1/categories" || path == "/api/v1/products" || strings.HasPrefix(path, "/api/v1/products/") || path == "/api/v1/articles" || strings.HasPrefix(path, "/api/v1/articles/") {
+			if path == "/api/v1/health" || path == "/api/v1/settings" || path == "/api/v1/categories" || path == "/api/v1/products" || strings.HasPrefix(path, "/api/v1/products/") || path == "/api/v1/articles" || strings.HasPrefix(path, "/api/v1/articles/") {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -148,12 +152,27 @@ func (a *App) middleware(next http.Handler) http.Handler {
 		r = r.WithContext(ctx)
 		s := session{}
 		var restrictions []string
-		if c, e := r.Cookie("bomish_session"); e == nil {
+		if c, e := r.Cookie(sessionCookieName(r)); e == nil {
 			s.Hash = hash(c.Value)
 			e = a.Pool.QueryRow(ctx, `SELECT s.csrf,coalesce(s.user_id,''),coalesce(s.staff_id,''),coalesce(t.role,''),coalesce(t.restrictions,'{}') FROM sessions s LEFT JOIN staff t ON t.id=s.staff_id AND t.active AND t.archived_at IS NULL WHERE s.token_hash=$1 AND s.expires_at>now()`, s.Hash).Scan(&s.CSRF, &s.UserID, &s.StaffID, &s.Role, &restrictions)
-			if e != nil {
+			if e == pgx.ErrNoRows {
+				// Never replace a cookie on an ordinary in-flight request: it may
+				// carry the token just rotated by a concurrent login.
+				if r.URL.Path != "/api/v1/session" {
+					fail(w, 401, "نشست منقضی شده است؛ دوباره وارد شوید")
+					return
+				}
 				s = session{}
+			} else if e != nil {
+				fail(w, 503, "سرویس موقتاً در دسترس نیست؛ دوباره تلاش کنید")
+				return
 			}
+		}
+		if sessionCookieName(r) == "bomish_staff_session" {
+			s.UserID = ""
+		} else {
+			s.StaffID = ""
+			s.Role = ""
 		}
 		s.Permissions = effectivePermissions(s.Role, restrictions)
 		if s.Role == "" {
@@ -166,7 +185,7 @@ func (a *App) middleware(next http.Handler) http.Handler {
 				fail(w, 503, "سرویس موقتاً در دسترس نیست")
 				return
 			}
-			a.cookie(w, raw)
+			a.cookie(w, r, raw)
 		}
 		if r.Method != "GET" && r.Method != "HEAD" {
 			if r.Header.Get("Origin") != a.Origin || r.Header.Get("X-CSRF-Token") != s.CSRF {
@@ -178,8 +197,15 @@ func (a *App) middleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(context.WithValue(ctx, sessionKey{}, s)))
 	})
 }
-func (a *App) cookie(w http.ResponseWriter, value string) {
-	http.SetCookie(w, &http.Cookie{Name: "bomish_session", Value: value, Path: "/", HttpOnly: true, Secure: !a.Dev || strings.HasPrefix(a.Origin, "https://"), SameSite: http.SameSiteLaxMode, MaxAge: 30 * 86400})
+func sessionCookieName(r *http.Request) string {
+	path := r.URL.Path
+	if strings.HasPrefix(path, "/api/v1/staff/") || strings.HasPrefix(path, "/api/v1/omnisire/") || ((path == "/api/v1/session" || path == "/api/v1/logout") && r.URL.Query().Get("workspace") == "staff") {
+		return "bomish_staff_session"
+	}
+	return "bomish_session"
+}
+func (a *App) cookie(w http.ResponseWriter, r *http.Request, value string) {
+	http.SetCookie(w, &http.Cookie{Name: sessionCookieName(r), Value: value, Path: "/", HttpOnly: true, Secure: !a.Dev || strings.HasPrefix(a.Origin, "https://"), SameSite: http.SameSiteLaxMode, MaxAge: 30 * 86400})
 }
 func (a *App) sessionInfo(w http.ResponseWriter, r *http.Request) {
 	s := current(r)

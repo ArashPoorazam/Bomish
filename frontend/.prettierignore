@@ -1,4 +1,6 @@
 .next
+.next-*
+next-env.d.ts
 node_modules
 src/lib/api-types.ts
 public

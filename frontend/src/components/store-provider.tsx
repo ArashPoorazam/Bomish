@@ -40,21 +40,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [busy, setBusy] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
+  const generation = useRef(0);
   const refresh = useCallback(async () => {
+    const current = ++generation.current;
     setSessionError("");
     let s: Session;
     try {
       s = await getSession();
     } catch (e) {
-      setSessionError((e as Error).message);
+      if (current === generation.current) setSessionError((e as Error).message);
       throw e;
     }
+    if (current !== generation.current) return;
     setUser(s);
-    if (!workspace) setCart(await api<Cart>("/cart"));
+    if (!workspace) {
+      const nextCart = await api<Cart>("/cart");
+      if (current === generation.current) setCart(nextCart);
+    }
   }, [workspace]);
   useEffect(() => {
     refresh().catch((e) => setError(e.message));
-  }, [refresh]);
+    const expired = (event: Event) => {
+      if (
+        (event as CustomEvent<string>).detail ===
+        (workspace ? "staff" : "customer")
+      )
+        void refresh().catch((e) => setError(e.message));
+    };
+    window.addEventListener("bomish:session-expired", expired);
+    return () => {
+      generation.current++;
+      window.removeEventListener("bomish:session-expired", expired);
+    };
+  }, [refresh, workspace]);
   const setItem = useCallback(
     async (p: Product, packageId: string, quantity: number) => {
       setCart(

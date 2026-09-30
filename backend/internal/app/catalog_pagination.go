@@ -43,10 +43,22 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 		status = "CASE WHEN p.status='archived' THEN 'archived' WHEN d.product_id IS NOT NULL THEN 'draft' ELSE p.status END"
 		where = "true"
 	}
-	base := `WITH catalog AS (SELECT p.id,p.first_published_at,p.slug,p.name,p.search_text,p.category_id,p.status AS published_status,` + status + ` AS status,p.price_rials,p.min_grams,` + content + ` AS content,coalesce((p.content->>'outOfStock')::boolean,false) AS out_of_stock,prices.min_price,prices.min_weight FROM products p ` + join + ` LEFT JOIN LATERAL (SELECT min(CASE WHEN coalesce((` + content + `->>'discountPercent')::numeric,0)>0 THEN least((pack->>'priceRials')::numeric,ceil((pack->>'priceRials')::numeric*(100-(` + content + `->>'discountPercent')::numeric)/1000000)*10000) ELSE (pack->>'priceRials')::numeric END) min_price,min(CASE pack->>'unit' WHEN 'g' THEN (pack->>'amount')::numeric WHEN 'kg' THEN (pack->>'amount')::numeric*1000 ELSE (pack->>'shippingGrams')::numeric END) min_weight FROM jsonb_array_elements(coalesce(nullif(` + content + `->'packages','null'::jsonb),'[]')) pack) prices ON true WHERE ` + where + `) SELECT * FROM catalog WHERE ($1='' OR id=$1 OR search_text LIKE '%'||$1||'%' OR name||' '||slug||' '||content::text ILIKE '%'||$1||'%' OR similarity(search_text,$1)>0.12) AND ($2='' OR category_id=$2) AND ($3='' OR status=$3) AND ($4='' OR ($4 IN ('true','in') AND NOT out_of_stock) OR ($4='out' AND out_of_stock)) AND ($5::bigint=0 OR min_price<=$5) AND ($6::text[]='{}' OR id=ANY($6::text[]))`
+	metric := "0::bigint AS sold_quantity"
+	if q.Get("collection") == "bestsellers" {
+		join += ` JOIN (SELECT oi.product_id,sum(oi.quantity) AS sold_quantity FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.paid_at>=now()-interval '30 days' AND o.paid_at<=now() AND o.status IN ('paid','packing','shipped','received') GROUP BY oi.product_id) sales ON sales.product_id=p.id`
+		metric = "sales.sold_quantity"
+	}
+	base := `WITH catalog AS (SELECT ` + metric + `,p.id,p.first_published_at,p.restocked_at,p.slug,p.name,p.search_text,p.category_id,p.status AS published_status,` + status + ` AS status,p.price_rials,p.min_grams,` + content + ` AS content,coalesce((p.content->>'outOfStock')::boolean,false) AS out_of_stock,prices.min_price,prices.min_weight FROM products p ` + join + ` LEFT JOIN LATERAL (SELECT min(CASE WHEN coalesce((` + content + `->>'discountPercent')::numeric,0)>0 THEN least((pack->>'priceRials')::numeric,ceil((pack->>'priceRials')::numeric*(100-(` + content + `->>'discountPercent')::numeric)/1000000)*10000) ELSE (pack->>'priceRials')::numeric END) min_price,min(CASE pack->>'unit' WHEN 'g' THEN (pack->>'amount')::numeric WHEN 'kg' THEN (pack->>'amount')::numeric*1000 ELSE (pack->>'shippingGrams')::numeric END) min_weight FROM jsonb_array_elements(coalesce(nullif(` + content + `->'packages','null'::jsonb),'[]')) pack) prices ON true WHERE ` + where + `) SELECT * FROM catalog WHERE ($1='' OR id=$1 OR search_text LIKE '%'||$1||'%' OR name||' '||slug||' '||content::text ILIKE '%'||$1||'%' OR similarity(search_text,$1)>0.12) AND ($2='' OR category_id=$2) AND ($3='' OR status=$3) AND ($4='' OR ($4 IN ('true','in') AND NOT out_of_stock) OR ($4='out' AND out_of_stock)) AND ($5::bigint=0 OR min_price<=$5) AND ($6::text[]='{}' OR id=ANY($6::text[]))`
 	if q.Get("discounted") == "true" {
 		base += " AND coalesce((content->>'discountPercent')::numeric,0)>0"
 	}
+	if q.Get("collection") == "suggestions" {
+		base += " AND id IN (SELECT product_id FROM product_suggestions)"
+	}
+	if q.Get("collection") == "arrivals" {
+		base += " AND (first_published_at IS NOT NULL OR restocked_at IS NOT NULL)"
+	}
+
 	ids := []string{}
 	if q.Get("ids") != "" {
 		ids = strings.Split(q.Get("ids"), ",")
@@ -60,7 +72,7 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 	sort := "name,id"
 	switch q.Get("sort") {
 	case "newest":
-		sort = "first_published_at DESC NULLS LAST,id"
+		sort = "greatest(first_published_at,restocked_at) DESC NULLS LAST,id"
 	case "price-asc":
 		sort = "min_price,id"
 	case "price-desc":
@@ -72,6 +84,13 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 			sort = "(id=$1 OR slug=$1) DESC,similarity(name,$1) DESC,name,id"
 		}
 	}
+	if q.Get("collection") == "suggestions" {
+		sort = "(SELECT position FROM product_suggestions WHERE product_id=catalog.id),id"
+	}
+	if q.Get("collection") == "bestsellers" {
+		sort = "sold_quantity DESC,id"
+	}
+
 	rows, e := queryMaps(r.Context(), a.Pool, base+" ORDER BY "+sort+" LIMIT $7 OFFSET $8", append(args, size, (page-1)*size)...)
 	if e != nil {
 		a.dbError(w, e)

@@ -11,30 +11,22 @@ import {
   Handshake,
 } from "lucide-react";
 import { serverApi } from "@/lib/api";
-import { inStock } from "@/lib/format";
 import type { Product, Article } from "@/lib/types";
 import { ProductRail } from "@/components/product-rail";
 export const dynamic = "force-dynamic";
 export default async function Home() {
-  const preferred = ["turmeric", "mint", "cinnamon", "sesame"];
-  const [products, picks, newest, offers, articles] = await Promise.all([
-    serverApi<Product[]>("/products?available=true&sort=name&pageSize=16"),
-    serverApi<Product[]>("/products?available=true&ids=" + preferred.join(",")),
-    serverApi<Product[]>("/products?available=true&sort=newest&pageSize=12"),
+  const [selected, newest, offers, articles] = await Promise.all([
     serverApi<Product[]>(
-      "/products?available=true&discounted=true&pageSize=12",
+      "/products?available=true&collection=bestsellers&pageSize=12",
+    ),
+    serverApi<Product[]>(
+      "/products?available=true&collection=arrivals&sort=newest&pageSize=12",
+    ),
+    serverApi<Product[]>(
+      "/products?available=true&collection=suggestions&pageSize=12",
     ),
     serverApi<Article[]>("/articles"),
   ]);
-  const featured = preferred.flatMap((id) =>
-    picks.filter((p) => p.id === id && inStock(p)),
-  );
-  const selected = [
-    ...featured,
-    ...products.filter(
-      (p) => inStock(p) && !featured.some((x) => x.id === p.id),
-    ),
-  ].slice(0, 12);
   return (
     <div className="shop-home">
       <section className="hero container">
@@ -122,9 +114,10 @@ export default async function Home() {
       </section>
       <div className="container">
         <ProductRail
-          title="انتخاب‌های بومیش"
-          eyebrow="برای قفسه آشپزخانه شما"
+          title="پرفروش ترین‌های بومیش"
+          eyebrow="محبوب‌ترین‌ها در ۳۰ روز گذشته"
           products={selected}
+          href="/products?collection=bestsellers"
         />
       </div>
       <section
@@ -172,13 +165,13 @@ export default async function Home() {
           title="تازه‌های بومیش"
           eyebrow="تازه به قفسه‌ها رسیده"
           href="/products?sort=newest"
-          products={newest.filter((p) => p.firstPublishedAt && inStock(p))}
+          products={newest}
         />
         <ProductRail
           title="پیشنهادهای بومیش"
-          eyebrow="طعم خوب، قیمت خوش"
-          href="/products?discounted=true"
-          products={offers.filter((p) => inStock(p) && p.discountPercent > 0)}
+          eyebrow="به انتخاب تیم بومیش"
+          href="/products?collection=suggestions"
+          products={offers}
         />
       </div>
       <section

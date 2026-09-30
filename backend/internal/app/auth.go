@@ -154,7 +154,7 @@ func (a *App) verifyOTP(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	a.cookie(w, raw)
+	a.cookie(w, r, raw)
 	write(w, 200, map[string]bool{"ok": true})
 }
 func PasswordHash(password string) string {
@@ -244,6 +244,6 @@ func (a *App) staffLogin(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	a.cookie(w, raw)
+	a.cookie(w, r, raw)
 	write(w, 200, map[string]bool{"ok": true})
 }

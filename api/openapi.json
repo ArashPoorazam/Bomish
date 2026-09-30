@@ -46,7 +46,20 @@
           "429": {
             "description": "Rate limited"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "staff"
+              ]
+            },
+            "description": "Select independent staff cookie; omit for customer session."
+          }
+        ]
       }
     },
     "/logout": {
@@ -93,6 +106,17 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "staff"
+              ]
+            },
+            "description": "Select independent staff cookie; omit for customer session."
           }
         ]
       }
@@ -488,6 +512,19 @@
               "type": "boolean"
             },
             "description": "Only products with a positive discount."
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "suggestions",
+                "arrivals",
+                "bestsellers"
+              ]
+            },
+            "description": "Manual picks, newly published/restocked products, or paid package quantities in rolling 30 days."
           }
         ]
       }
@@ -4456,6 +4493,854 @@
           }
         }
       }
+    },
+    "/requests": {
+      "get": {
+        "description": "Current customer only; page selects paginated envelope.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CustomerRequest"
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/RequestPage"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "support",
+                "custom"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      },
+      "post": {
+        "description": "Authenticated customer. One persistent support conversation per customer. Custom requests require quantity and a positive total budget.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/requests": {
+      "get": {
+        "description": "Requires requests permission.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CustomerRequest"
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/RequestPage"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "support",
+                "custom"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      }
+    },
+    "/staff/requests/{id}": {
+      "patch": {
+        "description": "Custom request decision. Compare-and-swap version; customer can see response.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestDecision"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/requests/{id}/messages": {
+      "get": {
+        "description": "Support messages in ascending ID order, at most 100. Default/after returns forward pages. latest=true returns the newest page; before returns the nearest older page. These three cursors are mutually exclusive. A page shorter than 100 has reached the boundary.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChatMessage"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "latest",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "enum": [
+                true
+              ]
+            }
+          }
+        ]
+      },
+      "post": {
+        "description": "Idempotent within conversation; ownership or staff requests permission required.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/staff/requests/{id}/messages": {
+      "get": {
+        "description": "Support messages in ascending ID order, at most 100. Default/after returns forward pages. latest=true returns the newest page; before returns the nearest older page. These three cursors are mutually exclusive. A page shorter than 100 has reached the boundary.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChatMessage"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "latest",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "enum": [
+                true
+              ]
+            }
+          }
+        ]
+      },
+      "post": {
+        "description": "Idempotent within conversation; ownership or staff requests permission required.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/staff/requests/{id}/read": {
+      "post": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lastMessageId": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "lastMessageId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/staff/orders/{id}/read": {
+      "post": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/staff/notifications": {
+      "get": {
+        "description": "Unread counts for current staff member, restricted by permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationCounts"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        }
+      }
+    },
+    "/staff/suggestions": {
+      "get": {
+        "description": "Requires products permission.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Suggestion"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        }
+      },
+      "put": {
+        "description": "Replace the ordered manual selection. Only published products accepted.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "productIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 12,
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "productIds"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6211,6 +7096,283 @@
           "productIds",
           "active",
           "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "support",
+              "custom"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "quantity": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "budgetRials": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000000000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "follow_up",
+              "accepted",
+              "rejected"
+            ]
+          },
+          "response": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "unread": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "description",
+          "quantity",
+          "budgetRials",
+          "status",
+          "response",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "RequestPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerRequest"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "ChatMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "body": {
+            "type": "string"
+          },
+          "fromStaff": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "fromStaff",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "RequestInput": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "support",
+              "custom"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "quantity": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "budgetRials": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000000000
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9_-]{16,100}$"
+          }
+        },
+        "required": [
+          "kind",
+          "description",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "MessageInput": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9_-]{16,100}$"
+          }
+        },
+        "required": [
+          "body",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "RequestDecision": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "rejected",
+              "follow_up"
+            ]
+          },
+          "response": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "status",
+          "response",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationCounts": {
+        "type": "object",
+        "properties": {
+          "support": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "custom": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "orders": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "supportEvent": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Newest permitted incoming event, independent of read state. Compare increases after initial load for optional sound; counts remain the badge source."
+          },
+          "customEvent": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Newest permitted incoming event, independent of read state. Compare increases after initial load for optional sound; counts remain the badge source."
+          },
+          "orderEvent": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Newest permitted incoming event, independent of read state. Compare increases after initial load for optional sound; counts remain the badge source."
+          }
+        },
+        "required": [
+          "support",
+          "custom",
+          "orders",
+          "supportEvent",
+          "customEvent",
+          "orderEvent"
+        ],
+        "additionalProperties": false
+      },
+      "Suggestion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status",
+          "position"
         ],
         "additionalProperties": false
       }

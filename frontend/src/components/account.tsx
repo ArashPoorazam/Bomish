@@ -1,9 +1,9 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, MapPin, Package, Truck } from "lucide-react";
 import type { Address, Order } from "@/lib/types";
-import { api } from "@/lib/api";
+import { useLiveQuery } from "@/hooks/use-live-query";
 import { fa, statuses } from "@/lib/format";
 import { useStore } from "./store-provider";
 import { AccountShell } from "./account-shell";
@@ -20,45 +20,25 @@ export function Account({
   section: "overview" | "orders" | "addresses";
 }) {
   const { user } = useStore();
-  const [data, setData] = useState<{
-      orders: Order[];
-      addresses: Address[];
-    } | null>(null),
-    [error, setError] = useState(""),
-    [status, setStatus] = useState(""),
-    [retry, setRetry] = useState(0);
-  const fetchData = useCallback(async () => {
-    const [orders, addresses] = await Promise.all([
-      api<Order[]>("/orders"),
-      api<Address[]>("/addresses"),
-    ]);
-    return {
-      orders: orders.toSorted((a, b) => b.createdAt.localeCompare(a.createdAt)),
-      addresses,
-    };
-  }, []);
-  const reload = async () => {
-    setData(await fetchData());
-    setError("");
-  };
-  useEffect(() => {
-    let active = true;
-    if (!user?.authenticated) {
-      setData(null);
-      return;
-    }
-    setError("");
-    fetchData()
-      .then((result) => {
-        if (active) setData(result);
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [user?.authenticated, fetchData, retry]);
+  const [status, setStatus] = useState("");
+  const orders = useLiveQuery<Order[]>("/orders", !!user?.authenticated);
+  const addresses = useLiveQuery<Address[]>(
+    "/addresses",
+    !!user?.authenticated,
+    0,
+  );
+  const reload = orders.refresh;
+  const refreshing = orders.loading;
+  const error = orders.error;
+  const data =
+    orders.data || (section === "addresses" && addresses.data)
+      ? {
+          orders: (orders.data || []).toSorted((a, b) =>
+            b.createdAt.localeCompare(a.createdAt),
+          ),
+          addresses: addresses.data || [],
+        }
+      : null;
   const active =
     data?.orders.filter((o) => activeOrderStates.includes(o.status)) || [];
   const latest = active[0] || data?.orders[0];
@@ -75,14 +55,28 @@ export function Account({
         }[section]
       }
     >
+      {section !== "addresses" && (
+        <button
+          className="button secondary order-refresh"
+          disabled={refreshing}
+          onClick={reload}
+        >
+          {refreshing ? "در حال به‌روزرسانی…" : "به‌روزرسانی وضعیت"}
+        </button>
+      )}
       {error && (
         <div className="account-panel" role="alert">
           <p className="error">{error}</p>
-          <button
-            className="button secondary"
-            onClick={() => setRetry((n) => n + 1)}
-          >
+          <button className="button secondary" onClick={reload}>
             تلاش دوباره
+          </button>
+        </div>
+      )}
+      {addresses.error && (
+        <div className="account-panel" role="alert">
+          <p className="error">{addresses.error}</p>
+          <button disabled={addresses.loading} onClick={addresses.refresh}>
+            تلاش دوباره برای نشانی‌ها
           </button>
         </div>
       )}
@@ -193,11 +187,9 @@ export function Account({
           {section === "addresses" && (
             <AccountAddresses
               addresses={data.addresses}
-              onChanged={(addresses) =>
-                setData((current) =>
-                  current ? { ...current, addresses } : current,
-                )
-              }
+              onChanged={() => {
+                void addresses.refresh();
+              }}
             />
           )}
         </>

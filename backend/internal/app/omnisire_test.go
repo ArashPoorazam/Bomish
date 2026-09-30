@@ -33,6 +33,7 @@ func testStaff(t *testing.T, a *App, role string, restricted []string) (*client,
 		t.Fatal(e)
 	}
 	c := newClient(t, a.Handler())
+	c.cookies[0].Name = "bomish_staff_session"
 	_, e = a.Pool.Exec(context.Background(), "UPDATE sessions SET staff_id=$1 WHERE token_hash=$2", id, hash(c.cookies[0].Value))
 	if e != nil {
 		t.Fatal(e)
@@ -465,7 +466,7 @@ func TestPartialPaymentsRefundsAndSessionRevocation(t *testing.T) {
 		t.Fatal("excess cumulative refund", code)
 	}
 	owner.ok(t, "POST", "/omnisire/members/"+id+"/credentials", map[string]any{"password": "a-new-safe-password-123", "resetTotp": true}, nil)
-	if code, _ := sales.call("GET", "/staff/sales", nil); code != 403 {
+	if code, _ := sales.call("GET", "/staff/sales", nil); code != 401 {
 		t.Fatal("credential reset retained session", code)
 	}
 	var sessionCount int

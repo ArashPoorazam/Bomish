@@ -65,7 +65,7 @@ func (a *App) product(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "محصول پیدا نشد")
 		return
 	}
-	write(w, 200, productFrom(db.Product{FirstPublishedAt: p.FirstPublishedAt, ID: p.ID, Slug: p.Slug, Name: p.Name, CategoryID: p.CategoryID, Status: p.Status, PriceRials: p.PriceRials, MinGrams: p.MinGrams, StepGrams: p.StepGrams, MaxGrams: p.MaxGrams, Content: p.Content}, p.OutOfStock))
+	write(w, 200, productFrom(p.Product, p.OutOfStock))
 }
 func articleFrom(p db.Article) domain.Article {
 	var v domain.Article

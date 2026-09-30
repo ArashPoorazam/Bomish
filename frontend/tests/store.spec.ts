@@ -62,7 +62,7 @@ test("mobile package quantities and accessible left cart survive refresh", async
   for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
   expect(
     await page.evaluate(() =>
-      document.querySelector("dialog")?.contains(document.activeElement),
+      document.querySelector("dialog[open]")?.contains(document.activeElement),
     ),
   ).toBe(true);
   await page.keyboard.press("Escape");
@@ -101,7 +101,10 @@ test("SMS login, shipping quote, payment and order history", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "شبیه‌سازی پرداخت موفق" }).click();
   await expect(page).toHaveURL(/account\/orders\//);
-  await expect(page.locator(".order-timeline")).toContainText("خرید ثبت شد");
+  await expect(page.locator(".order-timeline li")).toHaveCount(5);
+  await expect(
+    page.locator('.order-timeline [aria-current="step"]'),
+  ).toContainText("پرداخت");
   await page.getByRole("link", { name: "← حساب من", exact: true }).click();
   await expect(page.locator(".order-card").first()).toContainText(
     "خرید ثبت شد",
@@ -224,7 +227,9 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
   );
   await owner.getByRole("button", { name: "افزودن به سبد" }).click();
   await expect(owner.getByRole("dialog")).toContainText(productName);
-  const state = await (await owner.request.get("/api/v1/session")).json();
+  const state = await (
+    await owner.request.get("/api/v1/session?workspace=staff")
+  ).json();
   const product = await (
     await owner.request.get("/api/v1/products/" + slug)
   ).json();

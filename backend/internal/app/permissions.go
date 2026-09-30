@@ -5,7 +5,7 @@ import (
 	"slices"
 )
 
-var staffSections = []string{"products", "articles", "categories", "pricing", "orders", "shipping", "sales"}
+var staffSections = []string{"products", "articles", "categories", "pricing", "orders", "requests", "shipping", "sales"}
 
 func effectivePermissions(role string, restrictions []string) []string {
 	var allowed []string
@@ -15,7 +15,7 @@ func effectivePermissions(role string, restrictions []string) []string {
 	case "editor":
 		allowed = []string{"products", "articles", "categories", "pricing", "sales"}
 	case "operator":
-		allowed = []string{"orders", "sales"}
+		allowed = []string{"orders", "requests", "sales"}
 	case "salesperson":
 		allowed = []string{"sales"}
 	default:

@@ -1,20 +1,7 @@
-import {
-  Check,
-  ClipboardList,
-  CreditCard,
-  PackageCheck,
-  Truck,
-  House,
-} from "lucide-react";
+import { Check } from "lucide-react";
 import type { Order } from "@/lib/types";
 import { statuses } from "@/lib/format";
-const stages = [
-  ["pending", "ثبت سفارش", ClipboardList],
-  ["paid", "پرداخت", CreditCard],
-  ["packing", "بسته‌بندی", PackageCheck],
-  ["shipped", "ارسال", Truck],
-  ["received", "تحویل", House],
-] as const;
+import { orderStages as stages } from "@/lib/order-stages";
 export function StaffOrderStages({
   order,
   expanded = false,
@@ -22,13 +9,13 @@ export function StaffOrderStages({
   order: Order;
   expanded?: boolean;
 }) {
-  const current = stages.findIndex(([id]) => id === order.status);
+  const current = stages.findIndex(({ id }) => id === order.status);
   const stopped = current < 0;
   const reached = stopped
     ? Math.max(
         0,
         ...order.events.map((event) =>
-          stages.findIndex(([id]) => id === event.status),
+          stages.findIndex(({ id }) => id === event.status),
         ),
       )
     : current;
@@ -38,7 +25,7 @@ export function StaffOrderStages({
       role="img"
       aria-label={`وضعیت سفارش: ${statuses[order.status] || order.status}`}
     >
-      {stages.map(([id, label, Icon], index) => (
+      {stages.map(({ id, label, icon: Icon }, index) => (
         <span
           key={id}
           className={`staff-order-stage ${index <= reached ? "is-done" : ""} ${!stopped && index === current ? "is-current" : ""}`}

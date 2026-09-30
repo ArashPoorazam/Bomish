@@ -1,10 +1,11 @@
 "use client";
+import { sectionLabels } from "./workspace-navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, ArrowUpLeft, Users, ShieldCheck } from "lucide-react";
+import { Plus, ArrowUpLeft, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
-import { digits, money, fa } from "@/lib/format";
+import { digits, money } from "@/lib/format";
 import type { Member } from "@/lib/types";
 import {
   Workspace,
@@ -12,9 +13,7 @@ import {
   Feedback,
   Pager,
   useLoad,
-  sectionLabels,
   roleLabels,
-  stamp,
   type PageData,
 } from "./shared";
 import { SalesContent } from "./sales";
@@ -30,9 +29,18 @@ const empty = {
   password: "",
 };
 const defaults: Record<string, string[]> = {
-  manager: Object.keys(sectionLabels),
+  manager: [
+    "products",
+    "articles",
+    "categories",
+    "pricing",
+    "orders",
+    "requests",
+    "shipping",
+    "sales",
+  ],
   editor: ["products", "articles", "categories", "pricing", "sales"],
-  operator: ["orders", "sales"],
+  operator: ["orders", "requests", "sales"],
   salesperson: ["sales"],
 };
 export const formatCard = (s: string) =>
@@ -187,7 +195,7 @@ function MemberForm({
                   )
                 }
               />
-              {sectionLabels[p]}
+              {p === "requests" ? "درخواست‌ها" : sectionLabels[p]}
             </label>
           ))}
         </div>

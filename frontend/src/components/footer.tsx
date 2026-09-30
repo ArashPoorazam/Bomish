@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Leaf, ArrowUpLeft } from "lucide-react";
+import { ArrowUpLeft } from "lucide-react";
 export function Footer() {
   return (
     <footer className="site-footer">
