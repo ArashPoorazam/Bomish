@@ -40,7 +40,7 @@ export function Header() {
     <>
       <div className="top-strip">
         <span>از عطر خاک، تا طعم زندگی</span>
-        <span>بسته‌های مشخص، قیمت روشن</span>
+        <span>کیفیت از زمین، با عشق برای شما</span>
       </div>
       <header className="site-header">
         <div className="header-main container">
@@ -48,12 +48,12 @@ export function Header() {
             <Image
               src="/images/bomish-logo.png"
               alt=""
-              width={64}
-              height={64}
+              width={78}
+              height={78}
               priority
             />
             <span>
-              بومیش<small>BOMISH · طعمِ خوبِ طبیعت</small>
+              بومیش<small>طعمِ خوبِ زمین</small>
             </span>
           </Link>
           <form
@@ -177,10 +177,10 @@ export function Header() {
           <Link href="/products?category=spices">ادویه‌ها</Link>
           <Link href="/products?category=herbs">سبزی‌های خشک</Link>
           <Link href="/products?category=seeds">دانه‌های خوراکی</Link>
-          <Link href="/blog">مجله بومیش</Link>
           <Link href="/about" className="nav-about">
-            داستان بومیش
+            درباره ما
           </Link>
+          <Link href="/blog">مجله بومیش</Link>
         </nav>
       </header>
     </>

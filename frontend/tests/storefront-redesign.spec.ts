@@ -342,7 +342,24 @@ test("discounted package rounds to 1000 toman in listing, purchase, cart, and ch
     expect(manual.some((p: Product) => p.id === id)).toBe(false);
     await page.goto(`/products?q=${id}&discounted=true`);
     await expect(page.locator(".catalog-grid")).toContainText("۴۳٬۰۰۰");
-    await page.locator(".catalog-grid .product-card").click();
+    const card = page.locator(".catalog-grid .product-card");
+    await expect(
+      card.locator(".product-card-media .product-discount-tag"),
+    ).toHaveText("۱۰٪تخفیف");
+    await expect(card.locator("del")).toHaveText("۴۷٬۰۰۰ تومان");
+    await expect(card.locator(".product-discount-tag")).toHaveCSS(
+      "background-color",
+      "rgb(226, 239, 215)",
+    );
+    await expect(card.locator("del")).toHaveCSS(
+      "text-decoration-color",
+      "rgb(226, 239, 215)",
+    );
+    await page.screenshot({
+      path: "/tmp/bomish-discount-card.png",
+      fullPage: true,
+    });
+    await card.click();
     await expect(page.locator(".product-price")).toContainText("۴۳٬۰۰۰");
     await page.getByLabel("تعداد بسته", { exact: true }).fill("2");
     await expect(page.locator(".purchase-bottom")).toContainText("۸۶٬۰۰۰");
@@ -362,6 +379,28 @@ test("discounted package rounds to 1000 toman in listing, purchase, cart, and ch
     await page.getByLabel("کد تأیید", { exact: true }).fill(devCode);
     await page.getByRole("button", { name: "تأیید و ادامه" }).click();
     await expect(page.locator(".checkout-summary")).toContainText("۸۶٬۰۰۰");
+    expect(
+      (
+        await request.post(`/api/v1/staff/products/${id}/availability`, {
+          headers,
+          data: { outOfStock: true },
+        })
+      ).ok(),
+    ).toBe(true);
+    await page.goto(`/products?q=${id}`);
+    await expect(card).toHaveClass(/is-unavailable/);
+    await expect(
+      card.locator(".product-card-media .product-stock-stamp"),
+    ).toHaveText("ناموجود");
+    await expect(card.locator(".product-discount-tag")).toHaveCount(0);
+    await expect(card.locator(".product-photo")).toHaveCSS(
+      "filter",
+      "grayscale(0.8)",
+    );
+    await page.screenshot({
+      path: "/tmp/bomish-out-of-stock-card.png",
+      fullPage: true,
+    });
   } finally {
     await request.delete(`/api/v1/staff/product-discounts/${id}`, { headers });
     await request.post(`/api/v1/staff/products/${id}/archive`, { headers });

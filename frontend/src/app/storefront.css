@@ -4,8 +4,19 @@
   gap: 48px;
 }
 .shop-home .hero h1 {
-  font-size: clamp(3rem, 5vw, 4.7rem);
+  font-size: clamp(2.5rem, 3.8vw, 3.6rem);
   margin-block: 12px 18px;
+}
+.shop-home .hero h1 em {
+  isolation: isolate;
+  white-space: nowrap;
+}
+.shop-home .hero-actions {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.shop-home .hero-actions .button {
+  padding-inline: 20px;
 }
 .shop-home .hero-art {
   aspect-ratio: 1.35;
@@ -105,10 +116,77 @@
   min-height: 42px;
   margin-block: 5px 10px;
 }
-.compact-product .badge {
-  align-self: flex-start;
-  font-size: 10px;
-  margin-top: 5px;
+/* Product status stays in the same image corner across catalog and rails. */
+.product-card {
+  --discount-green: var(--herb-tile);
+}
+.product-card-media {
+  position: relative;
+  flex-shrink: 0;
+}
+.product-stock-stamp,
+.product-discount-tag {
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  inset-inline-start: 14px;
+}
+.product-stock-stamp {
+  padding: 4px 12px;
+  border: 2px solid currentColor;
+  outline: 1px solid currentColor;
+  outline-offset: -5px;
+  border-radius: 5px;
+  color: #a32f32;
+  background: #fff7f2ed;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.8;
+  transform: rotate(9deg);
+}
+.product-discount-tag {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid #ffffff60;
+  border-radius: 8px 8px 8px 2px;
+  color: var(--ink);
+  background: var(--discount-green);
+  box-shadow: 0 3px 10px #243c2926;
+}
+.product-discount-tag strong {
+  font-size: 19px;
+  line-height: 1.5;
+}
+.product-discount-tag > span {
+  font-size: 11px;
+}
+.product-card.is-unavailable {
+  background: #f1f1ee;
+  border-color: #deded8;
+}
+.product-card.is-unavailable .product-photo {
+  filter: grayscale(0.8);
+  opacity: 0.65;
+}
+.product-card.is-unavailable .product-card-content {
+  filter: grayscale(0.85);
+  opacity: 0.75;
+}
+.product-card-prices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.product-card-prices del {
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration-color: var(--discount-green);
+  text-decoration-thickness: 3px;
+}
+.product-card-prices.is-discounted strong {
+  color: var(--green);
 }
 .compact-product .product-card-bottom {
   margin-top: auto;
@@ -175,6 +253,9 @@
 .principle-card p {
   font-size: 13px;
   line-height: 2;
+}
+.principle-card p + p {
+  margin-top: 12px;
 }
 .principle-card:last-child p {
   color: #f3f7e9;
@@ -963,10 +1044,15 @@
     gap: 24px;
   }
   .shop-home .hero h1 {
-    font-size: 49px;
+    font-size: clamp(2rem, 6.8vw, 3rem);
   }
   .shop-home .hero-actions {
     margin-top: 20px;
+    gap: 10px;
+  }
+  .shop-home .hero-actions .button {
+    font-size: 13px;
+    padding-inline: 14px;
   }
   .shop-home .hero-caption {
     margin-top: 14px;
@@ -1311,7 +1397,23 @@
   margin-bottom: 0;
 }
 
-/* Homepage image rotation uses physical movement independent of RTL text. */
+/* Homepage image rotation follows the direction of the swipe. */
+.hero-slideshow {
+  --slide-enter: -100%;
+  --slide-exit: 100%;
+}
+.hero-slideshow[data-direction="-1"] {
+  --slide-enter: 100%;
+  --slide-exit: -100%;
+}
+.hero-slideshow.is-draggable .hero-slide-viewport {
+  cursor: grab;
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+}
+.hero-slideshow.is-dragging .hero-slide-viewport {
+  cursor: grabbing;
+}
 .hero-slide-viewport,
 .hero-slide {
   position: absolute;
@@ -1336,7 +1438,7 @@
 }
 @keyframes hero-enter {
   from {
-    transform: translateX(-100%);
+    transform: translateX(var(--slide-enter));
   }
   to {
     transform: translateX(0);
@@ -1347,7 +1449,7 @@
     transform: translateX(0);
   }
   to {
-    transform: translateX(100%);
+    transform: translateX(var(--slide-exit));
   }
 }
 .hero-slide-controls {
@@ -1365,17 +1467,6 @@
   border-radius: 30px;
   background: #fffef5ec;
   box-shadow: 0 4px 20px #243c2918;
-}
-.hero-slide-controls > button {
-  border: 0;
-  background: transparent;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  flex-shrink: 0;
 }
 .hero-slide-controls button:hover {
   background: #e6eddd;

@@ -108,28 +108,9 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
     await page.clock.runFor(10000);
     await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
     await page.mouse.move(0, 0);
-    const next = region.getByRole("button", {
-      name: "تصویر بعدی",
-      exact: true,
-    });
-    await next.focus();
+    await dots.nth(1).focus();
     await page.clock.runFor(10000);
     await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
-    await next.click();
-    await expect(dots.nth(1)).toHaveAttribute("aria-pressed", "true");
-    await region
-      .getByRole("button", { name: "تصویر قبلی", exact: true })
-      .click();
-    await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
-    await region
-      .getByRole("button", { name: "توقف پخش خودکار", exact: true })
-      .click();
-    await page.locator("h1").click();
-    await page.clock.runFor(10000);
-    await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
-    await region
-      .getByRole("button", { name: "پخش خودکار تصاویر", exact: true })
-      .click();
     await page.locator("h1").click();
     await page.evaluate(() => {
       Object.defineProperty(document, "visibilityState", {
@@ -152,12 +133,71 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.clock.runFor(15000);
     await expect(dots.nth(1)).toHaveAttribute("aria-pressed", "true");
-    await next.click();
+    await expect(region.getByRole("button")).toHaveCount(2);
+    await dots.nth(0).click();
     await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
     await expect(region.locator(".is-incoming")).toHaveCSS(
       "animation-name",
       "none",
     );
+    const viewport = region.locator(".hero-slide-viewport");
+    const box = (await viewport.boundingBox())!;
+    const drag = async (distance: number, vertical = 0) => {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(
+        box.x + box.width / 2 + distance,
+        box.y + box.height / 2 + vertical,
+        { steps: 8 },
+      );
+      await page.mouse.up();
+    };
+    await drag(120);
+    await expect(dots.nth(1)).toHaveAttribute("aria-pressed", "true");
+    await expect(region).toHaveAttribute("data-direction", "1");
+    await drag(-120);
+    await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
+    await expect(region).toHaveAttribute("data-direction", "-1");
+    await drag(15);
+    await drag(20, 80);
+    await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
+    await dots.nth(0).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(dots.nth(1)).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("ArrowLeft");
+    await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.locator("h1").click();
+    await page.mouse.move(0, 0);
+    await page.clock.runFor(10000);
+    await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await viewport.scrollIntoViewIfNeeded();
+    const mobileBox = (await viewport.boundingBox())!;
+    const cdp = await context.newCDPSession(page);
+    const point = {
+      x: mobileBox.x + mobileBox.width / 2,
+      y: mobileBox.y + mobileBox.height / 2,
+    };
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [point],
+    });
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ ...point, x: point.x + 100 }],
+    });
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await expect(dots.nth(1)).toHaveAttribute("aria-pressed", "true");
+    await noOverflow(page);
+    await page.screenshot({
+      path: "/tmp/bomish-updated-home-mobile.png",
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({
       path: "/tmp/bomish-home-slideshow-desktop.png",
       fullPage: true,

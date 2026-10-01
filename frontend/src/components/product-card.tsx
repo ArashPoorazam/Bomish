@@ -25,9 +25,25 @@ export function ProductImage({
   );
 }
 export function ProductCard({ product }: { product: Product }) {
+  const available = inStock(product);
+  const discounted = product.discountPercent > 0;
   return (
-    <ProductClickLink id={product.id} slug={product.slug}>
-      <ProductImage product={product} />
+    <ProductClickLink
+      id={product.id}
+      slug={product.slug}
+      className={available ? "" : "is-unavailable"}
+    >
+      <div className="product-card-media">
+        <ProductImage product={product} />
+        {!available ? (
+          <span className="product-stock-stamp">ناموجود</span>
+        ) : discounted ? (
+          <span className="product-discount-tag">
+            <strong>{fa(product.discountPercent)}٪</strong>
+            <span>تخفیف</span>
+          </span>
+        ) : null}
+      </div>
       <div className="product-card-content">
         <span className="eyebrow">
           {product.categoryId === "herbs"
@@ -39,19 +55,24 @@ export function ProductCard({ product }: { product: Product }) {
                 : "محصولات بومیش"}
         </span>
         <h3>{product.name}</h3>
-        {product.discountPercent > 0 && (
-          <span className="badge">{fa(product.discountPercent)}٪ تخفیف</span>
-        )}
         <p>{product.summary}</p>
         <div className="product-card-bottom">
-          <div>
-            <strong>{priceRange(product)}</strong> <span>تومان</span>
+          <div
+            className={`product-card-prices${discounted ? " is-discounted" : ""}`}
+          >
+            {discounted && (
+              <del aria-label="قیمت پیش از تخفیف">
+                {priceRange({ ...product, discountPercent: 0 })} تومان
+              </del>
+            )}
+            <div>
+              <strong>{priceRange(product)}</strong> <span>تومان</span>
+            </div>
           </div>
           <span className="round-arrow">
             <ArrowUpLeft size={18} />
           </span>
         </div>
-        {!inStock(product) ? <span className="muted">ناموجود</span> : null}
       </div>
     </ProductClickLink>
   );

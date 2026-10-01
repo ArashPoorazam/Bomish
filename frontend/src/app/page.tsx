@@ -7,7 +7,7 @@ import {
   Wheat,
   Sprout,
   BadgeCheck,
-  Coins,
+  Headset,
   Handshake,
 } from "lucide-react";
 import { serverApi } from "@/lib/api";
@@ -35,18 +35,21 @@ export default async function Home() {
         <div className="hero-copy">
           <span className="eyebrow">از طبیعت، برای سفره شما</span>
           <h1>
-            دنیایی از عطر
+            با <em>یک</em> بار خرید
             <br />
-            دنیایی از <em>طعم</em>
+            مشتری دائمی می‌شوید
           </h1>
           <p>
-            ادویه‌های خوش‌عطر، سبزی‌های خشک و دانه‌های خوراکی.
+            از ما ادویه‌های خوش‌طعم، سبزی‌های خوش‌عطر و دانه‌های خوراکی بخرید.
             <br />
-            طعم دلخواهتان را در بسته‌های مشخص و با قیمت روشن پیدا کنید.
+            به‌صورت اختصاصی یا عمده به ما سفارش بدید.
           </p>
           <div className="hero-actions">
             <Link className="button" href="/products">
               گشت‌وگذار در محصولات <ArrowLeft size={19} />
+            </Link>
+            <Link className="button secondary" href="/account/custom/new">
+              سفارش اختصاصی
             </Link>
           </div>
           <div className="hero-caption">
@@ -118,21 +121,24 @@ export default async function Home() {
         <div className="principle-grid">
           {[
             {
-              title: "کیفیت بالا",
-              text: "کیفیت خوب، اصل انتخاب ماست؛ عطر و طعم محصول باید ارزش خرید داشته باشد.",
+              title: "کیفیت و ارزانی",
+              text: "ما انتخاب کردیم که بهترین محصولات ممکن را عرضه و بسته‌بندی کنیم و با کمترین سود ممکن در اختیار مردم قرار بدهیم.",
+              detail: "سلامت و کیفیت محصول اولویت همیشگی ماست.",
               Icon: BadgeCheck,
             },
             {
-              title: "ارزان بودن",
-              text: "قیمت مناسب، بدون کوتاه آمدن از کیفیت و صداقت؛ مبلغ هر بسته روشن است.",
-              Icon: Coins,
+              title: "پشتیبانی و پیگیری",
+              text: "تیم ما از ساعت ۱۲ ظهر تا ۱۲ شب پاسخ‌گوی سؤالات مشتریان است.",
+              detail:
+                "از خرید و بسته‌بندی تا رسیدن کالا به درِ منزل، شما می‌توانید از مسیر حرکت سفارشتان باخبر بشید.",
+              Icon: Headset,
             },
             {
               title: "تقلب نکردن",
-              text: "به قول بازاری‌ها، جنس درجه ۱، ۲ و ۳ را قاطی نمی‌کنیم؛ کیفیت‌های مختلف را مخلوط نمی‌کنیم تا به اسم یک کیفیت بفروشیم.",
+              text: "در بازار امروزی، تقلب به یک ترفند اقتصادی تبدیل شده است. ما هرگز از چنین ترفندهایی برای سود بیشتر پیروی نمی‌کنیم؛ ما هرگز محصولات درجه ۱، ۲ و ۳ را ترکیب نمی‌کنیم و به اصول خود پایبندیم.",
               Icon: Handshake,
             },
-          ].map(({ title, text, Icon }, i) => (
+          ].map(({ title, text, detail, Icon }, i) => (
             <article className="principle-card" key={title}>
               <div className="principle-top">
                 <Icon size={28} strokeWidth={1.4} />
@@ -140,6 +146,7 @@ export default async function Home() {
               </div>
               <h3>{title}</h3>
               <p>{text}</p>
+              {detail && <p>{detail}</p>}
             </article>
           ))}
         </div>

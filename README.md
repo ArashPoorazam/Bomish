@@ -108,7 +108,7 @@ Regenerate database access after changing queries: `cd backend && sqlc generate`
 
 ## Store management
 
-Staff can use **مدیریت خانه** to upload, describe, reorder, and remove homepage slideshow images and curate up to 12 suggested products. Each editor saves independently; uploads support partial-failure retries. The homepage rotates images every five seconds with pause controls and reduced-motion support. Customers see compact order summaries and create personalized requests from a dedicated form. Staff can use the Requests section for orders, support conversations, and personalized product requests. The storefront includes a floating support button and customer-visible request decisions.
+Staff can use **مدیریت خانه** to upload, describe, reorder, and remove homepage slideshow images and curate up to 12 suggested products. Each editor saves independently; uploads support partial-failure retries. The homepage rotates images every five seconds with swipe/drag navigation, dot controls and reduced-motion support; manual navigation stops automatic rotation. Customers see compact order summaries and create personalized requests from a dedicated form. Staff can use the Requests section for orders, support conversations, and personalized product requests. The storefront includes a floating support button and customer-visible request decisions.
 
 Chat opens the latest 100 messages, supports loading older history without losing scroll position, and polls for new replies only while visible. Orders refresh independently of addresses and retain their last successful status during temporary failures.
 
