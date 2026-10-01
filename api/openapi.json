@@ -4703,6 +4703,37 @@
               "minimum": 1,
               "maximum": 100
             }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Literal substring of customer phone or request description."
+          },
+          {
+            "name": "unread",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filter by unread status for the current staff member."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "follow_up",
+                "accepted",
+                "rejected"
+              ]
+            },
+            "description": "Custom request status; only valid with kind=custom."
           }
         ]
       }
@@ -4772,6 +4803,34 @@
             }
           }
         ]
+      },
+      "get": {
+        "summary": "Read current staff request details",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Request details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerRequest"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request not found"
+          }
+        }
       }
     },
     "/requests/{id}/messages": {
@@ -7153,6 +7212,10 @@
           },
           "unread": {
             "type": "boolean"
+          },
+          "latestMessage": {
+            "type": "string",
+            "description": "Latest message preview, up to 140 characters; staff responses only."
           }
         },
         "required": [

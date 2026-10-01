@@ -1,0 +1,237 @@
+.auth-experience {
+  padding: 48px 24px 64px;
+  background: #f4f5ea;
+}
+.auth-staff {
+  min-height: 100dvh;
+  display: grid;
+  align-items: center;
+  background: #e9eee4;
+}
+.auth-surface {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-width: 1080px;
+  min-height: 670px;
+  margin: 0 auto;
+  border: 1px solid #e0e5d6;
+  border-radius: 28px;
+  background: #fffef8;
+  overflow: hidden;
+  box-shadow: 0 20px 60px #243c290a;
+}
+.auth-form-side {
+  padding: 36px clamp(28px, 4.3vw, 66px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 38px;
+  align-self: flex-start;
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.auth-brand img {
+  object-fit: contain;
+}
+.auth-brand small {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.auth-art {
+  position: relative;
+  min-width: 0;
+  background: #e9e8d8;
+}
+.auth-art img {
+  object-fit: cover;
+}
+.auth-art-copy {
+  position: absolute;
+  z-index: 1;
+  inset: 40px 32px auto;
+  text-align: center;
+  color: #243c29;
+}
+.auth-art-copy p {
+  color: inherit;
+  font-size: clamp(21px, 2.2vw, 29px);
+  font-weight: 600;
+  margin: 12px 0 6px;
+}
+.auth-art-copy > span:last-child {
+  font-size: 12px;
+}
+.auth-art-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid #52734d40;
+  border-radius: 50%;
+}
+.auth-staff .auth-art {
+  background: #243c29;
+}
+.auth-staff .auth-art-copy {
+  color: #fffde9;
+}
+.auth-staff .auth-art-mark {
+  border-color: #fffde94d;
+}
+.login-form {
+  width: 100%;
+  margin-block: auto;
+}
+.login-symbol {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: #ecf1e5;
+  color: var(--green);
+  margin-bottom: 18px;
+}
+.login-eyebrow {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 600;
+}
+.login-form h1,
+.login-form h2 {
+  font-size: 27px;
+  letter-spacing: -0.5px;
+  margin: 6px 0 10px;
+}
+.login-form > p {
+  font-size: 13px;
+  line-height: 1.95;
+  margin-bottom: 26px;
+}
+.login-form .stack {
+  gap: 19px;
+}
+.login-form input {
+  min-height: 49px;
+  background: #fff;
+  border-color: #ced7c5;
+  border-radius: 11px;
+}
+.login-form input[autocomplete="one-time-code"] {
+  letter-spacing: 0.35em;
+  font-size: 20px;
+}
+.login-form .button {
+  min-height: 49px;
+  border-radius: 11px;
+  justify-content: center;
+}
+.login-form .login-footnote {
+  font-size: 11px;
+  text-align: center;
+  margin: 20px 0 0;
+  color: #697660;
+}
+.login-form .dev-note {
+  font-size: 12px;
+  padding: 10px 12px;
+}
+.auth-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-top: 34px;
+  color: var(--muted);
+}
+.password-field {
+  position: relative;
+  display: block;
+}
+.password-field input {
+  padding-right: 48px;
+}
+.password-field button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  bottom: 3px;
+  width: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+.login-compact .login-symbol,
+.login-compact .login-eyebrow {
+  display: none;
+}
+.login-compact h2 {
+  font-size: 19px;
+}
+.login-compact > p {
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+.login-compact .stack {
+  gap: 13px;
+}
+.login-compact .login-footnote {
+  font-size: 10px;
+  margin-top: 14px;
+}
+@media (max-width: 700px) {
+  .auth-experience {
+    padding: 20px 16px 32px;
+  }
+  .auth-surface {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    border-radius: 20px;
+  }
+  .auth-form-side {
+    padding: 26px 24px 28px;
+  }
+  .auth-art {
+    grid-row: 1;
+    height: 155px;
+  }
+  .auth-art img {
+    object-position: center 65%;
+  }
+  .auth-art-copy {
+    inset: 20px 16px;
+    text-shadow: 0 1px 12px #fffef8;
+  }
+  .auth-art-copy p {
+    font-size: 21px;
+    margin-top: 3px;
+  }
+  .auth-art-mark {
+    display: none;
+  }
+  .auth-staff .auth-art-copy {
+    text-shadow: 0 1px 12px #243c29;
+  }
+  .auth-brand {
+    margin-bottom: 26px;
+    font-size: 21px;
+  }
+  .login-form h1 {
+    font-size: 25px;
+  }
+  .auth-back {
+    margin-top: 24px;
+  }
+}

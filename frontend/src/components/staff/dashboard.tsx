@@ -225,8 +225,12 @@ export function Dashboard({
           onStateChange={setEditor}
         />
       )}
-      {tab === "support" && <StaffRequests kind="support" />}
-      {tab === "custom" && <StaffRequests kind="custom" />}
+      {tab === "support" && (
+        <StaffRequests key="support" kind="support" onStateChange={setEditor} />
+      )}
+      {tab === "custom" && (
+        <StaffRequests key="custom" kind="custom" onStateChange={setEditor} />
+      )}
       {tab === "suggestions" && <SuggestionsEditor />}
       {tab === "shipping" && shipping && (
         <ShippingEditor initial={shipping} />

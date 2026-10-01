@@ -4980,6 +4980,12 @@ export interface paths {
                     kind: "support" | "custom";
                     page?: number;
                     pageSize?: number;
+                    /** @description Literal substring of customer phone or request description. */
+                    q?: string;
+                    /** @description Filter by unread status for the current staff member. */
+                    unread?: boolean;
+                    /** @description Custom request status; only valid with kind=custom. */
+                    status?: "new" | "follow_up" | "accepted" | "rejected";
                 };
                 header?: never;
                 path?: never;
@@ -5062,7 +5068,36 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Read current staff request details */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Request details */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CustomerRequest"];
+                    };
+                };
+                /** @description Request not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         put?: never;
         post?: never;
         delete?: never;
@@ -6400,6 +6435,8 @@ export interface components {
             updatedAt: string;
             phone?: string;
             unread?: boolean;
+            /** @description Latest message preview, up to 140 characters; staff responses only. */
+            latestMessage?: string;
         };
         RequestPage: {
             items: components["schemas"]["CustomerRequest"][];

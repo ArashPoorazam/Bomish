@@ -20,7 +20,7 @@ export const sectionLabels: Record<string, string> = {
   categories: "دسته‌بندی‌ها",
   pricing: "قیمت و تخفیف",
   orders: "سفارش‌ها",
-  support: "گفتگو با پشتیبانی",
+  support: "گفتگو با مشتری",
   custom: "سفارش‌های اختصاصی",
   suggestions: "پیشنهادهای بومیش",
   shipping: "ارسال",

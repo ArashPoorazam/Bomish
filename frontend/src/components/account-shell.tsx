@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useStore } from "./store-provider";
+import { AuthLayout } from "./auth-layout";
 import { LoginForm } from "./login-form";
 export function AccountShell({
   section,
@@ -54,9 +55,9 @@ export function AccountShell({
     );
   if (!user.authenticated)
     return (
-      <div className="auth-layout">
+      <AuthLayout>
         <LoginForm onSuccess={() => {}} />
-      </div>
+      </AuthLayout>
     );
   return (
     <div className="account-page container section">

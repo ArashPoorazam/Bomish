@@ -60,6 +60,15 @@ export async function api<T>(
   }
   return readResponse<T>(r);
 }
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 async function readResponse<T>(response: Response): Promise<T> {
   let data: unknown;
   try {
@@ -76,10 +85,11 @@ async function readResponse<T>(response: Response): Promise<T> {
       data && typeof data === "object" && "error" in data
         ? data.error
         : undefined;
-    throw new Error(
+    throw new ApiError(
       typeof message === "string" && message
         ? message
         : "درخواست انجام نشد؛ دوباره تلاش کنید.",
+      response.status,
     );
   }
   return data as T;

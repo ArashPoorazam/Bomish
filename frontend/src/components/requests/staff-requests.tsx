@@ -1,185 +1,349 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Inbox,
+  MessageCircle,
+  RefreshCw,
+  Search,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { useLiveQuery } from "@/hooks/use-live-query";
-import { date, money } from "@/lib/format";
+import { date, digits, fa } from "@/lib/format";
 import { Chat } from "./chat";
+import { ChatAvatar, emptyDraft, type ChatDraft } from "./chat-parts";
+import { CustomDecision, type RequestEditorState } from "./custom-decision";
 import {
   requestStatuses,
   type CustomerRequest,
   type RequestPage,
 } from "./types";
 
-export function StaffRequests({ kind }: { kind: "support" | "custom" }) {
-  const [page, setPage] = useState(1),
-    [selected, setSelected] = useState<CustomerRequest | null>(null);
+export function StaffRequests({
+  kind,
+  onStateChange,
+}: {
+  kind: "support" | "custom";
+  onStateChange?: (state: RequestEditorState) => void;
+}) {
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<CustomerRequest | null>(null);
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, ChatDraft>>({});
+  const [editor, setEditor] = useState<RequestEditorState>({
+    dirty: false,
+    busy: false,
+  });
+  const [detailError, setDetailError] = useState("");
+  const updateEditor = useCallback(
+    (state: RequestEditorState) => {
+      setEditor(state);
+      onStateChange?.(state);
+    },
+    [onStateChange],
+  );
+  const params = new URLSearchParams({
+    kind,
+    page: String(page),
+    pageSize: "20",
+  });
+  if (query) params.set("q", query);
+  if (filter) params.set(kind === "support" ? "unread" : "status", filter);
   const { data, error, loading, refresh } = useLiveQuery<RequestPage>(
-    `/staff/requests?kind=${kind}&page=${page}&pageSize=20`,
+    `/staff/requests?${params}`,
   );
   useEffect(() => {
-    setSelected(null);
-    setPage(1);
-  }, [kind]);
+    const timer = setTimeout(() => {
+      setQuery(digits(search.trim()));
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+  useEffect(() => {
+    if (data && page > 1 && !data.items.length)
+      setPage(Math.max(1, Math.ceil(data.total / 20)));
+  }, [data, page]);
+  const choose = (request: CustomerRequest | null) => {
+    if (editor.busy || request?.id === selected?.id) return;
+    if (
+      editor.dirty &&
+      !confirm("تغییرات ذخیره نشده‌اند. بدون ذخیره خارج می‌شوید؟")
+    )
+      return;
+    updateEditor({ dirty: false, busy: false });
+    setSelected(request);
+    setDetailError("");
+    if (request && kind === "custom")
+      void api(`/staff/requests/${request.id}/read`, "POST", {
+        lastMessageId: 0,
+      })
+        .then(() => {
+          window.dispatchEvent(new Event("bomish:notifications"));
+          void refresh();
+        })
+        .catch((e) => setDetailError((e as Error).message));
+  };
+  const reloadSelected = async () => {
+    if (!selected) return;
+    const next = await api<CustomerRequest>(
+      `/staff/requests/${encodeURIComponent(selected.id)}`,
+    );
+    setSelected((current) => (current?.id === next.id ? next : current));
+  };
   return (
-    <>
-      <button className="button secondary" disabled={loading} onClick={refresh}>
-        به‌روزرسانی درخواست‌ها
-      </button>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {selected ? (
-        <section className="omni-panel">
+    <div className={`requests-workbench ${selected ? "has-selection" : ""}`}>
+      <aside
+        className="requests-inbox"
+        aria-label={
+          kind === "support" ? "فهرست گفتگوها" : "فهرست سفارش‌های اختصاصی"
+        }
+      >
+        <div className="requests-inbox-toolbar">
+          <div>
+            <strong>
+              {kind === "support" ? "گفتگوهای مشتریان" : "درخواست‌های مشتریان"}
+            </strong>
+            <span>{data ? `${fa(data.total)} مورد` : "در حال دریافت…"}</span>
+          </div>
           <button
-            className="text-link"
-            onClick={() => {
-              setSelected(null);
-              void refresh();
+            className="icon-button"
+            aria-label="به‌روزرسانی درخواست‌ها"
+            title="به‌روزرسانی درخواست‌ها"
+            disabled={loading || editor.busy}
+            onClick={async () => {
+              await refresh();
+              if (selected && !editor.dirty) {
+                try {
+                  await reloadSelected();
+                } catch (e) {
+                  setDetailError((e as Error).message);
+                }
+              }
             }}
           >
-            بازگشت به درخواست‌ها
+            <RefreshCw size={18} />
           </button>
-          <h2>
-            مشتری <bdi>{selected.phone}</bdi>
-          </h2>
-          {kind === "support" ? (
-            <Chat key={selected.id} id={selected.id} staff />
-          ) : (
-            <CustomDecision
-              key={selected.id}
-              request={selected}
-              onSaved={async () => {
-                setSelected(null);
-                await refresh();
+        </div>
+        <label className="requests-search">
+          <Search size={18} />
+          <span className="sr-only">جستجوی درخواست‌ها</span>
+          <input
+            maxLength={200}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="شماره همراه یا شرح درخواست…"
+          />
+        </label>
+        {kind === "support" ? (
+          <div className="requests-filters" aria-label="فیلتر گفتگوها">
+            <button
+              aria-pressed={!filter}
+              onClick={() => {
+                setFilter("");
+                setPage(1);
               }}
-            />
+            >
+              همه گفتگوها
+            </button>
+            <button
+              aria-pressed={filter === "true"}
+              onClick={() => {
+                setFilter("true");
+                setPage(1);
+              }}
+            >
+              خوانده‌نشده
+            </button>
+          </div>
+        ) : (
+          <label className="requests-status-filter">
+            <span className="sr-only">فیلتر وضعیت</span>
+            <select
+              aria-label="فیلتر وضعیت"
+              value={filter}
+              onChange={(e) => {
+                setFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">همه وضعیت‌ها</option>
+              {Object.entries(requestStatuses).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {error && (
+          <div className="chat-feedback" role="alert">
+            <p className="error">{error}</p>
+            <button className="text-link" onClick={refresh}>
+              تلاش دوباره
+            </button>
+          </div>
+        )}
+        <div className="request-list" aria-busy={loading}>
+          {!data && loading && (
+            <p className="inbox-empty" role="status">
+              در حال دریافت درخواست‌ها…
+            </p>
           )}
-        </section>
-      ) : (
-        <>
-          <div className="request-list">
-            {data?.items.map((r) => (
-              <button
-                className="request-list-item"
-                key={r.id}
-                onClick={() => {
-                  setSelected(r);
-                  if (kind === "custom")
-                    void api(`/staff/requests/${r.id}/read`, "POST", {
-                      lastMessageId: 0,
-                    })
-                      .then(() =>
-                        window.dispatchEvent(new Event("bomish:notifications")),
-                      )
-                      .catch(() => {});
-                }}
-              >
-                <span>
+          {data?.items.map((r) => (
+            <button
+              key={r.id}
+              className={`request-list-item ${selected?.id === r.id ? "is-selected" : ""}`}
+              aria-current={selected?.id === r.id ? "true" : undefined}
+              disabled={editor.busy}
+              onClick={() => choose(r)}
+            >
+              <ChatAvatar seed={r.id} />
+              <span className="request-row-content">
+                <span className="request-row-heading">
                   <strong>
                     <bdi>{r.phone}</bdi>
                   </strong>
-                  {r.unread && (
-                    <span className="badge notification-badge">جدید</span>
-                  )}
+                  {r.unread && <span className="request-unread">جدید</span>}
                 </span>
-                <span>{r.description.slice(0, 140)}</span>
-                <small>
-                  {kind === "custom"
-                    ? requestStatuses[r.status]
-                    : "گفتگو با مشتری"}{" "}
-                  · {date(r.updatedAt)}
-                </small>
-              </button>
-            ))}
-          </div>
+                <span className="request-preview">
+                  {kind === "support"
+                    ? r.latestMessage || r.description
+                    : r.description}
+                </span>
+                <span className="request-row-meta">
+                  {kind === "custom" && (
+                    <span className={`request-status status-${r.status}`}>
+                      {requestStatuses[r.status]}
+                    </span>
+                  )}
+                  <time dateTime={r.updatedAt}>{date(r.updatedAt)}</time>
+                </span>
+              </span>
+            </button>
+          ))}
           {data?.total === 0 && (
-            <p className="omni-empty">درخواستی وجود ندارد.</p>
+            <div className="inbox-empty">
+              <Inbox size={30} />
+              <strong>
+                {query || filter
+                  ? "درخواستی با این مشخصات پیدا نشد"
+                  : "هنوز درخواستی ندارید"}
+              </strong>
+              <p>
+                {query || filter
+                  ? "جستجو یا فیلتر را تغییر دهید."
+                  : "درخواست‌های جدید اینجا نمایش داده می‌شوند."}
+              </p>
+            </div>
           )}
-          <div className="inline-actions">
-            <button disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              قبلی
-            </button>
-            <button
-              disabled={!data || page * 20 >= data.total}
-              onClick={() => setPage(page + 1)}
-            >
-              بعدی
-            </button>
-          </div>
-        </>
-      )}
-    </>
-  );
-}
-function CustomDecision({
-  request: r,
-  onSaved,
-}: {
-  request: CustomerRequest;
-  onSaved: () => Promise<void>;
-}) {
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  return (
-    <div className="request-card">
-      <p>{r.description}</p>
-      <p>مقدار: {r.quantity}</p>
-      <p>بودجه کل: {money(r.budgetRials)} تومان</p>
-      <p>وضعیت: {requestStatuses[r.status]}</p>
-      <form
-        className="request-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (busy) return;
-          const values = new FormData(e.currentTarget);
-          setBusy(true);
-          setError("");
-          try {
-            await api(`/staff/requests/${r.id}`, "PATCH", {
-              status: values.get("status"),
-              response: values.get("response"),
-              version: r.version,
-            });
-            await onSaved();
-          } catch (e) {
-            setError((e as Error).message);
-          } finally {
-            setBusy(false);
-          }
-        }}
+        </div>
+        <div className="requests-pagination">
+          <button
+            className="icon-button"
+            aria-label="قبلی"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage(page - 1)}
+          >
+            <ChevronRight size={18} />
+          </button>
+          <span>
+            صفحه {fa(page)} از{" "}
+            {fa(Math.max(1, Math.ceil((data?.total || 0) / 20)))}
+          </span>
+          <button
+            className="icon-button"
+            aria-label="بعدی"
+            disabled={!data || page * 20 >= data.total || loading}
+            onClick={() => setPage(page + 1)}
+          >
+            <ChevronLeft size={18} />
+          </button>
+        </div>
+      </aside>
+      <section
+        className="request-detail"
+        aria-label={
+          kind === "support" ? "گفتگو با مشتری" : "بررسی سفارش اختصاصی"
+        }
       >
-        <fieldset disabled={busy}>
-          <label>
-            نتیجه بررسی
-            <select
-              aria-label="نتیجه بررسی"
-              name="status"
-              defaultValue={r.status === "new" ? "follow_up" : r.status}
-            >
-              <option value="follow_up">پیگیری</option>
-              <option value="accepted">پذیرش</option>
-              <option value="rejected">عدم پذیرش</option>
-            </select>
-          </label>
-          <label>
-            پاسخ قابل مشاهده برای مشتری
-            <textarea
-              name="response"
-              required
-              maxLength={4000}
-              defaultValue={r.response}
-            />
-          </label>
-          <button className="button">ثبت نتیجه</button>
-        </fieldset>
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
+        {selected ? (
+          <>
+            <header className="request-detail-header">
+              <button
+                className="icon-button inbox-back"
+                aria-label="بازگشت به درخواست‌ها"
+                disabled={editor.busy}
+                onClick={() => choose(null)}
+              >
+                <ArrowRight size={20} />
+              </button>
+              <ChatAvatar seed={selected.id} />
+              <div>
+                <h2>
+                  مشتری <bdi>{selected.phone}</bdi>
+                </h2>
+                <p>
+                  {kind === "support"
+                    ? "پیام‌ها و پاسخ‌های مشتری"
+                    : "سفارش اختصاصی · بررسی و پیگیری درخواست"}
+                </p>
+              </div>
+            </header>
+            {detailError && (
+              <p className="error chat-feedback" role="alert">
+                {detailError}
+              </p>
+            )}
+            {kind === "support" ? (
+              <Chat
+                key={selected.id}
+                id={selected.id}
+                staff
+                draft={drafts[selected.id] || emptyDraft}
+                onDraftChange={(draft) =>
+                  setDrafts((old) => ({ ...old, [selected.id]: draft }))
+                }
+                onBusyChange={(busy) => updateEditor({ dirty: false, busy })}
+              />
+            ) : (
+              <CustomDecision
+                key={selected.id}
+                request={selected}
+                onStateChange={updateEditor}
+                onReload={reloadSelected}
+                onSaved={async () => {
+                  await reloadSelected();
+                  await refresh();
+                }}
+              />
+            )}
+          </>
+        ) : (
+          <div className="request-detail-empty">
+            <span>
+              {kind === "support" ? (
+                <MessageCircle size={32} />
+              ) : (
+                <Inbox size={32} />
+              )}
+            </span>
+            <h2>
+              {kind === "support"
+                ? "هر گفتگو، فرصتی برای همراهی"
+                : "از یک ایده تا یک سفارش اختصاصی"}
+            </h2>
+            <p>
+              {kind === "support"
+                ? "یک گفتگو را انتخاب کنید تا پیام‌های مشتری را ببینید و پاسخ دهید."
+                : "درخواستی را انتخاب کنید؛ جزئیات را بررسی و نتیجه را برای مشتری ثبت کنید."}
+            </p>
+          </div>
         )}
-      </form>
+      </section>
     </div>
   );
 }

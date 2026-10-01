@@ -1,12 +1,38 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { date } from "@/lib/format";
+import {
+  ChatAvatar,
+  MessageComposer,
+  WelcomeMessage,
+  emptyDraft,
+  type ChatDraft,
+} from "./chat-parts";
 import type { ChatMessage } from "./types";
 
-export function Chat({ id, staff = false }: { id: string; staff?: boolean }) {
+export function Chat({
+  id,
+  staff = false,
+  active = true,
+  draft,
+  onDraftChange,
+  onBusyChange,
+}: {
+  id: string;
+  staff?: boolean;
+  active?: boolean;
+  draft?: ChatDraft;
+  onDraftChange?: (draft: ChatDraft) => void;
+  onBusyChange?: (busy: boolean) => void;
+}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [body, setBody] = useState("");
+  const [localDraft, setLocalDraft] = useState<ChatDraft>(emptyDraft);
+  const currentDraft = draft || localDraft;
+  const { body } = currentDraft;
+  const updateDraft = onDraftChange || setLocalDraft;
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const savedScroll = useRef(0);
   const [error, setError] = useState("");
   const [sendError, setSendError] = useState("");
   const log = useRef<HTMLDivElement>(null);
@@ -18,7 +44,6 @@ export function Chat({ id, staff = false }: { id: string; staff?: boolean }) {
   const scrollAnchor = useRef<{ height: number; top: number } | null>(null);
   const mounted = useRef(true);
   const sending = useRef(false);
-  const key = useRef("");
   const refresh = useRef<() => Promise<void>>(async () => {});
   const prefix = `${staff ? "/staff" : ""}/requests/${encodeURIComponent(id)}`;
   useEffect(() => {
@@ -30,7 +55,13 @@ export function Chat({ id, staff = false }: { id: string; staff?: boolean }) {
     const controller = new AbortController();
     mounted.current = true;
     const load = async (backward = false) => {
-      if (!live || pending || document.visibilityState !== "visible") return;
+      if (
+        !live ||
+        pending ||
+        !activeRef.current ||
+        document.visibilityState !== "visible"
+      )
+        return;
       pending = true;
       setLoading(true);
       try {
@@ -61,7 +92,11 @@ export function Chat({ id, staff = false }: { id: string; staff?: boolean }) {
           const unique = new Map([...old, ...batch].map((m) => [m.id, m]));
           return [...unique.values()].sort((a, b) => a.id - b.id);
         });
-        if (staff && document.visibilityState === "visible") {
+        if (
+          staff &&
+          activeRef.current &&
+          document.visibilityState === "visible"
+        ) {
           await api(
             `${prefix}/read`,
             "POST",
@@ -94,8 +129,14 @@ export function Chat({ id, staff = false }: { id: string; staff?: boolean }) {
       document.removeEventListener("visibilitychange", visible);
     };
   }, [prefix, staff]);
+  useEffect(() => {
+    if (active) void refresh.current();
+  }, [active]);
   useLayoutEffect(() => {
-    if (!log.current) return;
+    if (active && log.current) log.current.scrollTop = savedScroll.current;
+  }, [active]);
+  useLayoutEffect(() => {
+    if (!log.current || !active) return;
     if (scrollAnchor.current) {
       log.current.scrollTop =
         scrollAnchor.current.top +
@@ -104,19 +145,49 @@ export function Chat({ id, staff = false }: { id: string; staff?: boolean }) {
       scrollAnchor.current = null;
     } else if (atBottom.current)
       log.current.scrollTop = log.current.scrollHeight;
-  }, [messages]);
+  }, [messages, active]);
+  async function send() {
+    if (sending.current || !body.trim()) return;
+    sending.current = true;
+    onBusyChange?.(true);
+    setBusy(true);
+    setSendError("");
+    const key = currentDraft.key || crypto.randomUUID();
+    updateDraft({ body, key });
+    try {
+      await api(`${prefix}/messages`, "POST", { body, idempotencyKey: key });
+      updateDraft(emptyDraft);
+      if (!mounted.current) return;
+      atBottom.current = true;
+      await refresh.current();
+    } catch (e) {
+      if (mounted.current) setSendError((e as Error).message);
+    } finally {
+      sending.current = false;
+      onBusyChange?.(false);
+      if (mounted.current) setBusy(false);
+    }
+  }
   return (
-    <div className="support-chat">
-      {hasOlder && (
-        <button disabled={loading} onClick={() => older.current()}>
-          پیام‌های قدیمی‌تر
-        </button>
-      )}
-      {loading && <p role="status">در حال دریافت پیام‌ها…</p>}
+    <div className="support-chat" aria-busy={busy}>
+      <div className="chat-history-tools">
+        {hasOlder && (
+          <button
+            className="text-link"
+            disabled={loading}
+            onClick={() => older.current()}
+          >
+            پیام‌های قدیمی‌تر
+          </button>
+        )}
+        <span role="status">{loading ? "در حال دریافت پیام‌ها…" : ""}</span>
+      </div>
       <div
         ref={log}
         onScroll={(e) => {
+          if (!active) return;
           const el = e.currentTarget;
+          savedScroll.current = el.scrollTop;
           atBottom.current =
             el.scrollHeight - el.scrollTop - el.clientHeight < 60;
         }}
@@ -124,23 +195,49 @@ export function Chat({ id, staff = false }: { id: string; staff?: boolean }) {
         role="log"
         aria-label="پیام‌های گفتگو"
         aria-live="polite"
+        aria-relevant="additions"
       >
-        {!messages.length && (
-          <p className="muted">پیام‌های گفتگو اینجا نمایش داده می‌شوند.</p>
-        )}
-        {messages.map((m) => (
-          <article
-            key={m.id}
-            className={`chat-message ${m.fromStaff ? "from-staff" : "from-customer"}`}
-          >
-            <strong>{m.fromStaff ? "پشتیبانی بومیش" : "مشتری"}</strong>
-            <p>{m.body}</p>
-            <small>{date(m.createdAt)}</small>
-          </article>
-        ))}
+        {!loading && !messages.length && <WelcomeMessage />}
+        {messages.map((m, index) => {
+          const day = new Intl.DateTimeFormat("fa-IR", {
+            dateStyle: "medium",
+          }).format(new Date(m.createdAt));
+          const previous = messages[index - 1];
+          const showDate =
+            !previous ||
+            new Date(previous.createdAt).toDateString() !==
+              new Date(m.createdAt).toDateString();
+          const outgoing = m.fromStaff === staff;
+          return (
+            <div key={m.id} className="chat-entry">
+              {showDate && (
+                <div className="chat-date">
+                  <span>{day}</span>
+                </div>
+              )}
+              <article
+                className={`chat-message ${m.fromStaff ? "from-staff" : "from-customer"} ${outgoing ? "is-outgoing" : "is-incoming"}`}
+              >
+                <ChatAvatar support={m.fromStaff} seed={id} />
+                <div className="chat-bubble">
+                  <strong>
+                    {m.fromStaff ? "پشتیبانی بومیش" : staff ? "مشتری" : "شما"}
+                  </strong>
+                  <p>{m.body}</p>
+                  <time dateTime={m.createdAt}>
+                    {new Intl.DateTimeFormat("fa-IR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }).format(new Date(m.createdAt))}
+                  </time>
+                </div>
+              </article>
+            </div>
+          );
+        })}
       </div>
       {error && (
-        <div role="alert">
+        <div className="chat-feedback" role="alert">
           <p className="error">{error}</p>
           <button
             className="text-link"
@@ -152,52 +249,16 @@ export function Chat({ id, staff = false }: { id: string; staff?: boolean }) {
         </div>
       )}
       {sendError && (
-        <p className="error" role="alert">
+        <p className="error chat-feedback" role="alert">
           {sendError}
         </p>
       )}
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (sending.current || !body.trim()) return;
-          sending.current = true;
-          setBusy(true);
-          setSendError("");
-          key.current ||= crypto.randomUUID();
-          try {
-            await api(`${prefix}/messages`, "POST", {
-              body,
-              idempotencyKey: key.current,
-            });
-            if (!mounted.current) return;
-            setBody("");
-            key.current = "";
-            await refresh.current();
-          } catch (e) {
-            if (mounted.current) setSendError((e as Error).message);
-          } finally {
-            sending.current = false;
-            if (mounted.current) setBusy(false);
-          }
-        }}
-      >
-        <label>
-          پیام شما
-          <textarea
-            value={body}
-            disabled={busy}
-            maxLength={4000}
-            required
-            onChange={(e) => {
-              setBody(e.target.value);
-              key.current = "";
-            }}
-          />
-        </label>
-        <button className="button" disabled={busy || !body.trim()}>
-          {busy ? "در حال ارسال…" : "ارسال پیام"}
-        </button>
-      </form>
+      <MessageComposer
+        body={body}
+        busy={busy}
+        onSend={send}
+        onChange={(body) => updateDraft({ body, key: "" })}
+      />
     </div>
   );
 }

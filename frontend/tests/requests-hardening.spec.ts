@@ -413,12 +413,9 @@ test("switching staff conversations ignores an older delayed response", async ({
     return r.fulfill({ json: {} });
   });
   await page.goto("/staff");
-  await page.getByRole("button", { name: /گفتگو با پشتیبانی/ }).click();
+  await page.getByRole("button", { name: /گفتگو با مشتری/ }).click();
   await page.getByRole("button", { name: /09120000001/ }).click();
   await expect.poll(() => !!release).toBe(true);
-  await page
-    .getByRole("button", { name: "بازگشت به درخواست‌ها", exact: true })
-    .click();
   await page.getByRole("button", { name: /09120000002/ }).click();
   await expect(page.getByRole("log")).toContainText("current message");
   release!();

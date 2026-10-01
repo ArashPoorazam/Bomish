@@ -4,7 +4,13 @@ import { api } from "@/lib/api";
 import { useStore } from "./store-provider";
 import { digits, fa } from "@/lib/format";
 import { Smartphone, ArrowLeft } from "lucide-react";
-export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+export function LoginForm({
+  onSuccess,
+  compact = false,
+}: {
+  onSuccess: () => void;
+  compact?: boolean;
+}) {
   const { refresh } = useStore();
   const [phone, setPhone] = useState(""),
     [code, setCode] = useState(""),
@@ -18,14 +24,22 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     const t = setTimeout(() => setRemaining((n) => n - 1), 1000);
     return () => clearTimeout(t);
   }, [remaining]);
+  const normalizedPhone = digits(phone)
+    .replace(/\s/g, "")
+    .replace(/^(\+98|0098)/, "0");
   async function request() {
+    if (busy) return;
+    if (!/^09[0-9]{9}$/.test(normalizedPhone)) {
+      setError("شماره همراه را با ۰۹ و در ۱۱ رقم وارد کنید.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       const result = await api<{ devCode?: string; resendAfter: number }>(
         "/auth/request",
         "POST",
-        { phone: digits(phone) },
+        { phone: normalizedPhone },
       );
       setSent(true);
       setDevCode(result.devCode || "");
@@ -38,6 +52,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   }
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     if (!sent) {
       await request();
       return;
@@ -46,7 +61,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     setError("");
     try {
       await api("/auth/verify", "POST", {
-        phone: digits(phone),
+        phone: normalizedPhone,
         code: digits(code),
       });
       await refresh();
@@ -57,10 +72,16 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
       setBusy(false);
     }
   }
+  const Heading = compact ? "h2" : "h1";
   return (
-    <div className="form-card">
-      <Smartphone size={28} />
-      <h1>{sent ? "کد تأیید را وارد کنید" : "به بومیش خوش آمدید"}</h1>
+    <div className={`login-form ${compact ? "login-compact" : ""}`}>
+      <span className="login-symbol">
+        <Smartphone size={24} />
+      </span>
+      <span className="login-eyebrow">
+        {sent ? "تأیید شماره همراه" : "ورود / ثبت‌نام"}
+      </span>
+      <Heading>{sent ? "کد تأیید را وارد کنید" : "به بومیش خوش آمدید"}</Heading>
       <p>
         {sent
           ? `کد تأیید شماره ${phone} را وارد کنید.`
@@ -71,13 +92,15 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           <label>
             شماره همراه
             <input
+              disabled={busy}
               type="tel"
               autoComplete="tel"
               inputMode="tel"
               dir="ltr"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="۰۹۱۲۱۲۳۴۵۶۷"
+              placeholder="09121234567"
+              maxLength={20}
               required
             />
           </label>
@@ -86,6 +109,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
             <label>
               کد تأیید
               <input
+                disabled={busy}
                 autoFocus
                 autoComplete="one-time-code"
                 inputMode="numeric"
@@ -141,6 +165,11 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           </div>
         ) : null}
       </form>
+      {!sent && (
+        <p className="login-footnote">
+          ورود امن با کد یک‌بارمصرف؛ بدون نیاز به گذرواژه
+        </p>
+      )}
     </div>
   );
 }

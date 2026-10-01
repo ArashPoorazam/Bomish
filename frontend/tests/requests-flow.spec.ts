@@ -159,7 +159,7 @@ test("customer session, five stages, refresh, support and custom requests work a
   await expect(page.getByRole("log")).toContainText(
     "زمان ارسال سفارش من چقدر است؟",
   );
-  await staff.getByRole("button", { name: /گفتگو با پشتیبانی/ }).click();
+  await staff.getByRole("button", { name: /گفتگو با مشتری/ }).click();
   await staff.getByRole("button", { name: new RegExp(phone) }).click();
   await staff
     .getByLabel("پیام شما", { exact: true })

@@ -187,7 +187,7 @@ export function Checkout() {
   if (!user.authenticated)
     return (
       <div className="auth-layout">
-        <LoginForm onSuccess={() => {}} />
+        <LoginForm compact onSuccess={() => {}} />
       </div>
     );
   if (outcome)

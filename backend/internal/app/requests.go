@@ -14,6 +14,7 @@ func (a *App) requestRoutes(m *http.ServeMux) {
 	m.HandleFunc("GET /api/v1/requests/{id}/messages", a.customerMessages)
 	m.HandleFunc("POST /api/v1/requests/{id}/messages", a.customerMessage)
 	m.HandleFunc("GET /api/v1/staff/requests", a.permit(a.staffRequests, "requests"))
+	m.HandleFunc("GET /api/v1/staff/requests/{id}", a.permit(a.staffRequest, "requests"))
 	m.HandleFunc("PATCH /api/v1/staff/requests/{id}", a.permit(a.decideRequest, "requests"))
 	m.HandleFunc("GET /api/v1/staff/requests/{id}/messages", a.permit(a.staffMessages, "requests"))
 	m.HandleFunc("POST /api/v1/staff/requests/{id}/messages", a.permit(a.staffMessage, "requests"))
@@ -51,21 +52,13 @@ func (a *App) listRequests(w http.ResponseWriter, r *http.Request, staff bool) {
 		fail(w, 400, "نوع درخواست معتبر نیست")
 		return
 	}
-	owner := ""
-	extra := ""
-	join := ""
-	if !staff {
-		owner = current(r).UserID
-	} else {
-		extra = `,u.phone,NOT EXISTS(SELECT 1 FROM request_reads rr WHERE rr.request_id=q.id AND rr.staff_id=$5 AND rr.last_message_id>=coalesce((SELECT max(id) FROM request_messages WHERE request_id=q.id AND staff_id IS NULL),0)) AS unread`
-		join = " JOIN users u ON u.id=q.user_id"
-	}
-	page, size := pageArgs(r)
-	args := []any{kind, owner, size, (page - 1) * size}
 	if staff {
-		args = append(args, current(r).StaffID)
+		a.listStaffRequests(w, r, kind)
+		return
 	}
-	rows, e := queryMaps(r.Context(), a.Pool, `SELECT `+requestColumns+extra+` FROM customer_requests q`+join+` WHERE q.kind=$1 AND ($2='' OR q.user_id=$2) ORDER BY q.updated_at DESC,q.id LIMIT $3 OFFSET $4`, args...)
+	owner := current(r).UserID
+	page, size := pageArgs(r)
+	rows, e := queryMaps(r.Context(), a.Pool, `SELECT `+requestColumns+` FROM customer_requests q WHERE q.kind=$1 AND q.user_id=$2 ORDER BY q.updated_at DESC,q.id LIMIT $3 OFFSET $4`, kind, owner, size, (page-1)*size)
 	if e != nil {
 		a.dbError(w, e)
 		return
