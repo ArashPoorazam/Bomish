@@ -3,7 +3,7 @@ package app
 import "net/http"
 
 func (a *App) suggestions(w http.ResponseWriter, r *http.Request) {
-	rows, e := queryMaps(r.Context(), a.Pool, `SELECT s.product_id AS id,p.name,p.status,s.position FROM product_suggestions s JOIN products p ON p.id=s.product_id ORDER BY position`)
+	rows, e := queryMaps(r.Context(), a.Pool, `SELECT s.product_id AS id,p.name,p.status,s.position,coalesce(p.content->'images'->>0,'/images/spices.png') AS image,coalesce((p.content->>'outOfStock')::boolean,false) AS "outOfStock" FROM product_suggestions s JOIN products p ON p.id=s.product_id ORDER BY position`)
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -41,7 +41,7 @@ func (a *App) saveSuggestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var valid int
-	if e = tx.QueryRow(r.Context(), `SELECT count(*) FROM products WHERE id=ANY($1::text[]) AND status='published'`, in.IDs).Scan(&valid); e != nil {
+	if e = tx.QueryRow(r.Context(), `SELECT count(*) FROM products WHERE id=ANY($1::text[]) AND (status='published' OR id IN (SELECT product_id FROM product_suggestions))`, in.IDs).Scan(&valid); e != nil {
 		a.dbError(w, e)
 		return
 	}

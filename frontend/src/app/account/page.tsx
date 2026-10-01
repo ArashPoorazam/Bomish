@@ -6,8 +6,8 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const { section } = await searchParams;
-  if (section === "custom") return <CustomOrders />;
+  const { section, created } = await searchParams;
+  if (section === "custom") return <CustomOrders created={created === "1"} />;
   return (
     <Account
       section={

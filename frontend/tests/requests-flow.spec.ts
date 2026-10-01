@@ -172,6 +172,10 @@ test("customer session, five stages, refresh, support and custom requests work a
   await page.getByRole("button", { name: "بستن گفتگو", exact: true }).click();
   await page.goto("/account?section=custom");
   await page
+    .getByRole("link", { name: "سفارش اختصاصی جدید", exact: true })
+    .first()
+    .click();
+  await page
     .getByLabel("شرح محصول", { exact: true })
     .fill("ترکیب ادویه اختصاصی بدون نمک");
   await page.getByLabel("مقدار و واحد", { exact: true }).fill("۳ کیلوگرم");
@@ -196,14 +200,16 @@ test("customer session, five stages, refresh, support and custom requests work a
   await expect(page.locator(".request-card")).toContainText(
     "برای ترکیب نهایی با شما تماس می‌گیریم.",
   );
-  await staff
-    .getByRole("button", { name: "پیشنهادهای بومیش", exact: true })
-    .click();
+  await request.put("/api/v1/staff/suggestions", {
+    headers: staffHeaders,
+    data: { productIds: [] },
+  });
+  await staff.getByRole("button", { name: "مدیریت خانه", exact: true }).click();
   await staff.getByLabel("جستجوی محصول", { exact: true }).fill("زردچوبه");
   const add = staff
     .locator(".suggestion-results button")
     .filter({ hasText: "زردچوبه" });
-  if (await add.count()) await add.first().click();
+  await add.first().click();
   await staff
     .getByRole("button", { name: "ذخیره پیشنهادها", exact: true })
     .click();

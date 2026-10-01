@@ -124,6 +124,24 @@ test("account views, all order states, address CRUD and recoverable errors", asy
   const nav = page.getByRole("navigation", { name: "حساب کاربری" });
   await nav.getByRole("link", { name: "سفارش‌ها", exact: true }).click();
   await expect(page).toHaveURL(/section=orders/);
+  await expect(page.locator(".account-order-list .order-timeline")).toHaveCount(
+    0,
+  );
+  await page.screenshot({
+    path: "/tmp/bomish-account-orders-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "/tmp/bomish-account-orders-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
   for (const state of states) {
     await page.getByLabel("وضعیت سفارش").selectOption(state);
     await expect(page.locator(".order-summary")).toHaveCount(1);
@@ -133,7 +151,7 @@ test("account views, all order states, address CRUD and recoverable errors", asy
     );
   }
   await page.getByLabel("وضعیت سفارش").selectOption("shipped");
-  await page.getByRole("link", { name: "جزئیات و پیگیری" }).click();
+  await page.getByRole("link", { name: /جزئیات و پیگیری/ }).click();
   await expect(page.locator(".order-timeline")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "پیگیری در پیشخوان ۲۴" }),

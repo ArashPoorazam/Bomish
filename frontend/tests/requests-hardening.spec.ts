@@ -280,9 +280,7 @@ test("suggestion retries preserve edits and event sound ignores unchanged pollin
     return r.fulfill({ json: [] });
   });
   await page.goto("/staff");
-  await page
-    .getByRole("button", { name: "پیشنهادهای بومیش", exact: true })
-    .click();
+  await page.getByRole("button", { name: "مدیریت خانه", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "ذخیره پیشنهادها", exact: true }),
   ).toBeDisabled();

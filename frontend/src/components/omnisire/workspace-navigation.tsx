@@ -22,7 +22,7 @@ export const sectionLabels: Record<string, string> = {
   orders: "سفارش‌ها",
   support: "گفتگو با مشتری",
   custom: "سفارش‌های اختصاصی",
-  suggestions: "پیشنهادهای بومیش",
+  suggestions: "مدیریت خانه",
   shipping: "ارسال",
   sales: "فروش من",
 };

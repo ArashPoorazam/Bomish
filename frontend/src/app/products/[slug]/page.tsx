@@ -77,7 +77,6 @@ export default async function Detail({
       </nav>
       <div className="product-detail">
         <div className="product-intro">
-          <span className="eyebrow">عطری برای آشپزخانه شما</span>
           <h1>{p.name}</h1>
           <p className="lead">{p.summary}</p>
         </div>

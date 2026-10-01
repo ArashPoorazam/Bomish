@@ -26,10 +26,14 @@ export const activeOrderStates = [
 ];
 export function OrderSummary({ order: o }: { order: Order }) {
   return (
-    <article className="order-card order-summary">
+    <Link
+      className="order-card order-summary"
+      href={`/account/orders/${o.id}`}
+      aria-label={`جزئیات و پیگیری سفارش ${o.id.slice(0, 8)}`}
+    >
       <div className="order-summary-top">
         <div className="order-symbol">
-          <Package size={23} />
+          <Package size={21} />
         </div>
         <div>
           <h3>
@@ -43,24 +47,26 @@ export function OrderSummary({ order: o }: { order: Order }) {
       </div>
       <p className="order-item-preview">
         {o.items
+          .slice(0, 2)
           .map(
             (i) =>
               `${i.name} · ${i.packageLabel || weight(i.grams)} × ${fa(i.quantity)}`,
           )
           .join("، ")}
+        {o.items.length > 2 ? ` و ${fa(o.items.length - 2)} محصول دیگر` : ""}
       </p>
-      <OrderProgress order={o} />
       <div className="order-summary-bottom">
         <strong>
           {money(o.totalRials)} <small>تومان</small>
         </strong>
-        <Link className="text-link" href={`/account/orders/${o.id}`}>
+        <span className="text-link">
           جزئیات و پیگیری <ArrowLeft size={16} />
-        </Link>
+        </span>
       </div>
-    </article>
+    </Link>
   );
 }
+
 export function PendingPayment({
   order,
   onPaid,

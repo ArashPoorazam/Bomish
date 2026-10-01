@@ -5332,7 +5332,7 @@
         }
       },
       "put": {
-        "description": "Replace the ordered manual selection. Only published products accepted.",
+        "description": "Replace the ordered manual selection. New selections must be published; previously selected unpublished products may be retained.",
         "responses": {
           "200": {
             "description": "Success",
@@ -5397,6 +5397,103 @@
                 "additionalProperties": false
               }
             }
+          }
+        }
+      }
+    },
+    "/home/slides": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Ordered homepage slides",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HomeSlide"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/home/slides": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Ordered homepage slides",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HomeSlide"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Requires products permission."
+      },
+      "put": {
+        "description": "Replace ordered homepage slides. Requires products permission and CSRF. Removing a placement does not delete the uploaded image.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/HomeSlide"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Login required"
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF"
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "409": {
+            "description": "Stale version or reused idempotency key"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retain session"
           }
         }
       }
@@ -7429,13 +7526,39 @@
           },
           "position": {
             "type": "integer"
+          },
+          "image": {
+            "type": "string"
+          },
+          "outOfStock": {
+            "type": "boolean"
           }
         },
         "required": [
           "id",
           "name",
           "status",
-          "position"
+          "position",
+          "image",
+          "outOfStock"
+        ],
+        "additionalProperties": false
+      },
+      "HomeSlide": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "string"
+          },
+          "alt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "image",
+          "alt"
         ],
         "additionalProperties": false
       }

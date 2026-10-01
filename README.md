@@ -108,13 +108,13 @@ Regenerate database access after changing queries: `cd backend && sqlc generate`
 
 ## Store management
 
-Staff can curate home-page suggestions and use the Requests section for orders, support conversations, and personalized product requests. The storefront includes a floating support button and customer-visible request decisions.
+Staff can use **مدیریت خانه** to upload, describe, reorder, and remove homepage slideshow images and curate up to 12 suggested products. Each editor saves independently; uploads support partial-failure retries. The homepage rotates images every five seconds with pause controls and reduced-motion support. Customers see compact order summaries and create personalized requests from a dedicated form. Staff can use the Requests section for orders, support conversations, and personalized product requests. The storefront includes a floating support button and customer-visible request decisions.
 
 Chat opens the latest 100 messages, supports loading older history without losing scroll position, and polls for new replies only while visible. Orders refresh independently of addresses and retain their last successful status during temporary failures.
 
 Customer and staff cookies remain independent; only genuine session expiry invokes sign-in. Notification badges track unread counts, while optional sound detects new event markers even when counts stay unchanged.
 
-Suggestion loading and product search have separate retries that preserve edits. Migrations 009 and 010 apply automatically at startup. See [architecture and behavior](docs/architecture.md) for permissions, polling, session isolation, and collection rules.
+Suggestion loading and product search have separate retries that preserve edits. Migrations 009–011 apply automatically at startup; migration 011 preserves the original homepage picture as the initial slide. See [architecture and behavior](docs/architecture.md) for permissions, polling, session isolation, and collection rules.
 
 The staff panel includes searchable products, flexible package and Markdown section editors, category and fulfillment workflows, owner price/discount controls, free-shipping settings, and a dedicated business analytics page.
 

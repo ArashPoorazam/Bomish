@@ -1,0 +1,339 @@
+/* Staff homepage editors share a calm, consistent editing surface. */
+.home-management {
+  display: grid;
+  gap: 28px;
+}
+.home-editor {
+  padding: 28px;
+  min-width: 0;
+}
+.home-editor-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+.home-editor-heading > .badge {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.home-editor-heading h2 {
+  font-size: 21px;
+  margin: 6px 0;
+}
+.home-editor-heading p {
+  font-size: 12px;
+  line-height: 1.9;
+}
+.home-editor .eyebrow {
+  font-size: 10px;
+}
+.home-editor fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.home-upload {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 9px;
+  padding: 26px 18px;
+  border: 1px dashed #afc19f;
+  border-radius: 14px;
+  background: #f5f8ef;
+  cursor: pointer;
+  text-align: center;
+}
+.home-upload strong {
+  font-size: 14px;
+}
+.home-upload span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+.home-upload small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.home-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.home-upload:focus-within {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+.home-slide-list {
+  display: grid;
+  gap: 14px;
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+.home-slide-list li {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  border: 1px solid var(--line);
+  padding: 12px;
+  border-radius: 14px;
+}
+.home-slide-preview {
+  position: relative;
+  aspect-ratio: 1.35;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #f4f2e9;
+}
+.home-slide-preview img {
+  object-fit: cover;
+  object-position: center;
+}
+.home-slide-preview > span {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fffef4eb;
+  font-size: 11px;
+}
+.home-slide-list label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}
+.home-slide-list input {
+  font-size: 13px;
+}
+.home-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.home-item-actions button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  width: 34px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+.home-item-actions button:hover:not(:disabled) {
+  background: #edf3e6;
+}
+.home-item-actions button:disabled {
+  opacity: 0.35;
+}
+.home-editor-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  margin-top: 24px;
+}
+.home-editor-footer .button {
+  font-size: 13px;
+}
+.home-editor-footer > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.home-editor-empty {
+  padding: 30px 18px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 2;
+}
+.home-upload-failures {
+  border: 1px solid #ebcbbd;
+  background: #fff8f3;
+  padding: 18px;
+  margin-top: 16px;
+  border-radius: 12px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.home-upload-failures ul {
+  padding-inline-start: 18px;
+}
+.suggestion-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(250px, 0.8fr);
+  gap: 26px;
+}
+.suggestion-workspace h3 {
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.suggestion-browser {
+  border-inline-start: 1px solid var(--line);
+  padding-inline-start: 24px;
+}
+.suggestion-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.suggestion-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eef0e8;
+}
+.suggestion-number {
+  font-size: 11px;
+  width: 18px;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.suggestion-list img,
+.suggestion-results img {
+  border-radius: 9px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.suggestion-name {
+  flex: 1;
+  min-width: 0;
+}
+.suggestion-name strong {
+  font-size: 13px;
+}
+.suggestion-name small {
+  display: block;
+  color: #8b6833;
+  font-size: 10px;
+  margin-top: 5px;
+}
+.suggestion-search {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+.suggestion-search > div {
+  position: relative;
+}
+.suggestion-search svg {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  color: var(--muted);
+}
+.suggestion-search input {
+  padding-right: 38px;
+  font-size: 13px;
+}
+.suggestion-results {
+  display: grid;
+  gap: 7px;
+  max-height: 480px;
+  overflow: auto;
+  padding: 3px;
+}
+.suggestion-results button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: start;
+  border: 1px solid var(--line);
+  padding: 9px;
+  border-radius: 10px;
+  background: white;
+  font-size: 12px;
+}
+.suggestion-results button > span {
+  flex: 1;
+}
+.suggestion-results small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+}
+.suggestion-results button:hover:not(:disabled) {
+  background: #f3f7ee;
+  border-color: #adbf9b;
+}
+.home-editor .request-success,
+.home-editor > .error {
+  margin-top: 16px;
+  font-size: 13px;
+}
+@media (max-width: 1100px) {
+  .suggestion-workspace {
+    grid-template-columns: 1fr;
+  }
+  .suggestion-browser {
+    border-inline-start: 0;
+    border-top: 1px solid var(--line);
+    padding: 20px 0 0;
+  }
+  .home-slide-list li {
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 14px;
+  }
+  .home-slide-list .home-item-actions {
+    grid-column: 2;
+  }
+}
+@media (max-width: 600px) {
+  .home-editor {
+    padding: 18px;
+  }
+  .home-editor-heading {
+    gap: 10px;
+  }
+  .home-editor-heading > .badge {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .home-editor-heading h2 {
+    font-size: 18px;
+  }
+  .home-slide-list li {
+    grid-template-columns: 1fr;
+    padding: 10px;
+  }
+  .home-slide-list .home-item-actions {
+    grid-column: 1;
+  }
+  .home-slide-preview {
+    aspect-ratio: 1.35;
+  }
+  .suggestion-list li {
+    flex-wrap: wrap;
+  }
+  .suggestion-list .home-item-actions {
+    margin-inline-start: auto;
+  }
+  .home-editor-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

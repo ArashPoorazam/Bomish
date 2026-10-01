@@ -11,11 +11,12 @@ import {
   Handshake,
 } from "lucide-react";
 import { serverApi } from "@/lib/api";
-import type { Product, Article } from "@/lib/types";
+import type { Product, Article, HomeSlide } from "@/lib/types";
 import { ProductRail } from "@/components/product-rail";
+import { HomeSlideshow } from "@/components/home-slideshow";
 export const dynamic = "force-dynamic";
 export default async function Home() {
-  const [selected, newest, offers, articles] = await Promise.all([
+  const [selected, newest, offers, articles, slides] = await Promise.all([
     serverApi<Product[]>(
       "/products?available=true&collection=bestsellers&pageSize=12",
     ),
@@ -26,6 +27,7 @@ export default async function Home() {
       "/products?available=true&collection=suggestions&pageSize=12",
     ),
     serverApi<Article[]>("/articles"),
+    serverApi<HomeSlide[]>("/home/slides").catch(() => []),
   ]);
   return (
     <div className="shop-home">
@@ -52,25 +54,7 @@ export default async function Home() {
             <span>بسته‌های متنوع، انتخابی ساده</span>
           </div>
         </div>
-        <div className="hero-art">
-          <Image
-            src="/images/spices.png"
-            fill
-            priority
-            sizes="(max-width: 760px) 100vw, 50vw"
-            alt="چیدمان ادویه‌های رنگارنگ، نعناع، کنجد و دارچین"
-          />
-          <div className="hero-label">
-            <span className="label-mark">
-              <Sprout size={26} />
-            </span>
-            <div>
-              <strong>هر دانه، یک داستان</strong>
-              <span>طعم‌های آشنا، انتخاب‌های تازه</span>
-            </div>
-          </div>
-          <span className="image-note">تصویر نمایشی</span>
-        </div>
+        <HomeSlideshow key={JSON.stringify(slides)} slides={slides} />
       </section>
       <section
         className="container home-categories"

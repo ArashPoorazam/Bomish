@@ -8,12 +8,7 @@ import { fa, statuses } from "@/lib/format";
 import { useStore } from "./store-provider";
 import { AccountShell } from "./account-shell";
 import { AccountAddresses } from "./account-addresses";
-import {
-  activeOrderStates,
-  OrderSummary,
-  orderStates,
-  PendingPayment,
-} from "./customer-order";
+import { activeOrderStates, OrderSummary, orderStates } from "./customer-order";
 export function Account({
   section,
 }: {
@@ -54,16 +49,18 @@ export function Account({
           addresses: "نشانی‌های شما",
         }[section]
       }
+      actions={
+        section !== "addresses" ? (
+          <button
+            className="button secondary order-refresh"
+            disabled={refreshing}
+            onClick={reload}
+          >
+            {refreshing ? "در حال به‌روزرسانی…" : "به‌روزرسانی وضعیت"}
+          </button>
+        ) : undefined
+      }
     >
-      {section !== "addresses" && (
-        <button
-          className="button secondary order-refresh"
-          disabled={refreshing}
-          onClick={reload}
-        >
-          {refreshing ? "در حال به‌روزرسانی…" : "به‌روزرسانی وضعیت"}
-        </button>
-      )}
       {error && (
         <div className="account-panel" role="alert">
           <p className="error">{error}</p>
@@ -115,14 +112,11 @@ export function Account({
                 </Link>
               </div>
               {latest ? (
-                <>
-                  <OrderSummary order={latest} />
-                  <PendingPayment order={latest} onPaid={reload} />
-                </>
+                <OrderSummary order={latest} />
               ) : (
                 <div className="empty-state">
                   <Package size={34} />
-                  <h3>اولین طعم را انتخاب کنید</h3>
+                  <h3>هنوز سفارشی ندارید</h3>
                   <p>هنوز سفارشی ثبت نکرده‌اید.</p>
                   <Link href="/products" className="button">
                     شروع خرید
@@ -132,7 +126,7 @@ export function Account({
               <div className="account-note">
                 <MapPin size={27} />
                 <div>
-                  <h3>نشانی‌ها، آماده برای خرید بعدی</h3>
+                  <h3>نشانی‌های تحویل</h3>
                   <p>نشانی تازه اضافه کنید یا اطلاعات قبلی را تغییر دهید.</p>
                 </div>
                 <Link href="/account?section=addresses" className="text-link">
@@ -159,10 +153,7 @@ export function Account({
               </label>
               <div className="account-order-list">
                 {filtered.map((o) => (
-                  <div key={o.id}>
-                    <OrderSummary order={o} />
-                    <PendingPayment order={o} onPaid={reload} />
-                  </div>
+                  <OrderSummary key={o.id} order={o} />
                 ))}
               </div>
               {!filtered.length && (

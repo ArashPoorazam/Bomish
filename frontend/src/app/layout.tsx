@@ -8,6 +8,7 @@ import "./globals.css";
 import "./storefront.css";
 import "./auth.css";
 import "./requests.css";
+import "./home-management.css";
 const vazir = localFont({
   src: "../../public/fonts/Vazirmatn.woff2",
   variable: "--font-vazir",

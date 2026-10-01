@@ -17,17 +17,22 @@ export function OrderTracking({ id }: { id: string }) {
     !!user?.authenticated,
   );
   return (
-    <AccountShell section="orders" title="سفارش شما، قدم به قدم">
-      <Link className="text-link account-back" href="/account">
-        ← حساب من
+    <AccountShell
+      section="orders"
+      title="جزئیات سفارش"
+      actions={
+        <button
+          className="button secondary order-refresh"
+          disabled={loading}
+          onClick={refresh}
+        >
+          {loading ? "در حال به‌روزرسانی…" : "به‌روزرسانی وضعیت"}
+        </button>
+      }
+    >
+      <Link className="text-link account-back" href="/account?section=orders">
+        بازگشت به سفارش‌ها
       </Link>
-      <button
-        className="button secondary order-refresh"
-        disabled={loading}
-        onClick={refresh}
-      >
-        {loading ? "در حال به‌روزرسانی…" : "به‌روزرسانی وضعیت"}
-      </button>
       {error && (
         <div className="account-panel" role="alert">
           <p className="error">{error}</p>

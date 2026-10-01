@@ -16,3 +16,6 @@ export type DiscountCode = components["schemas"]["DiscountCode"];
 export type DiscountCodeInput = components["schemas"]["DiscountCodeInput"];
 
 export type ProductDiscount = components["schemas"]["ProductDiscount"];
+
+export type HomeSlide = components["schemas"]["HomeSlide"];
+export type Suggestion = components["schemas"]["Suggestion"];

@@ -26,7 +26,7 @@ import {
   sectionPermission,
 } from "../omnisire/workspace-navigation";
 import { StaffRequests } from "../requests/staff-requests";
-import { SuggestionsEditor } from "./suggestions";
+import { HomeManagement } from "./home-management";
 import { OrderManager } from "./order-manager";
 export function Dashboard({
   initialSection = "",
@@ -231,7 +231,7 @@ export function Dashboard({
       {tab === "custom" && (
         <StaffRequests key="custom" kind="custom" onStateChange={setEditor} />
       )}
-      {tab === "suggestions" && <SuggestionsEditor />}
+      {tab === "suggestions" && <HomeManagement onState={setEditor} />}
       {tab === "shipping" && shipping && (
         <ShippingEditor initial={shipping} />
       )}{" "}

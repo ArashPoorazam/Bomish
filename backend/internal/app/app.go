@@ -120,6 +120,9 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("POST /api/v1/staff/uploads", a.permitAny(a.upload, "products", "articles"))
 	m.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(os.Getenv("UPLOAD_DIR")))))
 	a.requestRoutes(m)
+	m.HandleFunc("GET /api/v1/home/slides", a.homeSlides)
+	m.HandleFunc("GET /api/v1/staff/home/slides", a.permit(a.homeSlides, "products"))
+	m.HandleFunc("PUT /api/v1/staff/home/slides", a.permit(a.saveHomeSlides, "products"))
 	m.HandleFunc("GET /api/v1/staff/suggestions", a.permit(a.suggestions, "products"))
 	m.HandleFunc("PUT /api/v1/staff/suggestions", a.permit(a.saveSuggestions, "products"))
 	a.omnisireRoutes(m)
@@ -142,7 +145,7 @@ func (a *App) middleware(next http.Handler) http.Handler {
 		// Public catalog reads do not allocate anonymous sessions (including SSR fetches).
 		if r.Method == http.MethodGet || r.Method == http.MethodHead {
 			path := r.URL.Path
-			if path == "/api/v1/health" || path == "/api/v1/settings" || path == "/api/v1/categories" || path == "/api/v1/products" || strings.HasPrefix(path, "/api/v1/products/") || path == "/api/v1/articles" || strings.HasPrefix(path, "/api/v1/articles/") {
+			if path == "/api/v1/home/slides" || path == "/api/v1/health" || path == "/api/v1/settings" || path == "/api/v1/categories" || path == "/api/v1/products" || strings.HasPrefix(path, "/api/v1/products/") || path == "/api/v1/articles" || strings.HasPrefix(path, "/api/v1/articles/") {
 				next.ServeHTTP(w, r)
 				return
 			}

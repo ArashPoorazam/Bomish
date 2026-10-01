@@ -17,7 +17,7 @@ export function ProductGallery({ product: p }: { product: Product }) {
           alt={p.name}
           fill
           priority
-          sizes="(max-width: 760px) 90vw, 420px"
+          sizes="(max-width: 760px) 90vw, (max-width: 1100px) 45vw, 510px"
         />
       </div>
       {p.images.length > 1 ? (
