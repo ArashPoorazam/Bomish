@@ -40,7 +40,6 @@ export function ProductCard({ product }: { product: Product }) {
         ) : discounted ? (
           <span className="product-discount-tag">
             <strong>{fa(product.discountPercent)}٪</strong>
-            <span>تخفیف</span>
           </span>
         ) : null}
       </div>

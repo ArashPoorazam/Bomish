@@ -345,7 +345,7 @@ test("discounted package rounds to 1000 toman in listing, purchase, cart, and ch
     const card = page.locator(".catalog-grid .product-card");
     await expect(
       card.locator(".product-card-media .product-discount-tag"),
-    ).toHaveText("۱۰٪تخفیف");
+    ).toHaveText("۱۰٪");
     await expect(card.locator("del")).toHaveText("۴۷٬۰۰۰ تومان");
     await expect(card.locator(".product-discount-tag")).toHaveCSS(
       "background-color",
