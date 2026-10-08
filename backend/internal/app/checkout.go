@@ -12,12 +12,20 @@ import (
 )
 
 type quoteResult struct {
-	DiscountCode  string `json:"discountCode"`
-	DiscountRials int64  `json:"discountRials"`
-	SubtotalRials int64  `json:"subtotalRials"`
-	ShippingRials int64  `json:"shippingRials"`
-	TotalRials    int64  `json:"totalRials"`
-	WeightGrams   int64  `json:"weightGrams"`
+	ShippingQuoteID    string `json:"shippingQuoteId,omitempty"`
+	ExpiresAt          string `json:"expiresAt,omitempty"`
+	Method             string `json:"method,omitempty"`
+	Service            string `json:"service,omitempty"`
+	ParcelCount        int    `json:"parcelCount,omitempty"`
+	Simulated          bool   `json:"simulated"`
+	FallbackReason     string `json:"fallbackReason,omitempty"`
+	RequiresAcceptance bool   `json:"requiresAcceptance"`
+	DiscountCode       string `json:"discountCode"`
+	DiscountRials      int64  `json:"discountRials"`
+	SubtotalRials      int64  `json:"subtotalRials"`
+	ShippingRials      int64  `json:"shippingRials"`
+	TotalRials         int64  `json:"totalRials"`
+	WeightGrams        int64  `json:"weightGrams"`
 }
 
 func calculateQuote(ctx context.Context, q querier, c domain.Cart, province string) (quoteResult, error) {
@@ -51,16 +59,22 @@ func (a *App) quote(w http.ResponseWriter, r *http.Request) {
 	if !requireCustomer(w, r) {
 		return
 	}
-	var in struct {
-		Province     string `json:"province"`
-		DiscountCode string `json:"discountCode"`
-	}
+	var in shippingQuoteInput
 	if !decode(w, r, &in) {
 		return
 	}
 	c, e := loadCart(r.Context(), a.Pool, current(r).Hash)
 	if e != nil {
 		a.dbError(w, e)
+		return
+	}
+	cfg, e := readShippingConfig(r.Context(), a.Pool, false)
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+	if cfg.Mode == "calculated" {
+		a.calculatedQuote(w, r, c, in, cfg)
 		return
 	}
 	v, e := calculateQuote(r.Context(), a.Pool, c, in.Province)
@@ -79,6 +93,8 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 	}
 	var in struct {
 		Address            domain.Address `json:"address"`
+		ShippingQuoteID    string         `json:"shippingQuoteId"`
+		Method             string         `json:"method"`
 		DiscountCode       string         `json:"discountCode"`
 		ExpectedTotalRials int64          `json:"expectedTotalRials"`
 		IdempotencyKey     string         `json:"idempotencyKey"`
@@ -130,6 +146,11 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
+	cfg, e := readShippingConfig(r.Context(), tx, true)
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
 	for _, item := range c.Items {
 		_, e = tx.Exec(r.Context(), "SELECT p.id FROM products p WHERE p.id=$1 FOR UPDATE OF p", item.Product.ID)
 		if e != nil {
@@ -142,8 +163,26 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	v, e := calculateQuote(r.Context(), tx, c, in.Address.Province)
+	if cfg.Mode == "legacy" && in.ShippingQuoteID != "" {
+		shippingError(w, 409, "stale_quote", "روش محاسبه ارسال تغییر کرده؛ استعلام تازه لازم است")
+		return
+	}
+	var snapshot shippingSnapshot
+	var v quoteResult
+	if cfg.Mode == "calculated" {
+		snapshot, e = validateCheckoutQuote(r.Context(), tx, s.UserID, in.ShippingQuoteID, in.Method, c, in.Address, in.DiscountCode, cfg)
+		v = snapshot.Totals
+		if e != nil {
+			shippingError(w, 409, "stale_quote", e.Error())
+			return
+		}
+	} else {
+		v, e = calculateQuote(r.Context(), tx, c, in.Address.Province)
+	}
 	if e == nil {
+		v.DiscountRials = 0
+		v.DiscountCode = ""
+		v.TotalRials = v.SubtotalRials + v.ShippingRials
 		e = applyDiscount(r.Context(), tx, &v, in.DiscountCode, true)
 	}
 	if e != nil {
@@ -160,6 +199,18 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 	if e != nil {
 		a.dbError(w, e)
 		return
+	}
+	if cfg.Mode == "calculated" {
+		raw, _ := json.Marshal(snapshot)
+		parcels, _ := json.Marshal(snapshot.Parcels)
+		_, e = tx.Exec(r.Context(), "INSERT INTO order_shipping(order_id,method,snapshot,parcels) VALUES($1,$2,$3,$4)", id, snapshot.Method, raw, parcels)
+		if e == nil {
+			_, e = tx.Exec(r.Context(), "UPDATE shipping_quotes SET order_id=$1 WHERE id=$2", id, in.ShippingQuoteID)
+		}
+		if e != nil {
+			a.dbError(w, e)
+			return
+		}
 	}
 	for _, item := range c.Items {
 		_, e = tx.Exec(r.Context(), "INSERT INTO order_items(order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)", id, item.Product.ID, item.Product.Name, item.Grams, item.Product.PackagePrice(item.Package), item.TotalRials, item.Package.ID, item.Package.Label(), item.Quantity)
@@ -185,8 +236,15 @@ func loadOrders(ctx context.Context, q querier, user string, ids ...string) ([]d
 	}
 	return loadOrderPage(ctx, q, user, id, "", "", 100, 0)
 }
-func loadOrderPage(ctx context.Context, q querier, user, id, status, search string, limit, offset int) ([]domain.Order, error) {
-	rows, e := q.Query(ctx, `SELECT id,status,address,subtotal_rials,shipping_rials,total_rials,tracking,created_at,coalesce(discount_code,''),discount_rials FROM orders WHERE ($1='' OR user_id=$1) AND ($2='' OR id=$2) AND ($3='' OR status=$3 OR ($3='active' AND status IN ('paid','packing','shipped','review'))) AND ($4='' OR id||' '||address::text||' '||tracking ILIKE '%'||$4||'%') ORDER BY created_at DESC,id LIMIT $5 OFFSET $6`, user, id, status, search, limit, offset)
+func loadOrderPage(ctx context.Context, q querier, user, id, status, search string, limit, offset int, deliveryFilters ...string) ([]domain.Order, error) {
+	provider, attention := "", ""
+	if len(deliveryFilters) > 0 {
+		provider = deliveryFilters[0]
+	}
+	if len(deliveryFilters) > 1 {
+		attention = deliveryFilters[1]
+	}
+	rows, e := q.Query(ctx, `SELECT id,status,address,subtotal_rials,shipping_rials,total_rials,tracking,created_at,coalesce(discount_code,''),discount_rials FROM orders WHERE ($1='' OR user_id=$1) AND ($2='' OR id=$2) AND ($3='' OR status=$3 OR ($3='active' AND status IN ('paid','packing','shipped','review'))) AND ($4='' OR id||' '||address::text||' '||tracking ILIKE '%'||$4||'%') `+deliveryFilterSQL(7, 8)+` ORDER BY created_at DESC,id LIMIT $5 OFFSET $6`, user, id, status, search, limit, offset, provider, attention)
 	if e != nil {
 		return nil, e
 	}
@@ -252,7 +310,16 @@ func loadOrderPage(ctx context.Context, q querier, user, id, status, search stri
 		i := indexes[id]
 		out[i].Events = append(out[i].Events, v)
 	}
-	return out, events.Err()
+	if e = events.Err(); e != nil {
+		return nil, e
+	}
+	events.Close()
+	for i := range out {
+		if e = attachDelivery(ctx, q, &out[i]); e != nil {
+			return nil, e
+		}
+	}
+	return out, nil
 }
 func (a *App) orders(w http.ResponseWriter, r *http.Request) {
 	if !requireCustomer(w, r) {

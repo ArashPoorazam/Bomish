@@ -23,9 +23,9 @@ func (a *App) requestNotifications(w http.ResponseWriter, r *http.Request) {
 	if can(r, "orders") {
 		var count, event int64
 		e := a.Pool.QueryRow(r.Context(), `
-			SELECT count(*), coalesce((SELECT (extract(epoch FROM created_at)*1000000)::bigint FROM orders ORDER BY created_at DESC LIMIT 1),0)
+			SELECT count(*), greatest(coalesce((SELECT (extract(epoch FROM created_at)*1000000)::bigint FROM orders ORDER BY created_at DESC LIMIT 1),0),coalesce((SELECT (extract(epoch FROM received_at)*1000000)::bigint FROM delivery_events ORDER BY received_at DESC LIMIT 1),0))
 			FROM orders o WHERE status IN ('pending','paid','packing','shipped','review')
-			AND NOT EXISTS(SELECT 1 FROM order_reads rr WHERE rr.staff_id=$1 AND rr.order_id=o.id)`, current(r).StaffID).Scan(&count, &event)
+			AND NOT EXISTS(SELECT 1 FROM order_reads rr WHERE rr.staff_id=$1 AND rr.order_id=o.id AND rr.last_delivery_event>=coalesce((SELECT max(id) FROM delivery_events WHERE order_id=o.id),0))`, current(r).StaffID).Scan(&count, &event)
 		if e != nil {
 			a.dbError(w, e)
 			return
@@ -57,7 +57,7 @@ func (a *App) readRequest(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, map[string]bool{"ok": true})
 }
 func (a *App) readOrder(w http.ResponseWriter, r *http.Request) {
-	_, e := a.Pool.Exec(r.Context(), `INSERT INTO order_reads(staff_id,order_id) SELECT $1,id FROM orders WHERE id=$2 ON CONFLICT DO NOTHING`, current(r).StaffID, r.PathValue("id"))
+	_, e := a.Pool.Exec(r.Context(), `INSERT INTO order_reads(staff_id,order_id,last_delivery_event) SELECT $1,id,coalesce((SELECT max(id) FROM delivery_events WHERE order_id=$2),0) FROM orders WHERE id=$2 ON CONFLICT(staff_id,order_id) DO UPDATE SET last_delivery_event=greatest(order_reads.last_delivery_event,excluded.last_delivery_event)`, current(r).StaffID, r.PathValue("id"))
 	if e != nil {
 		a.dbError(w, e)
 		return

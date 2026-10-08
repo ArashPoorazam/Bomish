@@ -123,6 +123,9 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				if e := a.ProcessShipments(ctx); e != nil {
+					slog.Error("shipping worker failed")
+				}
 				if e := a.ProcessSMS(ctx); e != nil {
 					slog.Error("SMS processing failed")
 				}

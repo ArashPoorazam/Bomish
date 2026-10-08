@@ -233,7 +233,7 @@ export function Dashboard({
       )}
       {tab === "suggestions" && <HomeManagement onState={setEditor} />}
       {tab === "shipping" && shipping && (
-        <ShippingEditor initial={shipping} />
+        <ShippingEditor initial={shipping} onStateChange={setEditor} />
       )}{" "}
       {tab === "sales" && (
         <div className="omni-welcome">

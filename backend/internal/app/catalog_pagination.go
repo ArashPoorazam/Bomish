@@ -48,7 +48,10 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 		join += ` JOIN (SELECT oi.product_id,sum(oi.quantity) AS sold_quantity FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.paid_at>=now()-interval '30 days' AND o.paid_at<=now() AND o.status IN ('paid','packing','shipped','received') GROUP BY oi.product_id) sales ON sales.product_id=p.id`
 		metric = "sales.sold_quantity"
 	}
-	base := `WITH catalog AS (SELECT ` + metric + `,p.id,p.first_published_at,p.restocked_at,p.slug,p.name,p.search_text,p.category_id,p.status AS published_status,` + status + ` AS status,p.price_rials,p.min_grams,` + content + ` AS content,coalesce((p.content->>'outOfStock')::boolean,false) AS out_of_stock,prices.min_price,prices.min_weight FROM products p ` + join + ` LEFT JOIN LATERAL (SELECT min(CASE WHEN coalesce((` + content + `->>'discountPercent')::numeric,0)>0 THEN least((pack->>'priceRials')::numeric,ceil((pack->>'priceRials')::numeric*(100-(` + content + `->>'discountPercent')::numeric)/1000000)*10000) ELSE (pack->>'priceRials')::numeric END) min_price,min(CASE pack->>'unit' WHEN 'g' THEN (pack->>'amount')::numeric WHEN 'kg' THEN (pack->>'amount')::numeric*1000 ELSE (pack->>'shippingGrams')::numeric END) min_weight FROM jsonb_array_elements(coalesce(nullif(` + content + `->'packages','null'::jsonb),'[]')) pack) prices ON true WHERE ` + where + `) SELECT * FROM catalog WHERE ($1='' OR id=$1 OR search_text LIKE '%'||$1||'%' OR name||' '||slug||' '||content::text ILIKE '%'||$1||'%' OR similarity(search_text,$1)>0.12) AND ($2='' OR category_id=$2) AND ($3='' OR status=$3) AND ($4='' OR ($4 IN ('true','in') AND NOT out_of_stock) OR ($4='out' AND out_of_stock)) AND ($5::bigint=0 OR min_price<=$5) AND ($6::text[]='{}' OR id=ANY($6::text[]))`
+	base := `WITH catalog AS (SELECT ` + metric + `,shipping_measurements_complete(p.content) AS shipping_ready,p.id,p.first_published_at,p.restocked_at,p.slug,p.name,p.search_text,p.category_id,p.status AS published_status,` + status + ` AS status,p.price_rials,p.min_grams,` + content + ` AS content,coalesce((p.content->>'outOfStock')::boolean,false) AS out_of_stock,prices.min_price,prices.min_weight FROM products p ` + join + ` LEFT JOIN LATERAL (SELECT min(CASE WHEN coalesce((` + content + `->>'discountPercent')::numeric,0)>0 THEN least((pack->>'priceRials')::numeric,ceil((pack->>'priceRials')::numeric*(100-(` + content + `->>'discountPercent')::numeric)/1000000)*10000) ELSE (pack->>'priceRials')::numeric END) min_price,min(CASE pack->>'unit' WHEN 'g' THEN (pack->>'amount')::numeric WHEN 'kg' THEN (pack->>'amount')::numeric*1000 ELSE (pack->>'shippingGrams')::numeric END) min_weight FROM jsonb_array_elements(coalesce(nullif(` + content + `->'packages','null'::jsonb),'[]')) pack) prices ON true WHERE ` + where + `) SELECT * FROM catalog WHERE ($1='' OR id=$1 OR search_text LIKE '%'||$1||'%' OR name||' '||slug||' '||content::text ILIKE '%'||$1||'%' OR similarity(search_text,$1)>0.12) AND ($2='' OR category_id=$2) AND ($3='' OR status=$3) AND ($4='' OR ($4 IN ('true','in') AND NOT out_of_stock) OR ($4='out' AND out_of_stock)) AND ($5::bigint=0 OR min_price<=$5) AND ($6::text[]='{}' OR id=ANY($6::text[]))`
+	if staff && q.Get("shippingIncomplete") == "true" {
+		base += " AND NOT shipping_ready"
+	}
 	if q.Get("discounted") == "true" {
 		base += " AND coalesce((content->>'discountPercent')::numeric,0)>0"
 	}
@@ -105,6 +108,7 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 		if published, ok := row["first_published_at"].(time.Time); ok {
 			p.FirstPublishedAt = published.Format(time.RFC3339Nano)
 		}
+		p.PublishedShippingReady, _ = row["shipping_ready"].(bool)
 		p.ID = row["id"].(string)
 		p.Status = row["status"].(string)
 		if p.Name == "" {

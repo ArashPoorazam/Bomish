@@ -1043,11 +1043,18 @@
                   "discountCode": {
                     "type": "string",
                     "maxLength": 32
+                  },
+                  "address": {
+                    "$ref": "#/components/schemas/Address"
+                  },
+                  "method": {
+                    "type": "string"
+                  },
+                  "acceptFallback": {
+                    "type": "boolean"
                   }
                 },
-                "required": [
-                  "province"
-                ],
+                "required": [],
                 "additionalProperties": false
               }
             }
@@ -1130,6 +1137,12 @@
                   "discountCode": {
                     "type": "string",
                     "maxLength": 32
+                  },
+                  "method": {
+                    "type": "string"
+                  },
+                  "shippingQuoteId": {
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -5497,6 +5510,1041 @@
           }
         }
       }
+    },
+    "/shipping/localities": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Locality"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/staff/shipping/providers/{provider}/check": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderHealth"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/staff/shipping/preview": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingSnapshot"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "productId": {
+                          "type": "string"
+                        },
+                        "packageId": {
+                          "type": "string"
+                        },
+                        "quantity": {
+                          "type": "integer",
+                          "format": "int64"
+                        }
+                      },
+                      "required": [
+                        "productId",
+                        "packageId",
+                        "quantity"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "address": {
+                    "$ref": "#/components/schemas/Address"
+                  }
+                },
+                "required": [
+                  "items",
+                  "address"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/orders/{id}/delivery": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DeliveryRecord"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/staff/orders/{id}/parcels": {
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "parcels": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Parcel"
+                    }
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "version",
+                  "parcels",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/orders/{id}/ready": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                },
+                "required": [
+                  "version"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/orders/{id}/dispatch-quote": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "method": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "version",
+                  "method"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/orders/{id}/shipments": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "dispatchQuoteId": {
+                    "type": "string"
+                  },
+                  "idempotencyKey": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "version",
+                  "dispatchQuoteId",
+                  "idempotencyKey"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/orders/{id}/shipments/refresh": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                },
+                "required": [
+                  "version"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/orders/{id}/shipments/{shipmentId}/cancel": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "shipmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "confirmed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "version",
+                  "confirmed"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/orders/{id}/shipments/resolve": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "confirmedNoBooking": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "version",
+                  "reason",
+                  "confirmedNoBooking"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/orders/{id}/delivery-method": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "method": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "customerConsent": {
+                    "type": "boolean"
+                  },
+                  "dispatchQuoteId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "version",
+                  "method",
+                  "reason",
+                  "customerConsent",
+                  "dispatchQuoteId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/orders/{id}/parcels/{parcelId}": {
+      "patch": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "parcelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "tracking": {
+                    "type": "string"
+                  },
+                  "actualCostRials": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "version",
+                  "tracking",
+                  "actualCostRials"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/orders/{id}/shipments/simulate": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "version",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/snapp": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "accepted"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reference": {
+                    "type": "string"
+                  },
+                  "eventId": {
+                    "type": "string"
+                  },
+                  "occurredAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reference",
+                  "eventId",
+                  "occurredAt"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5631,6 +6679,9 @@
             "format": "date-time",
             "readOnly": true,
             "description": "First recorded publication; omitted when historical date is unknown."
+          },
+          "publishedShippingReady": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -5760,6 +6811,15 @@
           },
           "longitude": {
             "type": "number"
+          },
+          "provinceId": {
+            "type": "string"
+          },
+          "cityId": {
+            "type": "string"
+          },
+          "pinConfirmed": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -5920,6 +6980,9 @@
           "discountRials": {
             "type": "integer",
             "format": "int64"
+          },
+          "shipping": {
+            "$ref": "#/components/schemas/Delivery"
           }
         },
         "required": [
@@ -6006,6 +7069,31 @@
           "discountRials": {
             "type": "integer",
             "format": "int64"
+          },
+          "shippingQuoteId": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "fallbackReason": {
+            "type": "string"
+          },
+          "parcelCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "simulated": {
+            "type": "boolean"
+          },
+          "requiresAcceptance": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -6063,13 +7151,99 @@
           },
           "supportUrl": {
             "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "legacy",
+              "calculated"
+            ]
+          },
+          "originRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "boxes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShippingBox"
+            }
+          },
+          "localities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Locality"
+            }
+          },
+          "snapp": {
+            "$ref": "#/components/schemas/ProviderConfig"
+          },
+          "tapin": {
+            "$ref": "#/components/schemas/ProviderConfig"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingMeasurements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": {
+                  "type": "string"
+                },
+                "packageId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "productId",
+                "packageId",
+                "name",
+                "fields"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "providers": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProviderHealth"
+            }
           }
         },
         "required": [
           "packagingGrams",
           "rules",
           "freeShippingRials",
-          "supportUrl"
+          "supportUrl",
+          "version",
+          "mode",
+          "originRevision",
+          "origin",
+          "boxes",
+          "localities",
+          "snapp",
+          "tapin"
         ],
         "additionalProperties": false
       },
@@ -6140,6 +7314,9 @@
         "properties": {
           "error": {
             "type": "string"
+          },
+          "code": {
+            "type": "string"
           }
         },
         "required": [
@@ -6188,6 +7365,27 @@
           "shippingGrams": {
             "type": "integer",
             "format": "int64"
+          },
+          "lengthMm": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 3000
+          },
+          "widthMm": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 3000
+          },
+          "heightMm": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 3000
+          },
+          "shippingVerified": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -7559,6 +8757,650 @@
         "required": [
           "image",
           "alt"
+        ],
+        "additionalProperties": false
+      },
+      "ShippingSize": {
+        "type": "object",
+        "properties": {
+          "lengthMm": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "widthMm": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "heightMm": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "lengthMm",
+          "widthMm",
+          "heightMm"
+        ],
+        "additionalProperties": false
+      },
+      "ShippingBox": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "inside": {
+            "$ref": "#/components/schemas/ShippingSize"
+          },
+          "outside": {
+            "$ref": "#/components/schemas/ShippingSize"
+          },
+          "emptyGrams": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxGrams": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "insetMm": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fillerGrams": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "postalSizeId": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "inside",
+          "outside",
+          "emptyGrams",
+          "maxGrams",
+          "insetMm",
+          "fillerGrams",
+          "postalSizeId",
+          "active",
+          "verified"
+        ],
+        "additionalProperties": false
+      },
+      "Locality": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provinceId": {
+            "type": "string"
+          },
+          "province": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "tapinProvince": {
+            "type": "string"
+          },
+          "tapinCity": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "provinceId",
+          "province",
+          "city",
+          "tapinProvince",
+          "tapinCity",
+          "verified"
+        ],
+        "additionalProperties": false
+      },
+      "ProviderConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "service": {
+            "type": "string"
+          },
+          "shopId": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "cityId": {
+            "type": "string"
+          },
+          "area": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "maxGrams": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxVolumeCm3": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxParcels": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxSize": {
+            "$ref": "#/components/schemas/ShippingSize"
+          }
+        },
+        "required": [
+          "enabled",
+          "verified",
+          "service",
+          "shopId",
+          "currency",
+          "cityId",
+          "area",
+          "maxGrams",
+          "maxVolumeCm3",
+          "maxParcels",
+          "maxSize"
+        ],
+        "additionalProperties": false
+      },
+      "ProviderHealth": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "simulated": {
+            "type": "boolean"
+          },
+          "lastSuccess": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "configured",
+          "simulated",
+          "lastSuccess",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "PackingItem": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string"
+          },
+          "packageId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "size": {
+            "$ref": "#/components/schemas/ShippingSize"
+          },
+          "grams": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "priceRials": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "productId",
+          "packageId",
+          "label",
+          "unit",
+          "size",
+          "grams",
+          "priceRials"
+        ],
+        "additionalProperties": false
+      },
+      "Placement": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/PackingItem"
+          },
+          "x": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "y": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "z": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rotated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "item",
+          "x",
+          "y",
+          "z",
+          "rotated"
+        ],
+        "additionalProperties": false
+      },
+      "Parcel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "box": {
+            "$ref": "#/components/schemas/ShippingBox"
+          },
+          "placements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Placement"
+            }
+          },
+          "grossGrams": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "measuredGrams": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "confirmed": {
+            "type": "boolean"
+          },
+          "manual": {
+            "type": "boolean"
+          },
+          "tracking": {
+            "type": "string"
+          },
+          "actualCostRials": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "box",
+          "placements",
+          "grossGrams",
+          "measuredGrams",
+          "confirmed",
+          "manual",
+          "tracking",
+          "actualCostRials"
+        ],
+        "additionalProperties": false
+      },
+      "CarrierQuote": {
+        "type": "object",
+        "properties": {
+          "costRials": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "components": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "simulated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "costRials",
+          "expiresAt",
+          "components",
+          "simulated"
+        ],
+        "additionalProperties": false
+      },
+      "ShippingSnapshot": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/CalculatedShippingConfig"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "algorithm": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "parcels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Parcel"
+            }
+          },
+          "carrierQuote": {
+            "$ref": "#/components/schemas/CarrierQuote"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/Quote"
+          },
+          "fallbackReason": {
+            "type": "string"
+          },
+          "fallbackAccepted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "config",
+          "destination",
+          "algorithm",
+          "method",
+          "service",
+          "parcels",
+          "carrierQuote",
+          "totals",
+          "fallbackReason",
+          "fallbackAccepted"
+        ],
+        "additionalProperties": false
+      },
+      "DispatchReview": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "method": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "quote": {
+            "$ref": "#/components/schemas/CarrierQuote"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "method",
+          "expiresAt",
+          "quote"
+        ],
+        "additionalProperties": false
+      },
+      "DeliveryEvent": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "DeliveryRecord": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "method": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/ShippingSnapshot"
+          },
+          "parcels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Parcel"
+            }
+          },
+          "actualCostRials": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DispatchReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryEvent"
+            }
+          },
+          "attemptId": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "driverName": {
+            "type": "string"
+          },
+          "driverPhone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderId",
+          "version",
+          "method",
+          "status",
+          "ready",
+          "snapshot",
+          "parcels",
+          "actualCostRials",
+          "review",
+          "allowedActions",
+          "events",
+          "attemptId",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "Delivery": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "simulated": {
+            "type": "boolean"
+          },
+          "parcels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "tracking": {
+                  "type": "string"
+                },
+                "trackingUrl": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "tracking",
+                "trackingUrl"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryEvent"
+            }
+          }
+        },
+        "required": [
+          "method",
+          "service",
+          "status",
+          "simulated",
+          "parcels",
+          "events"
+        ],
+        "additionalProperties": false
+      },
+      "CalculatedShippingConfig": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "legacy",
+              "calculated"
+            ]
+          },
+          "originRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "boxes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShippingBox"
+            }
+          },
+          "localities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Locality"
+            }
+          },
+          "snapp": {
+            "$ref": "#/components/schemas/ProviderConfig"
+          },
+          "tapin": {
+            "$ref": "#/components/schemas/ProviderConfig"
+          }
+        },
+        "required": [
+          "version",
+          "mode",
+          "originRevision",
+          "origin",
+          "boxes",
+          "localities",
+          "snapp",
+          "tapin"
         ],
         "additionalProperties": false
       }

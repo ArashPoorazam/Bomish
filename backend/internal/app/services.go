@@ -38,7 +38,12 @@ func (a *App) publicSettings(w http.ResponseWriter, r *http.Request) {
 	if !validSupportURL(support) {
 		support = ""
 	}
-	write(w, 200, map[string]any{"freeShippingRials": threshold, "supportUrl": support, "mapEnabled": os.Getenv("NESHAN_API_KEY") != ""})
+	cfg, e := readShippingConfig(r.Context(), a.Pool, false)
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+	write(w, 200, map[string]any{"shippingMode": cfg.Mode, "freeShippingRials": threshold, "supportUrl": support, "mapEnabled": os.Getenv("NESHAN_API_KEY") != ""})
 }
 func (a *App) reverseAddress(w http.ResponseWriter, r *http.Request) {
 	if !requireCustomer(w, r) {
@@ -158,7 +163,12 @@ func (a *App) ProcessSMS(ctx context.Context) error {
 		}
 		title := map[string]string{"paid": "خرید شما ثبت شد", "packing": "سفارش شما بسته‌بندی شد", "shipped": "سفارش شما ارسال شد", "received": "سفارش شما تحویل شد"}[p.Stage]
 		message := "بومیش: " + title + "\n" + strings.TrimRight(a.Origin, "/") + "/account/orders/" + p.OrderID
-		if p.Stage == "shipped" {
+		var method string
+		if err := tx.QueryRow(ctx, "SELECT coalesce((SELECT method FROM order_shipping WHERE order_id=$1),'legacy_postal')", p.OrderID).Scan(&method); err != nil {
+			tx.Rollback(ctx)
+			return err
+		}
+		if p.Stage == "shipped" && method != "snapp" && validTracking(tracking) {
 			message += "\nکد رهگیری: " + tracking + "\n" + postalTrackingURL(tracking)
 		}
 		e = sendSMS(ctx, phone, message, "")
@@ -202,7 +212,11 @@ func (a *App) getOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, o := range orders {
 		if o.ID == r.PathValue("id") {
-			write(w, 200, map[string]any{"order": o, "trackingUrl": postalTrackingURL(o.Tracking)})
+			trackingURL := ""
+			if o.Shipping == nil && validTracking(o.Tracking) {
+				trackingURL = postalTrackingURL(o.Tracking)
+			}
+			write(w, 200, map[string]any{"order": o, "trackingUrl": trackingURL})
 			return
 		}
 	}

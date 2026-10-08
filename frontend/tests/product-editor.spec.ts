@@ -300,3 +300,43 @@ test("manual availability is independent of editor drafts and stock fields are g
   ).toHaveAttribute("aria-pressed", "true");
   expect(availability).toEqual([{ outOfStock: true }, { outOfStock: false }]);
 });
+
+test("shipping measurements preserve variants, Persian decimals, copy and incomplete drafts", async ({
+  page,
+}) => {
+  const saved = await workspace(page);
+  await page.getByRole("button", { name: "ویرایش", exact: true }).click();
+  await step(page, "بسته‌ها و قیمت");
+  await page.getByRole("button", { name: "افزودن بسته", exact: true }).click();
+  await step(page, "بسته‌بندی و ارسال");
+  const lengths = page.getByLabel("طول (سانتی‌متر)", { exact: true }),
+    widths = page.getByLabel("عرض (سانتی‌متر)", { exact: true }),
+    heights = page.getByLabel("ارتفاع (سانتی‌متر)", { exact: true }),
+    weights = page.getByLabel("وزن بسته آماده ارسال (گرم)", { exact: true });
+  await lengths.first().fill("۱۲٫۵");
+  await widths.first().fill("۸");
+  await heights.first().fill("۱۰");
+  await weights.first().fill("۱۵۰");
+  await page
+    .getByLabel("کپی اندازه‌ها از بسته دیگر", { exact: true })
+    .nth(1)
+    .selectOption("legacy");
+  await expect(lengths.nth(1)).toHaveValue("12.5");
+  await lengths.first().fill("۱۴");
+  await lengths.first().press("Tab");
+  await expect(lengths.nth(1)).toHaveValue("12.5");
+  await heights.nth(1).fill("");
+  await page
+    .getByRole("button", { name: "ذخیره پیش‌نویس", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  const packs = saved.at(-1)!.packages as {
+    id: string;
+    lengthMm: number;
+    heightMm: number;
+  }[];
+  expect(packs).toHaveLength(2);
+  expect(packs[0].lengthMm).toBe(140);
+  expect(packs[1].lengthMm).toBe(125);
+  expect(packs[1].heightMm).toBe(0);
+});

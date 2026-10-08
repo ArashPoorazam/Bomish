@@ -11,6 +11,7 @@ import {
 import { api } from "@/lib/api";
 import type { Order } from "@/lib/types";
 import { digits, fa, money, statuses, weight } from "@/lib/format";
+import { ShippingFulfillment } from "./shipping-fulfillment";
 import { StaffOrderStages, orderStamp } from "./order-stages";
 export function StaffOrderDetail({
   initial,
@@ -35,7 +36,14 @@ export function StaffOrderDetail({
   useEffect(() => {
     heading.current?.focus();
   }, []);
-  useEffect(() => onBusyChange(busy), [busy, onBusyChange]);
+  const [shippingState, setShippingState] = useState({
+    dirty: false,
+    busy: false,
+  });
+  useEffect(
+    () => onBusyChange(busy || shippingState.busy || shippingState.dirty),
+    [busy, shippingState, onBusyChange],
+  );
   useEffect(() => {
     let live = true;
     setLoading(true);
@@ -98,9 +106,13 @@ export function StaffOrderDetail({
     }
   }
   const packed = order.items.filter((i) => i.packed).length;
-  const canPack = ["paid", "packing"].includes(order.status);
-  const next =
-    order.status === "paid"
+  const canPack =
+    ["paid", "packing"].includes(order.status) &&
+    (!order.shipping ||
+      ["not_requested", "cancelled", "failed"].includes(order.shipping.status));
+  const next = order.shipping
+    ? ""
+    : order.status === "paid"
       ? "packing"
       : order.status === "packing"
         ? "shipped"
@@ -112,7 +124,7 @@ export function StaffOrderDetail({
       <button
         type="button"
         className="button secondary staff-order-back"
-        disabled={busy}
+        disabled={busy || shippingState.busy || shippingState.dirty}
         onClick={onClose}
       >
         <ArrowRight size={18} /> بازگشت به سفارش‌ها
@@ -128,6 +140,17 @@ export function StaffOrderDetail({
         </div>
       </header>
       <div className="staff-order-detail-body">
+        {order.shipping && (
+          <ShippingFulfillment
+            orderId={order.id}
+            customerCharge={order.shippingRials}
+            onStateChange={setShippingState}
+            refreshOrder={async () => {
+              setOrder(await api<Order>(`/staff/orders/${order.id}`));
+              await onChanged();
+            }}
+          />
+        )}
         <section className="staff-order-status-card">
           <div className="between">
             <h3>وضعیت سفارش</h3>
@@ -135,95 +158,97 @@ export function StaffOrderDetail({
           </div>
           <StaffOrderStages order={order} expanded />
         </section>
-        <section
-          className="staff-order-next"
-          aria-labelledby="order-next-title"
-        >
-          <div className="staff-order-next-copy">
-            <h3 id="order-next-title">قدم بعدی</h3>
-            {next && (
-              <p className="staff-order-transition">
-                <span>{statuses[order.status]}</span>
-                <ArrowLeft size={18} aria-hidden="true" />
-                <strong>{statuses[next]}</strong>
-              </p>
-            )}
-            {order.status === "review" && (
-              <p className="error">
-                پرداخت تأیید شده اما سفارش نیازمند بررسی است. تأیید یا بازپرداخت
-                را با مالک پیگیری کنید.
-              </p>
-            )}
-            {order.status === "pending" && (
-              <p className="muted">
-                در انتظار پرداخت مشتری؛ بسته‌بندی پس از تأیید پرداخت فعال
-                می‌شود.
-              </p>
-            )}
-            {["cancelled", "expired", "received"].includes(order.status) && (
-              <p className="muted">
-                {statuses[order.status]}؛ اقدام دیگری برای ارسال لازم نیست.
-              </p>
-            )}
-            {order.status === "paid" && (
-              <p className="muted">
-                اقلام را آماده کنید و پس از تکمیل، بسته‌بندی سفارش را تأیید
-                کنید.
-              </p>
-            )}
-          </div>
-          <div className="staff-order-next-controls">
-            {order.status === "packing" && (
-              <label>
-                کد رهگیری مرسوله
-                <input
-                  inputMode="numeric"
-                  dir="ltr"
-                  value={tracking}
-                  disabled={busy || loading}
-                  placeholder="۱۰ تا ۳۰ رقم"
-                  onChange={(e) =>
-                    setTracking(digits(e.target.value).replace(/\s/g, ""))
+        {!order.shipping && (
+          <section
+            className="staff-order-next"
+            aria-labelledby="order-next-title"
+          >
+            <div className="staff-order-next-copy">
+              <h3 id="order-next-title">قدم بعدی</h3>
+              {next && (
+                <p className="staff-order-transition">
+                  <span>{statuses[order.status]}</span>
+                  <ArrowLeft size={18} aria-hidden="true" />
+                  <strong>{statuses[next]}</strong>
+                </p>
+              )}
+              {order.status === "review" && (
+                <p className="error">
+                  پرداخت تأیید شده اما سفارش نیازمند بررسی است. تأیید یا
+                  بازپرداخت را با مالک پیگیری کنید.
+                </p>
+              )}
+              {order.status === "pending" && (
+                <p className="muted">
+                  در انتظار پرداخت مشتری؛ بسته‌بندی پس از تأیید پرداخت فعال
+                  می‌شود.
+                </p>
+              )}
+              {["cancelled", "expired", "received"].includes(order.status) && (
+                <p className="muted">
+                  {statuses[order.status]}؛ اقدام دیگری برای ارسال لازم نیست.
+                </p>
+              )}
+              {order.status === "paid" && (
+                <p className="muted">
+                  اقلام را آماده کنید و پس از تکمیل، بسته‌بندی سفارش را تأیید
+                  کنید.
+                </p>
+              )}
+            </div>
+            <div className="staff-order-next-controls">
+              {!order.shipping && order.status === "packing" && (
+                <label>
+                  کد رهگیری مرسوله
+                  <input
+                    inputMode="numeric"
+                    dir="ltr"
+                    value={tracking}
+                    disabled={busy || loading}
+                    placeholder="۱۰ تا ۳۰ رقم"
+                    onChange={(e) =>
+                      setTracking(digits(e.target.value).replace(/\s/g, ""))
+                    }
+                  />
+                </label>
+              )}
+              {next && (
+                <button
+                  type="button"
+                  className="button"
+                  disabled={
+                    busy ||
+                    loading ||
+                    !!error ||
+                    (next === "shipped" && !/^[0-9]{10,30}$/.test(tracking))
                   }
-                />
-              </label>
-            )}
-            {next && (
-              <button
-                type="button"
-                className="button"
-                disabled={
-                  busy ||
-                  loading ||
-                  !!error ||
-                  (next === "shipped" && !/^[0-9]{10,30}$/.test(tracking))
-                }
-                onClick={() =>
-                  void change(
-                    `/staff/orders/${encodeURIComponent(order.id)}`,
-                    { status: next, tracking },
-                    "وضعیت سفارش به‌روز شد.",
-                  )
-                }
-              >
-                <ArrowLeft size={18} aria-hidden="true" />
-                {busy
-                  ? "در حال ذخیره…"
-                  : next === "packing"
-                    ? "تأیید بسته‌بندی"
-                    : next === "shipped"
-                      ? "ثبت ارسال و اطلاع‌رسانی"
-                      : "تأیید تحویل به مشتری"}
-              </button>
-            )}
-            {order.tracking && (
-              <p>
-                کد رهگیری:{" "}
-                <bdi className="staff-tracking-code">{order.tracking}</bdi>
-              </p>
-            )}
-          </div>
-        </section>
+                  onClick={() =>
+                    void change(
+                      `/staff/orders/${encodeURIComponent(order.id)}`,
+                      { status: next, tracking },
+                      "وضعیت سفارش به‌روز شد.",
+                    )
+                  }
+                >
+                  <ArrowLeft size={18} aria-hidden="true" />
+                  {busy
+                    ? "در حال ذخیره…"
+                    : next === "packing"
+                      ? "تأیید بسته‌بندی"
+                      : next === "shipped"
+                        ? "ثبت ارسال و اطلاع‌رسانی"
+                        : "تأیید تحویل به مشتری"}
+                </button>
+              )}
+              {order.tracking && (
+                <p>
+                  کد رهگیری:{" "}
+                  <bdi className="staff-tracking-code">{order.tracking}</bdi>
+                </p>
+              )}
+            </div>
+          </section>
+        )}
         {loading && <p role="status">در حال دریافت آخرین وضعیت سفارش…</p>}
         {error && (
           <p role="alert" className="error">

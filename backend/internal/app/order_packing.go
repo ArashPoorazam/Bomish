@@ -52,6 +52,23 @@ func (a *App) packOrderItem(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, "چک‌لیست فقط پیش از ارسال سفارش پرداخت‌شده قابل ویرایش است")
 		return
 	}
+	d, err := loadDelivery(r.Context(), tx, id, true)
+	if err != nil && err != pgx.ErrNoRows {
+		a.dbError(w, err)
+		return
+	}
+	if err == nil {
+		if deliveryLocked(d.Status) {
+			shippingError(w, 409, "booking_uncertain", "چک‌لیست هنگام درخواست فعال یا نامشخص قابل تغییر نیست")
+			return
+		}
+		d.Ready = false
+		d.Review = nil
+		if e = saveDelivery(r.Context(), tx, d); e != nil {
+			a.dbError(w, e)
+			return
+		}
+	}
 	result, e := tx.Exec(r.Context(), "UPDATE order_items SET packed=$4 WHERE order_id=$1 AND product_id=$2 AND package_id=$3", id, in.ProductID, in.PackageID, *in.Packed)
 	if e != nil {
 		a.dbError(w, e)

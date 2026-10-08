@@ -19,3 +19,11 @@ export type ProductDiscount = components["schemas"]["ProductDiscount"];
 
 export type HomeSlide = components["schemas"]["HomeSlide"];
 export type Suggestion = components["schemas"]["Suggestion"];
+export type ShippingBox = components["schemas"]["ShippingBox"];
+export type ShippingSize = components["schemas"]["ShippingSize"];
+export type Locality = components["schemas"]["Locality"];
+export type ProviderConfig = components["schemas"]["ProviderConfig"];
+export type ProviderHealth = components["schemas"]["ProviderHealth"];
+export type Parcel = components["schemas"]["Parcel"];
+export type DeliveryRecord = components["schemas"]["DeliveryRecord"];
+export type ShippingSnapshot = components["schemas"]["ShippingSnapshot"];

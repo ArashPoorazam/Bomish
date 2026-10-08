@@ -6,6 +6,7 @@ import type { Order } from "@/lib/types";
 import { date, fa, money, statuses, weight } from "@/lib/format";
 import { api } from "@/lib/api";
 import { useStore } from "./store-provider";
+import { deliveryStatuses, providerName } from "@/lib/shipping";
 import { OrderProgress } from "./order-progress";
 export const orderStates = [
   "pending",
@@ -132,6 +133,42 @@ export function OrderView({
           </span>
         </div>
         <OrderProgress order={o} trackingUrl={trackingUrl} />
+        {o.shipping && (
+          <section className="stack delivery-selection">
+            <h4>
+              {providerName(o.shipping.method)} ·{" "}
+              {fa(o.shipping.parcels.length)} کارتن ارسال
+            </h4>
+            <p>{deliveryStatuses[o.shipping.status] ?? "در حال بررسی ارسال"}</p>
+            {o.shipping.simulated && <small>ارسال شبیه‌سازی‌شده</small>}
+            {o.shipping.parcels.map((p, i) => (
+              <div key={p.id}>
+                {p.tracking && (
+                  <p>
+                    کارتن {fa(i + 1)}: <bdi>{p.tracking}</bdi>
+                  </p>
+                )}
+                {p.trackingUrl && (
+                  <a
+                    href={p.trackingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    پیگیری مرسوله پستی {fa(i + 1)}
+                  </a>
+                )}
+              </div>
+            ))}
+            <ol>
+              {o.shipping.events.map((e, i) => (
+                <li key={i}>
+                  {deliveryStatuses[e.status] ?? "به‌روزرسانی ارسال"} ·{" "}
+                  {date(e.createdAt)}
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
       </article>
       <article className="account-panel">
         <h3>محصولات سفارش</h3>

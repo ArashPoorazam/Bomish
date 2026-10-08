@@ -12,12 +12,16 @@ type Nutrient struct {
 	Value string `json:"value"`
 }
 type Package struct {
-	ID            string  `json:"id"`
-	Amount        float64 `json:"amount"`
-	Unit          string  `json:"unit"`
-	PriceRials    int64   `json:"priceRials"`
-	MaxQuantity   int64   `json:"maxQuantity"`
-	ShippingGrams int64   `json:"shippingGrams"`
+	ID               string  `json:"id"`
+	Amount           float64 `json:"amount"`
+	Unit             string  `json:"unit"`
+	PriceRials       int64   `json:"priceRials"`
+	MaxQuantity      int64   `json:"maxQuantity"`
+	ShippingGrams    int64   `json:"shippingGrams"`
+	LengthMm         int64   `json:"lengthMm"`
+	WidthMm          int64   `json:"widthMm"`
+	HeightMm         int64   `json:"heightMm"`
+	ShippingVerified bool    `json:"shippingVerified"`
 }
 type Section struct {
 	Title string `json:"title"`
@@ -61,11 +65,12 @@ func (p *Product) EnsurePackages() {
 }
 
 type Product struct {
-	FirstPublishedAt string    `json:"firstPublishedAt,omitempty"`
-	Packages         []Package `json:"packages"`
-	Sections         []Section `json:"sections"`
-	DiscountPercent  int64     `json:"discountPercent"`
-	Popularity       int64     `json:"popularity"`
+	PublishedShippingReady bool      `json:"publishedShippingReady"`
+	FirstPublishedAt       string    `json:"firstPublishedAt,omitempty"`
+	Packages               []Package `json:"packages"`
+	Sections               []Section `json:"sections"`
+	DiscountPercent        int64     `json:"discountPercent"`
+	Popularity             int64     `json:"popularity"`
 
 	ID             string     `json:"id"`
 	Slug           string     `json:"slug"`
@@ -103,15 +108,18 @@ type Article struct {
 	UpdatedAt  string   `json:"updatedAt"`
 }
 type Address struct {
-	Latitude   *float64 `json:"latitude,omitempty"`
-	Longitude  *float64 `json:"longitude,omitempty"`
-	ID         string   `json:"id"`
-	Recipient  string   `json:"recipient"`
-	Phone      string   `json:"phone"`
-	Province   string   `json:"province"`
-	City       string   `json:"city"`
-	Street     string   `json:"street"`
-	PostalCode string   `json:"postalCode"`
+	ProvinceID   string   `json:"provinceId,omitempty"`
+	CityID       string   `json:"cityId,omitempty"`
+	PinConfirmed bool     `json:"pinConfirmed"`
+	Latitude     *float64 `json:"latitude,omitempty"`
+	Longitude    *float64 `json:"longitude,omitempty"`
+	ID           string   `json:"id"`
+	Recipient    string   `json:"recipient"`
+	Phone        string   `json:"phone"`
+	Province     string   `json:"province"`
+	City         string   `json:"city"`
+	Street       string   `json:"street"`
+	PostalCode   string   `json:"postalCode"`
 }
 type CartItem struct {
 	Package    Package `json:"package"`
@@ -136,6 +144,7 @@ type OrderItem struct {
 	TotalRials   int64  `json:"totalRials"`
 }
 type Order struct {
+	Shipping      *Delivery    `json:"shipping,omitempty"`
 	DiscountCode  string       `json:"discountCode"`
 	DiscountRials int64        `json:"discountRials"`
 	Events        []OrderEvent `json:"events"`
@@ -207,8 +216,11 @@ func (p Product) Validate(publish bool) error {
 	}
 	seen := map[string]bool{}
 	for _, v := range p.Packages {
-		if v.ID == "" || len(v.ID) > 100 || seen[v.ID] || math.IsNaN(v.Amount) || math.IsInf(v.Amount, 0) || v.Amount <= 0 || v.Amount > 1000000 || v.MaxQuantity < 1 || v.MaxQuantity > 1000 || v.PriceRials < 0 || v.PriceRials > 100000000000 || v.PriceRials%10 != 0 || (publish && v.PriceRials == 0) || (v.Unit != "g" && v.Unit != "kg" && v.Unit != "ml" && v.Unit != "l") || v.Weight() < 1 || v.Weight() > 1000000 {
+		if v.ID == "" || len(v.ID) > 100 || seen[v.ID] || math.IsNaN(v.Amount) || math.IsInf(v.Amount, 0) || v.Amount <= 0 || v.Amount > 1000000 || v.MaxQuantity < 1 || v.MaxQuantity > 1000 || v.PriceRials < 0 || v.PriceRials > 100000000000 || v.PriceRials%10 != 0 || (publish && v.PriceRials == 0) || (v.Unit != "g" && v.Unit != "kg" && v.Unit != "ml" && v.Unit != "l") || (v.Weight() < 1 && (publish || v.Unit == "g" || v.Unit == "kg")) || v.Weight() > 1000000 {
 			return errors.New("مقدار، واحد، قیمت، وزن ارسال و سقف خرید بسته را بررسی کنید")
+		}
+		if err := v.ValidateMeasurements(false); err != nil {
+			return err
 		}
 		seen[v.ID] = true
 	}

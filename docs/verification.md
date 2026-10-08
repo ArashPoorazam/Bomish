@@ -27,3 +27,21 @@ Verified locally against PostgreSQL and the running Go/Next.js application:
 - The one-command native launcher recognized the already-running store without starting duplicates.
 
 The preview runs at http://localhost:3000, with staff access at /staff. The database persists in `.data/postgres`, uploads in `.data/uploads`. Test-generated products were archived after verification; demo customer orders remain as fulfillment examples. Real SMS, payments, production hosting and real merchant content have not been activated. See launch.md for the live-sales gate.
+
+## Shipping verification
+
+Use a disposable seeded PostgreSQL database, an isolated API port and frontend `API_URL`. Never run the shipping browser fixture against the merchant database: it publishes measurement fixtures and switches the **test store** to calculated mode. Start the API with `APP_ENV=development SHIPPING_SIMULATED=true SMS_ENABLED=false SEED_DEMO=true`; do not source the merchant `.env` for this test.
+
+Backend: `TEST_DATABASE_URL=... go test -race ./...` and `go vet ./...`. Tests create isolated schemas. Shipping tests cover geometry/support/rotation/weight/work limits, measurement drafts and publication, legacy rollback, quote binding and expiry, explicit fallback, serviceability with free shipping, invoice immutability, postal barcode uniqueness/nullable costs, role restrictions, uncertain create recovery, concurrent workers, cancellation replacement, callbacks/deduplication, monotonic status and customer data isolation. Provider HTTP tests use local fake servers only.
+
+Frontend: regenerate types with `npm run api:generate`, then `npm run typecheck`, `npm run format:check`, `npm run build`. The opt-in real simulated journey is `SHIPPING_ACCEPTANCE=true BASE_URL=http://localhost:3100 CHROMIUM_PATH=/usr/bin/chromium npx playwright test tests/shipping.spec.ts`. It covers measurement entry with Persian decimals, setup, customer selection/payment, physical readiness, courier review/request and delivery, plus explicit postal fallback and multi-parcel tracking. Screenshots are written to Playwright's test-results directory. `tests/product-editor.spec.ts` additionally checks two independent variants, local copying and incomplete draft saves; existing staff-order tests cover historical orders.
+
+Manual review remains required for real packing trials, live account wire contracts, actual tariffs, provider coverage, cancellation fees, callback authentication and accessibility with assistive technology. Automated and browser simulation cannot verify those external facts.
+
+### Shipping results — 2026-10-08
+
+- Full `go test -race ./...` passed with disposable PostgreSQL integration schemas (application suite: 171.592s). Final focused race regressions passed for provider-check persistence/environment isolation, unused-quote rejection after rollback, staff-only driver details, and recovery from an unknown lookup without regressing confirmed pickup (19.965s).
+- `go vet ./...`, OpenAPI generation, frontend typecheck, formatting check and optimized production build passed. Provider fixture tests passed using local HTTP servers; no carrier endpoint was called for quotations or bookings.
+- All 10 targeted Playwright tests passed: seven product-editor cases, one historical staff-order case, and two real API/database simulated shipping journeys. Narrow mobile measurements, checkout/postal fallback and customer progress, plus desktop dispatch review were visually inspected. Screenshots are in the ignored frontend `test-results` directory.
+- Migration 012 applied successfully to the disposable database. No merchant database or credentials were used. The preexisting edit in migration 001 and the supplied handoff were preserved. No real courier, postage purchase or SMS was issued.
+- Live shipping remains unavailable. The Snapp wire-contract implementation and installation of verified live adapters are still required, in addition to the operational prerequisites in `launch.md`; passing simulation does not complete that activation work.

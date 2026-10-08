@@ -35,3 +35,4 @@ CREATE TABLE jobs (id bigserial PRIMARY KEY, kind text NOT NULL, payload jsonb N
 CREATE INDEX jobs_pending_idx ON jobs(available_at) WHERE status='pending';
 CREATE TABLE product_drafts (product_id text PRIMARY KEY REFERENCES products(id), content jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE article_drafts (article_id text PRIMARY KEY REFERENCES articles(id), content jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now());
+

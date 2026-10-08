@@ -20,7 +20,7 @@ func (a *App) updateAddress(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, e.Error())
 		return
 	}
-	result, e := a.Pool.Exec(r.Context(), `UPDATE addresses SET recipient=$3,phone=$4,province=$5,city=$6,street=$7,postal_code=$8,latitude=$9,longitude=$10 WHERE id=$1 AND user_id=$2`, in.ID, current(r).UserID, in.Recipient, in.Phone, in.Province, in.City, in.Street, in.PostalCode, in.Latitude, in.Longitude)
+	result, e := a.Pool.Exec(r.Context(), `UPDATE addresses SET recipient=$3,phone=$4,province=$5,city=$6,street=$7,postal_code=$8,latitude=$9,longitude=$10,province_id=$11,city_id=$12,pin_confirmed=$13 WHERE id=$1 AND user_id=$2`, in.ID, current(r).UserID, in.Recipient, in.Phone, in.Province, in.City, in.Street, in.PostalCode, in.Latitude, in.Longitude, in.ProvinceID, in.CityID, in.PinConfirmed)
 	if e != nil {
 		a.dbError(w, e)
 		return

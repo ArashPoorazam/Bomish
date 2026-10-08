@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, RefreshCw, Search } from "lucide-react";
 import type { Order } from "@/lib/types";
 import { digits, fa, money, statuses } from "@/lib/format";
+import { deliveryStatuses, providerName } from "@/lib/shipping";
 import { StaffOrderStages, orderStamp } from "./order-stages";
 import { StaffOrderDetail } from "./order-detail";
 export function OrderManager({
@@ -20,6 +21,8 @@ export function OrderManager({
   onStateChange: (state: { dirty: boolean; busy: boolean }) => void;
   onDetailChange: (open: boolean) => void;
 }) {
+  const [provider, setProvider] = useState(""),
+    [attention, setAttention] = useState("");
   const [query, setQuery] = useState(initialQuery),
     [filter, setFilter] = useState(initialQuery ? "" : "active");
   const [selected, setSelected] = useState<Order | null>(null),
@@ -28,11 +31,11 @@ export function OrderManager({
     [error, setError] = useState("");
   useEffect(() => {
     const timer = setTimeout(
-      () => onFilters?.({ q: query, status: filter }),
+      () => onFilters?.({ q: query, status: filter, provider, attention }),
       250,
     );
     return () => clearTimeout(timer);
-  }, [query, filter, onFilters]);
+  }, [query, filter, provider, attention, onFilters]);
   useEffect(() => onStateChange({ dirty: false, busy }), [busy, onStateChange]);
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
   const returnFocus = useRef("");
@@ -101,6 +104,32 @@ export function OrderManager({
             ))}
           </select>
         </label>
+        <label>
+          روش ارسال
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value)}
+          >
+            <option value="">همه روش‌ها</option>
+            <option value="snapp">پیک اسنپ</option>
+            <option value="post">پست محاسبه‌شده</option>
+            <option value="legacy_postal">پست قبلی</option>
+          </select>
+        </label>
+        <label>
+          پیگیری ارسال
+          <select
+            value={attention}
+            onChange={(e) => setAttention(e.target.value)}
+          >
+            <option value="">همه</option>
+            <option value="ready">آماده درخواست</option>
+            <option value="waiting">در انتظار پیک</option>
+            <option value="unknown">درخواست نامشخص</option>
+            <option value="failed">ارسال ناموفق / بازگشت</option>
+            <option value="missing">نیازمند تکمیل</option>
+          </select>
+        </label>
         <button
           type="button"
           className="button secondary"
@@ -144,7 +173,18 @@ export function OrderManager({
             aria-label={`جزئیات سفارش ${o.id.slice(0, 8)}، ${o.address.recipient}`}
           >
             <span className="staff-order-identity">
-              <strong>{o.address.recipient}</strong>
+              <strong>
+                {o.address.recipient}{" "}
+                <span className="badge">
+                  {providerName(o.shipping?.method)}
+                </span>
+              </strong>
+              {o.shipping && (
+                <small>
+                  {deliveryStatuses[o.shipping.status]} ·{" "}
+                  {fa(o.shipping.parcels.length)} کارتن ارسال
+                </small>
+              )}
               <small>
                 <bdi>#{o.id.slice(0, 8)}</bdi> · {o.address.city}
               </small>
@@ -160,7 +200,7 @@ export function OrderManager({
                 </span>
                 <span>
                   {fa(o.items.reduce((sum, item) => sum + item.quantity, 0))}{" "}
-                  بسته · {fa(o.items.filter((i) => i.packed).length)} از{" "}
+                  بسته محصول · {fa(o.items.filter((i) => i.packed).length)} از{" "}
                   {fa(o.items.length)} ردیف آماده
                 </span>
               </span>

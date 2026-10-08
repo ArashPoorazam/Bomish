@@ -19,6 +19,7 @@ import { fa, money, packageLabel, statuses } from "@/lib/format";
 import { normalizeProduct, productIssues, productSteps } from "./product-form";
 import { ProductBasics, ProductDetails } from "./product-content-fields";
 import { ProductImages } from "./product-images";
+import { ProductMeasurements, MeasurementReview } from "./product-measurements";
 import { ProductPackages } from "./product-packages";
 
 export function newProduct(): Product {
@@ -75,7 +76,18 @@ export function ProductEditor({
   const [saved, setSaved] = useState(() =>
     JSON.stringify(normalizeProduct(product)),
   );
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() =>
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("step") === "shipping"
+      ? 3
+      : 0,
+  );
+  const [calculated, setCalculated] = useState(false);
+  useEffect(() => {
+    api<{ shippingMode: string }>("/settings")
+      .then((v) => setCalculated(v.shippingMode === "calculated"))
+      .catch(() => {});
+  }, []);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -91,7 +103,7 @@ export function ProductEditor({
   const dirty = JSON.stringify(p) !== saved;
   const locked = !!busy || uploading;
   const existing = products.find((x) => x.id === p.id);
-  const issues = productIssues(p, true);
+  const issues = productIssues(p, true, calculated);
   useEffect(() => {
     onStateChange({ dirty, busy: locked });
   }, [dirty, locked, onStateChange]);
@@ -121,7 +133,7 @@ export function ProductEditor({
   async function save(publish: boolean) {
     if (locked) return;
     feedbackTrigger.current = document.activeElement as HTMLElement;
-    const invalid = productIssues(p, publish);
+    const invalid = productIssues(p, publish, calculated);
     if (invalid.length) {
       setStep(invalid[0].step);
       setError(invalid[0].text);
@@ -230,7 +242,7 @@ export function ProductEditor({
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          if (step < 4) go(step + 1);
+          if (step < productSteps.length - 1) go(step + 1);
           else void save(false);
         }}
       >
@@ -250,9 +262,17 @@ export function ProductEditor({
           {step === 2 && (
             <ProductPackages p={p} field={field} owner={canPrice} />
           )}
-          {step === 3 && <ProductDetails p={p} field={field} />}
-          {step === 4 && (
+          {step === 3 && <ProductMeasurements p={p} field={field} />}
+          {step === 4 && <ProductDetails p={p} field={field} />}
+          {step === 5 && (
             <div className="stack">
+              <MeasurementReview packages={p.packages} onFix={() => go(3)} />
+              {!calculated && (
+                <p className="notice">
+                  تعرفه قبلی فعال است. اندازه‌های ناقص پیش از فعال‌سازی ارسال
+                  محاسبه‌شده باید تکمیل شوند.
+                </p>
+              )}
               <div className="product-review-summary">
                 {p.images[0] && (
                   <Image
@@ -407,7 +427,7 @@ export function ProductEditor({
               {busy === "draft" ? "در حال ذخیره…" : "ذخیره پیش‌نویس"}
             </button>
           </div>
-          {step < 4 ? (
+          {step < productSteps.length - 1 ? (
             <button
               className="button"
               type="button"

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"bomish/internal/carrier"
 	"bomish/internal/db"
 	"bomish/internal/storage"
 	"github.com/jackc/pgx/v5"
@@ -20,11 +21,12 @@ import (
 )
 
 type App struct {
-	Pool    *pgxpool.Pool
-	Queries *db.Queries
-	Dev     bool
-	Origin  string
-	Uploads storage.Store
+	ShippingProvider carrier.Courier
+	Pool             *pgxpool.Pool
+	Queries          *db.Queries
+	Dev              bool
+	Origin           string
+	Uploads          storage.Store
 }
 type session struct {
 	Hash, CSRF, UserID, StaffID, Role string
@@ -119,6 +121,7 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("PUT /api/v1/staff/shipping", a.permit(a.saveShipping, "shipping"))
 	m.HandleFunc("POST /api/v1/staff/uploads", a.permitAny(a.upload, "products", "articles"))
 	m.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(os.Getenv("UPLOAD_DIR")))))
+	a.shippingRoutes(m)
 	a.requestRoutes(m)
 	m.HandleFunc("GET /api/v1/home/slides", a.homeSlides)
 	m.HandleFunc("GET /api/v1/staff/home/slides", a.permit(a.homeSlides, "products"))
@@ -138,6 +141,10 @@ func (a *App) middleware(next http.Handler) http.Handler {
 				fail(w, 500, "خطایی رخ داد؛ دوباره تلاش کنید")
 			}
 		}()
+		if r.URL.Path == "/api/v1/webhooks/snapp" {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if !strings.HasPrefix(r.URL.Path, "/api/v1/") {
 			next.ServeHTTP(w, r)
 			return

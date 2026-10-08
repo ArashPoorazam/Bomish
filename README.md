@@ -123,3 +123,5 @@ Fill private service keys and support details in the root `.env`; see [integrati
 ## Deployment and operations
 
 See [architecture and behavior](docs/architecture.md), [launch requirements](docs/launch.md), and [asset provenance](docs/assets.md). No public deployment has been made.
+
+Shipping measurements and calculated delivery workflows are now available behind the store's default `legacy` mode. Staff can prepare package measurements, origin/locality mappings and verified boxes, then exercise calculated checkout and fulfillment using the durable development simulator (`SHIPPING_SIMULATED=true`). Live carrier activation remains blocked pending verified merchant contracts and operational setup; see [shipping integration and recovery](docs/integrations.md#shipping-provider-integration-and-simulation) and [activation prerequisites](docs/launch.md#shipping-activation-gate).

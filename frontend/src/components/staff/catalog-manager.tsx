@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Plus, RotateCcw, ArrowRight } from "lucide-react";
 import type { Product, Category } from "@/lib/types";
 import { fa, priceRange, statuses, inStock } from "@/lib/format";
@@ -26,6 +26,20 @@ export function CatalogManager({
   reload: () => Promise<void>;
   onEditorStateChange: (state: { dirty: boolean; busy: boolean }) => void;
 }) {
+  const openedShipping = useRef(false);
+  useEffect(() => {
+    if (
+      !openedShipping.current &&
+      new URLSearchParams(window.location.search).get("step") === "shipping"
+    ) {
+      const p = products.find((p) => p.id === initialQuery);
+      if (p) {
+        openedShipping.current = true;
+        setSelected(p);
+      }
+    }
+  }, [products, initialQuery]);
+  const [shippingIncomplete, setShippingIncomplete] = useState("");
   const [q, setQ] = useState(initialQuery),
     [category, setCategory] = useState(""),
     [status, setStatus] = useState(""),
@@ -33,11 +47,18 @@ export function CatalogManager({
     [selected, setSelected] = useState<Product | null>(null);
   useEffect(() => {
     const timer = setTimeout(
-      () => onFilters?.({ q, category, status, available: stock }),
+      () =>
+        onFilters?.({
+          q,
+          category,
+          status,
+          available: stock,
+          shippingIncomplete,
+        }),
       250,
     );
     return () => clearTimeout(timer);
-  }, [q, category, status, stock, onFilters]);
+  }, [q, category, status, stock, shippingIncomplete, onFilters]);
   useEffect(() => {
     setSelected((current) =>
       current ? products.find((p) => p.id === current.id) || current : null,
@@ -101,6 +122,16 @@ export function CatalogManager({
               </button>
             </div>
             <div className="catalog-filters">
+              <label>
+                اطلاعات ارسال
+                <select
+                  value={shippingIncomplete}
+                  onChange={(e) => setShippingIncomplete(e.target.value)}
+                >
+                  <option value="">همه محصولات</option>
+                  <option value="true">اطلاعات ارسال ناقص</option>
+                </select>
+              </label>
               <label>
                 جستجوی محصول
                 <input
@@ -194,6 +225,14 @@ export function CatalogManager({
                     <tr key={p.id}>
                       <td>
                         <strong>{p.name}</strong>
+                        {!p.publishedShippingReady && (
+                          <Link
+                            className="badge"
+                            href={`/staff?section=products&q=${encodeURIComponent(p.id)}&step=shipping`}
+                          >
+                            اطلاعات ارسال ناقص
+                          </Link>
+                        )}
                         <small className="muted">
                           {categories.find((c) => c.id === p.categoryId)?.name}
                         </small>

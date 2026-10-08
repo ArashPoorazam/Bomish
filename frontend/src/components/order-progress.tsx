@@ -37,7 +37,7 @@ export function OrderProgress({
           );
         })}
       </ol>
-      {order.tracking && (
+      {!order.shipping && order.tracking && (
         <div className="tracking-box">
           <span>کد رهگیری مرسوله</span>
           <strong dir="ltr">{order.tracking}</strong>

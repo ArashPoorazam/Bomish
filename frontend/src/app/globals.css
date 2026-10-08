@@ -2120,7 +2120,7 @@ details[open] > summary {
 }
 .product-steps {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   margin: 28px 0;
   padding: 8px;
@@ -5060,5 +5060,98 @@ details[open] > summary {
   }
   .order-timeline small {
     font-size: 0.6rem;
+  }
+}
+
+.shipping-settings > fieldset > section,
+.shipping-fulfillment {
+  border-top: 1px solid #dbe2d4;
+  padding-top: 1.25rem;
+}
+.shipping-settings details > summary {
+  cursor: pointer;
+  padding: 0.75rem 0;
+  font-weight: 700;
+}
+.shipping-box-diagram {
+  display: grid;
+  grid-template-columns: auto 100px auto;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: #235943;
+}
+.shipping-box-diagram strong {
+  font-size: 6rem;
+  line-height: 1;
+}
+.shipping-box-diagram small {
+  grid-column: 2;
+}
+.packing-layout {
+  width: 100%;
+  max-width: 320px;
+  max-height: 220px;
+  border: 2px solid #235943;
+  background: #fffdf5;
+}
+.shipping-fulfillment figure {
+  margin: 0;
+}
+.shipping-fulfillment ol {
+  padding-inline-start: 1.5rem;
+}
+.shipping-fulfillment .form-grid,
+.shipping-settings .form-grid {
+  min-width: 0;
+}
+.shipping-dialog {
+  max-width: min(600px, 92vw);
+  max-height: 85vh;
+  overflow: auto;
+  border: 1px solid #c9d7c5;
+  border-radius: 20px;
+  padding: 24px;
+  background: #fffdf5;
+  color: #243c2d;
+}
+.shipping-dialog::backdrop {
+  background: #13251ba8;
+}
+.delivery-selection {
+  padding: 1rem;
+  border: 1px solid #c9d7c5;
+  border-radius: 16px;
+  background: #f4f7ed;
+}
+@media (max-width: 640px) {
+  .shipping-settings .form-grid,
+  .shipping-fulfillment .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .shipping-settings .product-package {
+    min-width: 0;
+  }
+  .shipping-fulfillment .inline-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+@media print {
+  .no-print,
+  .staff-order-back,
+  .shipping-fulfillment button,
+  .shipping-fulfillment input,
+  .shipping-fulfillment select {
+    display: none !important;
+  }
+  .shipping-fulfillment .product-package {
+    break-inside: avoid;
+  }
+}
+
+@media (max-width: 640px) {
+  .product-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

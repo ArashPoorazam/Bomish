@@ -33,3 +33,16 @@ SELECT status, count(*) FROM payment_attempts GROUP BY status;
 ```
 
 Before traffic grows, add request metrics, provider delivery/error metrics and periodic cleanup of expired sessions, rate-limit rows and unused uploads. For large catalogs, add paginated listing APIs and improve Persian relevance with a real merchant search corpus.
+
+## Shipping activation gate
+
+Calculated shipping is available for development simulation. Live activation remains blocked in code, including when server credentials are present. Before enabling a live adapter:
+
+- Verify the real Tehran pickup contact, full postal address and pin; confirm the permitted service polygon, city and account service category.
+- Measure and physically trial all active product packages and boxes, including internal/external sizes, protection, filler, stacking suitability and gross load ceilings. Publish the completed measurements; use the catalog's incomplete-shipping filter.
+- Verify Snapp credentials, current booking/lookup/cancel wire contract, wallet behavior, monetary unit, rate limits, cancellation fees, driver state semantics and callback authentication. Implement/install the verified `SnappContract`; fixture verification is not live certification.
+- Verify Tapin merchant shop quotation authentication, service IDs, locality and exterior-box mappings, parcel limits, request/response currency and inclusive tariff total against actual dispatch.
+- Configure HTTPS callback delivery and a monitored worker. Unauthenticated callbacks remain lookup hints; they must never mutate an order from their payload alone. Test provider timeouts after booking, restarts, missed callbacks and cancellation ambiguity in an authorized provider test account.
+- Verify existing production payment/SMS requirements independently. Nothing in shipping bypasses the current production startup restriction.
+
+Activation and rollback require an explicit version-checked save in the shipping settings. Rolling back to legacy invalidates unconsumed calculated quotes by configuration version; existing paid and pending orders retain their agreed method, parcel snapshots and invoice. A provider outage never triggers a silent return to fixed bands. Keep old additive shipping records during rollback so active courier attempts can still be reconciled.

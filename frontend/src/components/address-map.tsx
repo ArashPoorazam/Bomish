@@ -6,7 +6,9 @@ import { api } from "@/lib/api";
 export function AddressMap({
   address,
   onChange,
+  reverse = true,
 }: {
+  reverse?: boolean;
   address: Address;
   onChange: (value: Address) => void;
 }) {
@@ -80,6 +82,19 @@ export function AddressMap({
     sequence.current++;
     const seq = sequence.current;
     if (!point) return;
+    const before = latest.current;
+    const textBefore = JSON.stringify([
+      before.street,
+      before.city,
+      before.province,
+    ]);
+    change.current({
+      ...before,
+      latitude: point[0],
+      longitude: point[1],
+      pinConfirmed: false,
+    });
+    if (!reverse) return;
     setBusy(true);
     setError("");
     const timer = setTimeout(() => {
@@ -87,11 +102,31 @@ export function AddressMap({
         Pick<Address, "street" | "city" | "province" | "latitude" | "longitude">
       >(`/addresses/reverse?lat=${point[0]}&lng=${point[1]}`)
         .then((v) => {
-          if (seq === sequence.current)
-            change.current({ ...latest.current, ...v, id: "" });
+          if (
+            seq === sequence.current &&
+            latest.current.latitude === point[0] &&
+            latest.current.longitude === point[1] &&
+            textBefore ===
+              JSON.stringify([
+                latest.current.street,
+                latest.current.city,
+                latest.current.province,
+              ])
+          )
+            change.current({
+              ...latest.current,
+              street: v.street,
+              latitude: point[0],
+              longitude: point[1],
+              pinConfirmed: false,
+            });
         })
         .catch((e) => {
-          if (seq === sequence.current) {
+          if (
+            seq === sequence.current &&
+            latest.current.latitude === point[0] &&
+            latest.current.longitude === point[1]
+          ) {
             setError(e.message);
             change.current({
               ...latest.current,
@@ -108,12 +143,32 @@ export function AddressMap({
       clearTimeout(timer);
       sequence.current++;
     };
-  }, [point]);
+  }, [point, reverse]);
   useEffect(() => {
-    if (address.latitude !== undefined && address.longitude !== undefined)
-      map.current?.panTo([address.latitude, address.longitude]);
-    if (address.latitude !== undefined && address.longitude !== undefined)
-      marker.current?.setLatLng([address.latitude, address.longitude]);
+    let active = true;
+    if (address.latitude === undefined || address.longitude === undefined) {
+      marker.current?.remove();
+      marker.current = null;
+      return;
+    }
+    const lat = address.latitude,
+      lng = address.longitude;
+    import("leaflet").then((L) => {
+      if (!active || !map.current) return;
+      map.current.panTo([lat, lng]);
+      if (marker.current) marker.current.setLatLng([lat, lng]);
+      else
+        marker.current = L.circleMarker([lat, lng], {
+          radius: 10,
+          color: "#fff",
+          weight: 3,
+          fillColor: "#235943",
+          fillOpacity: 1,
+        }).addTo(map.current);
+    });
+    return () => {
+      active = false;
+    };
   }, [address.latitude, address.longitude]);
   return (
     <section className="address-map">

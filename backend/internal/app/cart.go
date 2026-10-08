@@ -119,7 +119,7 @@ func (a *App) addresses(w http.ResponseWriter, r *http.Request) {
 	if !requireCustomer(w, r) {
 		return
 	}
-	rows, e := a.Pool.Query(r.Context(), "SELECT id,recipient,phone,province,city,street,postal_code,latitude,longitude FROM addresses WHERE user_id=$1", current(r).UserID)
+	rows, e := a.Pool.Query(r.Context(), "SELECT id,recipient,phone,province,city,street,postal_code,latitude,longitude,province_id,city_id,pin_confirmed FROM addresses WHERE user_id=$1", current(r).UserID)
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -128,7 +128,7 @@ func (a *App) addresses(w http.ResponseWriter, r *http.Request) {
 	out := []domain.Address{}
 	for rows.Next() {
 		var v domain.Address
-		if e = rows.Scan(&v.ID, &v.Recipient, &v.Phone, &v.Province, &v.City, &v.Street, &v.PostalCode, &v.Latitude, &v.Longitude); e != nil {
+		if e = rows.Scan(&v.ID, &v.Recipient, &v.Phone, &v.Province, &v.City, &v.Street, &v.PostalCode, &v.Latitude, &v.Longitude, &v.ProvinceID, &v.CityID, &v.PinConfirmed); e != nil {
 			a.dbError(w, e)
 			return
 		}
@@ -151,7 +151,7 @@ func (a *App) saveAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.ID = token()
-	_, e := a.Pool.Exec(r.Context(), "INSERT INTO addresses(id,user_id,recipient,phone,province,city,street,postal_code,latitude,longitude) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)", in.ID, current(r).UserID, in.Recipient, in.Phone, in.Province, in.City, in.Street, in.PostalCode, in.Latitude, in.Longitude)
+	_, e := a.Pool.Exec(r.Context(), "INSERT INTO addresses(id,user_id,recipient,phone,province,city,street,postal_code,latitude,longitude,province_id,city_id,pin_confirmed) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)", in.ID, current(r).UserID, in.Recipient, in.Phone, in.Province, in.City, in.Street, in.PostalCode, in.Latitude, in.Longitude, in.ProvinceID, in.CityID, in.PinConfirmed)
 	if e != nil {
 		a.dbError(w, e)
 		return

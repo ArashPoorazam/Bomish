@@ -1228,8 +1228,11 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        province: string;
+                        province?: string;
                         discountCode?: string;
+                        address?: components["schemas"]["Address"];
+                        method?: string;
+                        acceptFallback?: boolean;
                     };
                 };
             };
@@ -1314,6 +1317,8 @@ export interface paths {
                         expectedTotalRials: number;
                         idempotencyKey: string;
                         discountCode?: string;
+                        method?: string;
+                        shippingQuoteId?: string;
                     };
                 };
             };
@@ -6094,6 +6099,934 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/shipping/localities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Locality"][];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/shipping/providers/{provider}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    provider: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProviderHealth"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/shipping/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        items: {
+                            productId: string;
+                            packageId: string;
+                            /** Format: int64 */
+                            quantity: number;
+                        }[];
+                        address: components["schemas"]["Address"];
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ShippingSnapshot"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"] | null;
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/parcels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                        parcels: components["schemas"]["Parcel"][];
+                        reason: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/dispatch-quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                        method: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/shipments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                        dispatchQuoteId: string;
+                        idempotencyKey: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/shipments/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/shipments/{shipmentId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    shipmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                        confirmed: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/shipments/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                        reason: string;
+                        confirmedNoBooking: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/delivery-method": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                        method: string;
+                        reason: string;
+                        customerConsent: boolean;
+                        dispatchQuoteId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/parcels/{parcelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    parcelId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                        tracking: string;
+                        actualCostRials: number | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/staff/orders/{id}/shipments/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                        status: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/snapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        reference: string;
+                        eventId: string;
+                        occurredAt: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            accepted: boolean;
+                        };
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6141,6 +7074,7 @@ export interface components {
              * @description First recorded publication; omitted when historical date is unknown.
              */
             readonly firstPublishedAt?: string;
+            publishedShippingReady?: boolean;
         };
         Category: {
             id: string;
@@ -6168,6 +7102,9 @@ export interface components {
             postalCode: string;
             latitude?: number;
             longitude?: number;
+            provinceId?: string;
+            cityId?: string;
+            pinConfirmed?: boolean;
         };
         CartItem: {
             product: components["schemas"]["Product"];
@@ -6217,6 +7154,7 @@ export interface components {
             discountCode: string;
             /** Format: int64 */
             discountRials: number;
+            shipping?: components["schemas"]["Delivery"];
         };
         Session: {
             csrf: string;
@@ -6239,6 +7177,15 @@ export interface components {
             discountCode: string;
             /** Format: int64 */
             discountRials: number;
+            shippingQuoteId?: string;
+            expiresAt?: string;
+            method?: string;
+            service?: string;
+            fallbackReason?: string;
+            /** Format: int64 */
+            parcelCount?: number;
+            simulated?: boolean;
+            requiresAcceptance?: boolean;
         };
         ShippingRule: {
             id: string;
@@ -6255,6 +7202,27 @@ export interface components {
             /** Format: int64 */
             freeShippingRials: number;
             supportUrl: string;
+            /** Format: int64 */
+            version: number;
+            /** @enum {string} */
+            mode: "legacy" | "calculated";
+            /** Format: int64 */
+            originRevision: number;
+            origin: components["schemas"]["Address"];
+            boxes: components["schemas"]["ShippingBox"][];
+            localities: components["schemas"]["Locality"][];
+            snapp: components["schemas"]["ProviderConfig"];
+            tapin: components["schemas"]["ProviderConfig"];
+            blockers?: string[];
+            missingMeasurements?: {
+                productId: string;
+                packageId: string;
+                name: string;
+                fields: string[];
+            }[];
+            providers?: {
+                [key: string]: components["schemas"]["ProviderHealth"];
+            };
         };
         Member: {
             id: string;
@@ -6273,6 +7241,7 @@ export interface components {
         };
         Error: {
             error: string;
+            code?: string;
         };
         OK: {
             ok: boolean;
@@ -6288,6 +7257,13 @@ export interface components {
             maxQuantity: number;
             /** Format: int64 */
             shippingGrams: number;
+            /** Format: int64 */
+            lengthMm?: number;
+            /** Format: int64 */
+            widthMm?: number;
+            /** Format: int64 */
+            heightMm?: number;
+            shippingVerified?: boolean;
         };
         Section: {
             title: string;
@@ -6646,6 +7622,174 @@ export interface components {
         HomeSlide: {
             image: string;
             alt: string;
+        };
+        ShippingSize: {
+            /** Format: int64 */
+            lengthMm: number;
+            /** Format: int64 */
+            widthMm: number;
+            /** Format: int64 */
+            heightMm: number;
+        };
+        ShippingBox: {
+            id: string;
+            name: string;
+            inside: components["schemas"]["ShippingSize"];
+            outside: components["schemas"]["ShippingSize"];
+            /** Format: int64 */
+            emptyGrams: number;
+            /** Format: int64 */
+            maxGrams: number;
+            /** Format: int64 */
+            insetMm: number;
+            /** Format: int64 */
+            fillerGrams: number;
+            postalSizeId: string;
+            active: boolean;
+            verified: boolean;
+        };
+        Locality: {
+            id: string;
+            provinceId: string;
+            province: string;
+            city: string;
+            tapinProvince: string;
+            tapinCity: string;
+            verified: boolean;
+        };
+        ProviderConfig: {
+            enabled: boolean;
+            verified: boolean;
+            service: string;
+            shopId: string;
+            currency: string;
+            cityId: string;
+            area: number[][];
+            /** Format: int64 */
+            maxGrams: number;
+            /** Format: int64 */
+            maxVolumeCm3: number;
+            /** Format: int64 */
+            maxParcels: number;
+            maxSize: components["schemas"]["ShippingSize"];
+        };
+        ProviderHealth: {
+            state: string;
+            configured: boolean;
+            simulated: boolean;
+            lastSuccess: string;
+            error: string;
+        };
+        PackingItem: {
+            productId: string;
+            packageId: string;
+            label: string;
+            /** Format: int64 */
+            unit: number;
+            size: components["schemas"]["ShippingSize"];
+            /** Format: int64 */
+            grams: number;
+            /** Format: int64 */
+            priceRials: number;
+        };
+        Placement: {
+            item: components["schemas"]["PackingItem"];
+            /** Format: int64 */
+            x: number;
+            /** Format: int64 */
+            y: number;
+            /** Format: int64 */
+            z: number;
+            rotated: boolean;
+        };
+        Parcel: {
+            id: string;
+            box: components["schemas"]["ShippingBox"];
+            placements: components["schemas"]["Placement"][];
+            /** Format: int64 */
+            grossGrams: number;
+            /** Format: int64 */
+            measuredGrams: number;
+            confirmed: boolean;
+            manual: boolean;
+            tracking: string;
+            actualCostRials: number | null;
+        };
+        CarrierQuote: {
+            /** Format: int64 */
+            costRials: number;
+            expiresAt: string;
+            components: {
+                [key: string]: number;
+            };
+            simulated: boolean;
+        };
+        ShippingSnapshot: {
+            config: components["schemas"]["CalculatedShippingConfig"];
+            destination: components["schemas"]["Address"];
+            algorithm: string;
+            method: string;
+            service: string;
+            parcels: components["schemas"]["Parcel"][];
+            carrierQuote: components["schemas"]["CarrierQuote"];
+            totals: components["schemas"]["Quote"];
+            fallbackReason: string;
+            fallbackAccepted: boolean;
+        };
+        DispatchReview: {
+            id: string;
+            /** Format: int64 */
+            version: number;
+            method: string;
+            expiresAt: string;
+            quote: components["schemas"]["CarrierQuote"];
+        };
+        DeliveryEvent: {
+            status: string;
+            createdAt: string;
+        };
+        DeliveryRecord: {
+            orderId: string;
+            /** Format: int64 */
+            version: number;
+            method: string;
+            status: string;
+            ready: boolean;
+            snapshot: components["schemas"]["ShippingSnapshot"];
+            parcels: components["schemas"]["Parcel"][];
+            actualCostRials: number | null;
+            review: components["schemas"]["DispatchReview"] | null;
+            allowedActions: string[];
+            events: components["schemas"]["DeliveryEvent"][];
+            attemptId: string;
+            updatedAt: string;
+            driverName?: string;
+            driverPhone?: string;
+        };
+        Delivery: {
+            method: string;
+            service: string;
+            status: string;
+            simulated: boolean;
+            parcels: {
+                id: string;
+                tracking: string;
+                trackingUrl: string;
+            }[];
+            events: components["schemas"]["DeliveryEvent"][];
+        };
+        CalculatedShippingConfig: {
+            /** Format: int64 */
+            version: number;
+            /** @enum {string} */
+            mode: "legacy" | "calculated";
+            /** Format: int64 */
+            originRevision: number;
+            origin: components["schemas"]["Address"];
+            boxes: components["schemas"]["ShippingBox"][];
+            localities: components["schemas"]["Locality"][];
+            snapp: components["schemas"]["ProviderConfig"];
+            tapin: components["schemas"]["ProviderConfig"];
         };
     };
     responses: never;
