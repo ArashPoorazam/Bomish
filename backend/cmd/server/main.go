@@ -82,17 +82,17 @@ func main() {
 		os.Setenv("UPLOAD_DIR", root)
 	}
 	a := &app.App{Pool: pool, Queries: db.New(pool), Dev: dev, Origin: origin, Uploads: storage.Local{Root: root}}
-	if os.Getenv("SEED_DEMO") == "true" {
-		if e = a.Seed(ctx); e != nil {
-			panic(e)
-		}
-	}
 	if len(os.Args) > 1 && os.Args[1] == "refresh-demo-catalog" {
 		if e = a.RefreshDemoCatalog(ctx); e != nil {
 			panic(e)
 		}
-		fmt.Println("Demo catalog refreshed: six package-based products; old fixtures archived.")
+		fmt.Println("Development data refreshed: 30 products and five new staff accounts; historical records archived.")
 		return
+	}
+	if os.Getenv("SEED_DEMO") == "true" {
+		if e = a.Seed(ctx); e != nil {
+			panic(e)
+		}
 	}
 	if len(os.Args) > 1 && os.Args[1] == "totp" {
 		if !dev {

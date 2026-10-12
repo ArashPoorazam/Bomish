@@ -44,21 +44,23 @@ npm ci
 npm run dev
 ```
 
-Use **http://localhost:3000**, matching `APP_ORIGIN` exactly. The Go server applies versioned SQL migrations under an advisory lock. `SEED_DEMO=true` seeds only an empty catalog, only in development. Development pictures and prices are not actual merchant inventory.
+Use **http://localhost:3000**, matching `APP_ORIGIN` exactly. The Go server applies versioned SQL migrations under an advisory lock. `SEED_DEMO=true` seeds only when both products and staff are empty, only in development. Development pictures and prices are not actual merchant inventory.
 
 ## Employee access
 
-Development fixtures create these three separate accounts:
+Development fixtures create five separate test accounts:
 
 | Username | Permission |
 |---|---|
 | `owner` | All staff tools and the independent Omnisire owner workspace |
+| `manager` | All staff tools |
+| `salesperson` | Personal sales and referral tracking |
 | `editor` | Products, availability, publishing, magazine, categories, pricing and personal sales |
 | `operator` | Order preparation, tracking and personal sales |
 
 Owners can also create managers (all staff tools) and salespersons (personal sales only) in Omnisire, with individual section restrictions or account suspension. Members receive referral links, a permanent commission/payment ledger and audited activity.
 
-All three use the development password `Bomish-demo-2026!` and authenticator setup key `JBSWY3DPEHPK3PXP`. Add that key to a TOTP authenticator, or print the current local development code with the same environment as the API:
+All five use the development password `Bomish-demo-2026!` and authenticator setup key `JBSWY3DPEHPK3PXP`. Add that key to a TOTP authenticator, or print the current local development code with the same environment as the API:
 
 ```sh
 cd backend
@@ -68,6 +70,21 @@ go run ./cmd/server totp
 A TOTP cannot be reused for the same account. Customer login instead displays a newly generated development SMS code in the login form. Codes expire after five minutes and are single-use. With the default `SMS_ENABLED=false`, no text messages or money are sent.
 
 **Never use fixture credentials, the fixture authenticator secret, or seeded inventory for live sales.**
+
+## Replace development fixtures
+
+The development catalog contains 30 Persian pantry products across six categories, with 110 explicitly priced packages (three or four per product). Prices are illustrative and images reuse the existing development illustration. Shipping weights are estimates and are not marked as verified merchant measurements.
+
+To replace an existing development catalog and staff roster, back up the database first, then run with the same `DATABASE_URL` and `APP_ENV=development` as the API:
+
+```sh
+cd backend
+go run ./cmd/server refresh-demo-catalog
+```
+
+This explicit command archives all previous products and staff, invalidates staff sessions, clears stale carts, drafts, referral cookies and product promotions, and installs the new catalog, homepage suggestions and five fresh accounts. Usernames are `owner`, `manager`, `editor`, `operator` and `salesperson`, with the fixture password and authenticator key above. Existing orders, customer data, commission ledgers and audit history remain attached to their original records. Archived accounts cannot log in. Normal startup never resets existing data.
+
+The old five-product fixture is retained only in backend test files for historical checkout and migration regression tests.
 
 ## Included
 

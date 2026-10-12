@@ -93,6 +93,11 @@ func (c *client) staff(t *testing.T, role string) {
 }
 func setup(t *testing.T) *App {
 	t.Helper()
+	return setupCatalog(t, true)
+}
+
+func setupCatalog(t *testing.T, legacy bool) *App {
+	t.Helper()
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
 		t.Skip("set TEST_DATABASE_URL for isolated PostgreSQL integration tests")
@@ -129,7 +134,13 @@ func setup(t *testing.T) *App {
 		}
 	}
 	a := &App{Pool: pool, Queries: db.New(pool), Dev: true, Origin: "http://bomish.test", Uploads: storage.Local{Root: t.TempDir()}}
-	if e = a.Seed(ctx); e != nil {
+	if !legacy {
+		if e = a.Seed(ctx); e != nil {
+			t.Fatal(e)
+		}
+		return a
+	}
+	if e = a.seedLegacyTestData(ctx); e != nil {
 		t.Fatal(e)
 	}
 	// A 500g package preserves the existing checkout scenarios.
