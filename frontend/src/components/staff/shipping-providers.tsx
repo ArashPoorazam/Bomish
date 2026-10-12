@@ -1,6 +1,6 @@
 import type { Locality, ProviderConfig, ProviderHealth } from "@/lib/types";
 import { SizeFields } from "./shipping-boxes";
-import { MeasurementNumber } from "./product-measurements";
+import { MeasurementNumber } from "./measurement-number";
 import { providerName } from "@/lib/shipping";
 export function ProviderCard({
   name,

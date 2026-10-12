@@ -136,6 +136,9 @@ type shippingRule struct {
 	FeeRials int64  `json:"feeRials"`
 }
 type shippingConfig struct {
+	Readiness  []readinessIssue  `json:"readiness"`
+	BoxCatalog []boxCatalogEntry `json:"boxCatalog"`
+	Simulated  bool              `json:"simulated"`
 	calculatedConfig
 	Blockers            []string                  `json:"blockers,omitempty"`
 	MissingMeasurements []map[string]any          `json:"missingMeasurements,omitempty"`
@@ -177,7 +180,12 @@ func (a *App) shippingSettings(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	v.Blockers, e = a.activationBlockers(r.Context(), a.Pool, v.calculatedConfig)
+	v.Readiness, e = a.shippingReadiness(r.Context(), a.Pool, v.calculatedConfig)
+	v.BoxCatalog = shippingBoxCatalog()
+	v.Simulated = a.simulatedShipping()
+	for _, issue := range v.Readiness {
+		v.Blockers = append(v.Blockers, issue.Message)
+	}
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -198,6 +206,12 @@ func (a *App) saveShipping(w http.ResponseWriter, r *http.Request) {
 	var v shippingConfig
 	if !decode(w, r, &v) {
 		return
+	}
+	for _, box := range v.Boxes {
+		if box.Simulated && box.Active && !a.simulatedShipping() {
+			fail(w, 400, "کارتن آزمایشی فقط در شبیه‌سازی قابل استفاده است")
+			return
+		}
 	}
 	if e := validateConfig(v.calculatedConfig); e != nil {
 		fail(w, 400, e.Error())

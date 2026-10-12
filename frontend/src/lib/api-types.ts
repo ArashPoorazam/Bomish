@@ -1233,6 +1233,8 @@ export interface paths {
                         address?: components["schemas"]["Address"];
                         method?: string;
                         acceptFallback?: boolean;
+                        /** @description Exact displayed postal quote accepted by the customer; does not refresh its price or expiry. */
+                        acceptedQuoteId?: string;
                     };
                 };
             };
@@ -1720,7 +1722,10 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["Product"];
+                    "application/json": components["schemas"]["Product"] & {
+                        /** @description Package IDs explicitly reviewed in the merged package editor. Complete measurements are verified by the server. */
+                        confirmMeasurements?: string[];
+                    };
                 };
             };
             responses: {
@@ -7223,6 +7228,9 @@ export interface components {
             providers?: {
                 [key: string]: components["schemas"]["ProviderHealth"];
             };
+            readiness?: components["schemas"]["ShippingReadinessIssue"][];
+            boxCatalog?: components["schemas"]["BoxCatalogEntry"][];
+            simulated?: boolean;
         };
         Member: {
             id: string;
@@ -7647,6 +7655,8 @@ export interface components {
             postalSizeId: string;
             active: boolean;
             verified: boolean;
+            catalog?: components["schemas"]["BoxCatalogReference"];
+            simulated?: boolean;
         };
         Locality: {
             id: string;
@@ -7790,6 +7800,30 @@ export interface components {
             localities: components["schemas"]["Locality"][];
             snapp: components["schemas"]["ProviderConfig"];
             tapin: components["schemas"]["ProviderConfig"];
+        };
+        BoxCatalogReference: {
+            id: string;
+            version: string;
+            /** Format: uri */
+            sourceUrl: string;
+            nominalOutside: components["schemas"]["ShippingSize"];
+        };
+        BoxCatalogEntry: {
+            id: string;
+            version: string;
+            /** Format: uri */
+            sourceUrl: string;
+            nominalOutside: components["schemas"]["ShippingSize"];
+            name: string;
+            note: string;
+        };
+        ShippingReadinessIssue: {
+            code: string;
+            /** @enum {string} */
+            group: "merchant" | "integration";
+            /** @enum {string} */
+            section: "origin" | "boxes" | "products" | "technical";
+            message: string;
         };
     };
     responses: never;

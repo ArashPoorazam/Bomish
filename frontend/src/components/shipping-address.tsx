@@ -113,38 +113,45 @@ export function ShippingLocalities({
 export function PinConfirmation({
   address,
   onChange,
+  origin = false,
 }: {
   address: Address;
   onChange: (a: Address) => void;
+  origin?: boolean;
 }) {
   return (
     <div className="stack">
-      <div className="form-grid">
-        {(
-          [
-            ["latitude", "عرض جغرافیایی"],
-            ["longitude", "طول جغرافیایی"],
-          ] as const
-        ).map(([key, label]) => (
-          <label key={key}>
-            {label}
-            <input
-              dir="ltr"
-              type="number"
-              step="any"
-              value={address[key] ?? ""}
-              onChange={(e) =>
-                onChange({
-                  ...address,
-                  [key]:
-                    e.target.value === "" ? undefined : Number(e.target.value),
-                  pinConfirmed: false,
-                })
-              }
-            />
-          </label>
-        ))}
-      </div>
+      <details>
+        <summary>ورود دقیق مختصات نقشه</summary>
+        <div className="form-grid">
+          {(
+            [
+              ["latitude", "عرض جغرافیایی"],
+              ["longitude", "طول جغرافیایی"],
+            ] as const
+          ).map(([key, label]) => (
+            <label key={key}>
+              {label}
+              <input
+                dir="ltr"
+                type="number"
+                step="any"
+                value={address[key] ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...address,
+                    [key]:
+                      e.target.value === ""
+                        ? undefined
+                        : Number(e.target.value),
+                    pinConfirmed: false,
+                  })
+                }
+              />
+            </label>
+          ))}
+        </div>
+      </details>
       <label className="check-label">
         <input
           type="checkbox"
@@ -158,7 +165,11 @@ export function PinConfirmation({
         />
         این موقعیت دقیق نشانی است
       </label>
-      <small>بدون موقعیت تأییدشده، ارسال با پست را انتخاب کنید.</small>
+      <small>
+        {origin
+          ? "پس از انتخاب محل فروشگاه روی نقشه، موقعیت را تأیید کنید."
+          : "برای پیک، موقعیت دقیق روی نقشه لازم است."}
+      </small>
     </div>
   );
 }

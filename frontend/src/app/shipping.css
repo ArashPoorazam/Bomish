@@ -1,0 +1,288 @@
+.shipping-settings > fieldset > section,
+.shipping-fulfillment {
+  border-top: 1px solid #dbe2d4;
+  padding-top: 1.25rem;
+}
+.shipping-settings details > summary {
+  cursor: pointer;
+  padding: 0.75rem 0;
+  font-weight: 700;
+}
+.shipping-box-diagram {
+  display: grid;
+  grid-template-columns: auto 100px auto;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: #235943;
+}
+.shipping-box-diagram small {
+  grid-column: 2;
+}
+.packing-layout {
+  width: 100%;
+  max-width: 320px;
+  max-height: 220px;
+  border: 2px solid #235943;
+  background: #fffdf5;
+}
+.shipping-fulfillment figure {
+  margin: 0;
+}
+.shipping-fulfillment ol {
+  padding-inline-start: 1.5rem;
+}
+.shipping-fulfillment .form-grid,
+.shipping-settings .form-grid {
+  min-width: 0;
+}
+.shipping-dialog {
+  max-width: min(600px, 92vw);
+  max-height: 85vh;
+  overflow: auto;
+  border: 1px solid #c9d7c5;
+  border-radius: 20px;
+  padding: 24px;
+  background: #fffdf5;
+  color: #243c2d;
+}
+.shipping-dialog::backdrop {
+  background: #13251ba8;
+}
+.delivery-selection {
+  padding: 1rem;
+  border: 1px solid #c9d7c5;
+  border-radius: 16px;
+  background: #f4f7ed;
+}
+@media (max-width: 640px) {
+  .shipping-settings .form-grid,
+  .shipping-fulfillment .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .shipping-settings .product-package {
+    min-width: 0;
+  }
+  .shipping-fulfillment .inline-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+@media print {
+  .no-print,
+  .staff-order-back,
+  .shipping-fulfillment button,
+  .shipping-fulfillment input,
+  .shipping-fulfillment select {
+    display: none !important;
+  }
+  .shipping-fulfillment .product-package {
+    break-inside: avoid;
+  }
+}
+
+@media (max-width: 640px) {
+  .product-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Store shipping setup: everyday operations first, technical details on demand. */
+.shipping-settings {
+  --shipping-line: #dbe2d4;
+  gap: 24px;
+}
+.shipping-section,
+.shipping-readiness {
+  border: 1px solid var(--shipping-line, #dbe2d4);
+  border-radius: 20px;
+  padding: 24px;
+  min-width: 0;
+}
+.shipping-settings > fieldset > .shipping-section {
+  padding-top: 24px;
+}
+.shipping-readiness {
+  background: #eef4e9;
+}
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.section-heading h3,
+.section-heading p,
+.box-stock-card h4 {
+  margin: 0;
+}
+.section-heading > div {
+  flex: 1;
+  min-width: 160px;
+}
+.section-number {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #edf3e8;
+  color: #235943;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.readiness-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.readiness-columns h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.readiness-columns ul {
+  padding-inline-start: 20px;
+}
+.readiness-columns a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.box-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.box-catalog-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #dbe2d4;
+  border-radius: 14px;
+  background: #fffdf8;
+  min-width: 0;
+}
+.box-catalog-card strong {
+  font-size: 0.9rem;
+}
+.box-catalog-card bdi {
+  font-size: 0.85rem;
+  align-self: flex-start;
+}
+.box-catalog-card button {
+  margin-top: auto;
+}
+.box-stock-card {
+  border: 1px solid #dbe2d4;
+  padding: 18px;
+  border-radius: 14px;
+  min-width: 0;
+}
+.package-measurements {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #dbe2d4;
+}
+.package-measurements h4,
+.package-measurements p {
+  margin: 0;
+}
+.package-help {
+  border-radius: 12px;
+  background: #f5f7f0;
+  padding: 0 14px;
+  margin-top: 12px;
+}
+.package-help > div {
+  padding: 12px 0 18px;
+}
+.package-help summary,
+.shipping-section summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 12px;
+}
+.shipping-settings .technical-settings {
+  background: #f7f8f3;
+}
+.shipping-save-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid #dbe2d4;
+}
+.shipping-save-bar > span {
+  color: #4e6255;
+  font-size: 0.85rem;
+}
+.shipping-settings :is(button, input:not([type="checkbox"]), select),
+.product-package :is(button, input:not([type="checkbox"]), select) {
+  min-height: 44px;
+}
+.shipping-settings .check-label,
+.product-package .check-label {
+  min-height: 44px;
+}
+.shipping-settings :is(a, button, input, select, summary):focus-visible,
+.product-package :is(button, input, select, summary):focus-visible {
+  outline: 3px solid #38664d;
+  outline-offset: 3px;
+}
+.shipping-settings :is(fieldset, .form-grid > *, input, select),
+.product-package :is(fieldset, .form-grid > *, input, select) {
+  min-width: 0;
+  max-width: 100%;
+}
+.shipping-settings .between {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .box-catalog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .shipping-section,
+  .shipping-readiness,
+  .shipping-settings > fieldset > .shipping-section {
+    padding: 16px;
+    border-radius: 16px;
+  }
+  .readiness-columns,
+  .box-catalog-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .shipping-save-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .product-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .shipping-box-diagram {
+    grid-template-columns: auto 80px auto;
+    gap: 8px;
+  }
+}
+.product-package .package-dimension-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.package-dimension-fields > label:last-child {
+  grid-column: 1 / -1;
+}
+@media (max-width: 640px) {
+  .product-package .package-selling-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .package-selling-fields > .package-price-field {
+    grid-column: 1 / -1;
+  }
+  .package-dimension-fields > label:not(:last-child) {
+    font-size: 0.8rem;
+  }
+}

@@ -23,18 +23,26 @@ func (s Size) Valid() bool {
 	return s.Length > 0 && s.Width > 0 && s.Height > 0 && s.Length <= 3000 && s.Width <= 3000 && s.Height <= 3000
 }
 
+type BoxCatalogReference struct {
+	ID             string `json:"id"`
+	Version        string `json:"version"`
+	SourceURL      string `json:"sourceUrl"`
+	NominalOutside Size   `json:"nominalOutside"`
+}
 type Box struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Inside       Size   `json:"inside"`
-	Outside      Size   `json:"outside"`
-	EmptyGrams   int64  `json:"emptyGrams"`
-	MaxGrams     int64  `json:"maxGrams"`
-	InsetMm      int64  `json:"insetMm"`
-	FillerGrams  int64  `json:"fillerGrams"`
-	PostalSizeID string `json:"postalSizeId"`
-	Active       bool   `json:"active"`
-	Verified     bool   `json:"verified"`
+	Catalog      *BoxCatalogReference `json:"catalog,omitempty"`
+	Simulated    bool                 `json:"simulated,omitempty"`
+	ID           string               `json:"id"`
+	Name         string               `json:"name"`
+	Inside       Size                 `json:"inside"`
+	Outside      Size                 `json:"outside"`
+	EmptyGrams   int64                `json:"emptyGrams"`
+	MaxGrams     int64                `json:"maxGrams"`
+	InsetMm      int64                `json:"insetMm"`
+	FillerGrams  int64                `json:"fillerGrams"`
+	PostalSizeID string               `json:"postalSizeId"`
+	Active       bool                 `json:"active"`
+	Verified     bool                 `json:"verified"`
 }
 
 func (b Box) Usable() Size {

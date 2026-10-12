@@ -5,7 +5,7 @@ import type { DeliveryRecord, Parcel } from "@/lib/types";
 import { fa, money, digits } from "@/lib/format";
 import { deliveryStatuses, providerName } from "@/lib/shipping";
 import { ParcelView } from "./shipping-parcel";
-import { MeasurementNumber } from "./product-measurements";
+import { MeasurementNumber } from "./measurement-number";
 export function ShippingFulfillment({
   orderId,
   customerCharge,

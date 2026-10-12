@@ -1,6 +1,8 @@
 import { Plus, Trash2, Package as PackageIcon } from "lucide-react";
 import type { Package } from "@/lib/types";
 import { digits, fa, packageLabel, money } from "@/lib/format";
+import { MeasurementNumber } from "./measurement-number";
+import { PackageMeasurements } from "./product-measurements";
 import type { ProductFields } from "./product-form";
 
 export function ProductPackages({
@@ -33,18 +35,14 @@ export function ProductPackages({
           <legend>
             بسته {fa(i + 1)} · {packageLabel(pack)}
           </legend>
-          <div className="form-grid">
-            <label>
-              مقدار
-              <input
-                type="number"
-                min="0.001"
-                max="1000000"
-                step="any"
-                value={pack.amount || ""}
-                onChange={(e) => update(i, { amount: Number(e.target.value) })}
-              />
-            </label>
+          <div className="form-grid package-selling-fields">
+            <MeasurementNumber
+              label="مقدار محتویات"
+              value={pack.amount * 1000}
+              scale={1000}
+              max={1000000000}
+              onChange={(n) => update(i, { amount: n / 1000 })}
+            />
             <label>
               واحد
               <select
@@ -60,7 +58,7 @@ export function ProductPackages({
               </select>
             </label>
             {owner && (
-              <label>
+              <label className="package-price-field">
                 قیمت بسته (تومان)
                 <div className="price-input">
                   <input
@@ -107,24 +105,12 @@ export function ProductPackages({
                 بیشترین تعداد این بسته در هر سفارش
               </small>
             </label>
-            {(pack.unit === "l" || pack.unit === "ml") && (
-              <label>
-                وزن ارسال (گرم)
-                <input
-                  type="number"
-                  min="1"
-                  max="1000000"
-                  value={pack.shippingGrams || ""}
-                  onChange={(e) =>
-                    update(i, { shippingGrams: Number(e.target.value) })
-                  }
-                />
-                <small className="muted">
-                  وزن واقعی بسته برای محاسبه هزینه ارسال
-                </small>
-              </label>
-            )}
           </div>
+          <PackageMeasurements
+            pack={pack}
+            packages={p.packages}
+            onChange={(patch) => update(i, patch)}
+          />
           <div className="package-footer">
             <button
               type="button"

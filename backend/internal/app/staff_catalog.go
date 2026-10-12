@@ -15,9 +15,24 @@ func audit(r *http.Request, tx pgx.Tx, action, id string) error {
 }
 func (a *App) staffProducts(w http.ResponseWriter, r *http.Request) { a.catalogPage(w, r, true) }
 func (a *App) saveProduct(w http.ResponseWriter, r *http.Request) {
-	var p domain.Product
-	if !decode(w, r, &p) {
+	var in struct {
+		domain.Product
+		ConfirmMeasurements []string `json:"confirmMeasurements"`
+	}
+	if !decode(w, r, &in) {
 		return
+	}
+	p := in.Product
+	for i := range p.Packages {
+		for _, id := range in.ConfirmMeasurements {
+			if p.Packages[i].ID == id {
+				p.Packages[i].ShippingVerified = true
+				if err := p.Packages[i].ValidateMeasurements(true); err != nil {
+					fail(w, 400, err.Error())
+					return
+				}
+			}
+		}
 	}
 	p.ID = r.PathValue("id")
 	p.Status = "draft"

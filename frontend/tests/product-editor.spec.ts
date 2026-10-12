@@ -126,7 +126,7 @@ test("legacy null lists open, step state persists, drafts save, and mobile layou
   await page
     .getByLabel("برچسب‌ها (با ویرگول جدا کنید)")
     .pressSequentially("ادویه، آشپزی");
-  await step(page, "بسته‌ها و قیمت");
+  await step(page, "بسته‌ها");
   const price = page.getByLabel("قیمت بسته (تومان)", { exact: true });
   await price.fill("۱٬۲۳۴٬۵۶۷");
   await expect(price).toHaveValue("1,234,567");
@@ -306,9 +306,8 @@ test("shipping measurements preserve variants, Persian decimals, copy and incomp
 }) => {
   const saved = await workspace(page);
   await page.getByRole("button", { name: "ویرایش", exact: true }).click();
-  await step(page, "بسته‌ها و قیمت");
+  await step(page, "بسته‌ها");
   await page.getByRole("button", { name: "افزودن بسته", exact: true }).click();
-  await step(page, "بسته‌بندی و ارسال");
   const lengths = page.getByLabel("طول (سانتی‌متر)", { exact: true }),
     widths = page.getByLabel("عرض (سانتی‌متر)", { exact: true }),
     heights = page.getByLabel("ارتفاع (سانتی‌متر)", { exact: true }),
@@ -317,6 +316,10 @@ test("shipping measurements preserve variants, Persian decimals, copy and incomp
   await widths.first().fill("۸");
   await heights.first().fill("۱۰");
   await weights.first().fill("۱۵۰");
+  await page
+    .getByText("راهنمای اندازه‌گیری و کپی اندازه‌ها", { exact: true })
+    .nth(1)
+    .click();
   await page
     .getByLabel("کپی اندازه‌ها از بسته دیگر", { exact: true })
     .nth(1)
@@ -339,4 +342,32 @@ test("shipping measurements preserve variants, Persian decimals, copy and incomp
   expect(packs[0].lengthMm).toBe(140);
   expect(packs[1].lengthMm).toBe(125);
   expect(packs[1].heightMm).toBe(0);
+});
+
+test("removing a middle package retains the other packages and their numeric drafts", async ({
+  page,
+}) => {
+  const saved = await workspace(page);
+  await page.getByRole("button", { name: "ویرایش", exact: true }).click();
+  await step(page, "بسته‌ها");
+  await page.getByRole("button", { name: "افزودن بسته", exact: true }).click();
+  await page.getByRole("button", { name: "افزودن بسته", exact: true }).click();
+  const lengths = page.getByLabel("طول (سانتی‌متر)", { exact: true });
+  await lengths.nth(0).fill("١٢٫٥");
+  await lengths.nth(1).fill("۲۰");
+  await lengths.nth(2).fill("۳۰");
+  await page
+    .getByRole("button", { name: "حذف بسته", exact: true })
+    .nth(1)
+    .click();
+  await expect(lengths).toHaveCount(2);
+  await expect(lengths.nth(0)).toHaveValue("12.5");
+  await expect(lengths.nth(1)).toHaveValue("30");
+  await page
+    .getByRole("button", { name: "ذخیره پیش‌نویس", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  const packages = saved.at(-1)!.packages as { id: string; lengthMm: number }[];
+  expect(packages.map((p) => p.lengthMm)).toEqual([125, 300]);
+  expect(packages[0].id).toBe("legacy");
 });

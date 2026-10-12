@@ -21,50 +21,64 @@ export type ProductFields = {
 };
 export const productSteps = [
   {
+    id: "basics",
     title: "اطلاعات اصلی",
     description: "نام، دسته‌بندی و معرفی محصول را وارد کنید.",
   },
   {
+    id: "images",
     title: "تصاویر",
     description: "چند تصویر انتخاب کنید و تصویر اصلی را مشخص کنید.",
   },
   {
-    title: "بسته‌ها و قیمت",
-    description: "اندازه، قیمت و سقف خرید هر بسته را تعیین کنید.",
+    id: "packages",
+    title: "بسته‌ها",
+    description: "محتویات، قیمت و اندازه‌های هر بسته را یک‌جا وارد کنید.",
   },
   {
-    title: "بسته‌بندی و ارسال",
-    description: "اندازه‌ها و وزن واقعی هر بسته آماده ارسال را وارد کنید.",
-  },
-  {
+    id: "details",
     title: "اطلاعات تکمیلی",
     description:
       "توضیحات، برچسب‌ها و اطلاعات تغذیه‌ای را کامل کنید؛ این مرحله اختیاری است.",
   },
   {
+    id: "review",
     title: "بررسی و انتشار",
     description: "اطلاعات محصول را مرور و سپس ذخیره یا منتشر کنید.",
   },
-];
+] as const;
+export type ProductStep = (typeof productSteps)[number]["id"];
 export function productIssues(
   p: Product,
   publish: boolean,
   calculated = false,
 ) {
-  const issues: { step: number; text: string }[] = [];
+  const issues: { step: ProductStep; text: string }[] = [];
   if (!p.name.trim() || !p.slug.trim() || !p.categoryId)
-    issues.push({ step: 0, text: "نام، نشانی صفحه و دسته‌بندی را کامل کنید." });
+    issues.push({
+      step: "basics",
+      text: "نام، نشانی صفحه و دسته‌بندی را کامل کنید.",
+    });
   if (/[ /?#\\]/.test(p.slug))
     issues.push({
-      step: 0,
+      step: "basics",
       text: "نشانی صفحه نباید فاصله یا /، ?، # داشته باشد.",
     });
   if (publish && !p.summary.trim())
-    issues.push({ step: 0, text: "برای انتشار، خلاصه محصول را بنویسید." });
+    issues.push({
+      step: "basics",
+      text: "برای انتشار، خلاصه محصول را بنویسید.",
+    });
   if (publish && !p.images.length)
-    issues.push({ step: 1, text: "برای انتشار، دست‌کم یک تصویر اضافه کنید." });
+    issues.push({
+      step: "images",
+      text: "برای انتشار، دست‌کم یک تصویر اضافه کنید.",
+    });
   if (publish && !p.packages.length)
-    issues.push({ step: 2, text: "برای انتشار، دست‌کم یک بسته اضافه کنید." });
+    issues.push({
+      step: "packages",
+      text: "برای انتشار، دست‌کم یک بسته اضافه کنید.",
+    });
   p.packages.forEach((pack, i) => {
     if (
       pack.amount <= 0 ||
@@ -81,7 +95,7 @@ export function productIssues(
       (publish && pack.priceRials === 0)
     )
       issues.push({
-        step: 2,
+        step: "packages",
         text: `مقدار، قیمت، وزن ارسال و سقف خرید بسته ${(i + 1).toLocaleString("fa-IR")} را بررسی کنید.`,
       });
   });
@@ -97,14 +111,20 @@ export function productIssues(
         pack.shippingGrams > 0 &&
         pack.shippingGrams < pack.amount * (pack.unit === "kg" ? 1000 : 1));
     if (enteredInvalid || (publish && calculated && incomplete.length))
-      issues.push({ step: 3, text: `بسته ${i + 1}: ${incomplete.join("، ")}` });
+      issues.push({
+        step: "packages",
+        text: `بسته ${i + 1}: ${incomplete.join("، ")}`,
+      });
   });
   if (p.sections.some((s) => !s.title.trim()))
     issues.push({
-      step: 4,
+      step: "details",
       text: "برای هر بخش توضیحات یک عنوان بنویسید یا بخش خالی را حذف کنید.",
     });
   if (p.nutrients.length && !p.nutrientSource.trim())
-    issues.push({ step: 4, text: "منبع اطلاعات تغذیه‌ای را وارد کنید." });
+    issues.push({
+      step: "details",
+      text: "منبع اطلاعات تغذیه‌ای را وارد کنید.",
+    });
   return issues;
 }

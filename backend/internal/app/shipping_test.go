@@ -43,7 +43,10 @@ func shippingFixture(t *testing.T) (*App, *client, *client, domain.Address) {
 func quoteAndCheckout(t *testing.T, c *client, addr domain.Address, method string) (string, quoteResult, map[string]any) {
 	t.Helper()
 	var q quoteResult
-	c.ok(t, "POST", "/checkout/quote", shippingQuoteInput{Address: addr, Method: method, AcceptFallback: true}, &q)
+	c.ok(t, "POST", "/checkout/quote", shippingQuoteInput{Address: addr, Method: method}, &q)
+	if q.RequiresAcceptance {
+		c.ok(t, "POST", "/checkout/quote", shippingQuoteInput{Address: addr, Method: "post", AcceptFallback: true, AcceptedQuoteID: q.ShippingQuoteID}, &q)
+	}
 	body := map[string]any{"address": addr, "shippingQuoteId": q.ShippingQuoteID, "method": q.Method, "expectedTotalRials": q.TotalRials, "idempotencyKey": token()}
 	var result map[string]string
 	c.ok(t, "POST", "/checkout", body, &result)

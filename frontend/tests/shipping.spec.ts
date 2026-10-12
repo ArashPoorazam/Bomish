@@ -11,6 +11,7 @@ test.skip(
   "Requires an isolated simulated shipping server",
 );
 const origin = process.env.BASE_URL || "http://localhost:3000";
+let shippingProduct: Product;
 const address: Address = {
   id: "",
   recipient: "گیرنده آزمایشی ارسال",
@@ -45,7 +46,7 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
   page.on("pageerror", (e) => errors.push(e.message));
   const headers = await loginStaffAPI(page.request, origin, "owner");
   const products = (await (
-    await page.request.get("/api/v1/staff/products")
+    await page.request.get("/api/v1/staff/products?pageSize=100")
   ).json()) as Product[];
   // This suite is opt-in and requires a disposable seeded database with SHIPPING_SIMULATED=true.
   for (const product of products) {
@@ -75,13 +76,16 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
       headers,
     );
   }
-  const product = products.find((p) => p.id === "turmeric")!;
-  await page.goto("/staff?section=products&q=turmeric&step=shipping");
+  const product = products.find(
+    (p) => p.packages[0]?.unit === "g" && p.packages[0]?.amount === 100,
+  )!;
+  shippingProduct = product;
+  await page.goto(`/staff?section=products&q=${product.id}&step=shipping`);
   await expect(
     page.getByRole("navigation", { name: "مراحل محصول" }).getByRole("button"),
-  ).toHaveCount(6);
+  ).toHaveCount(5);
   await expect(
-    page.getByRole("heading", { name: "بسته‌بندی و ارسال", exact: true }),
+    page.getByRole("heading", { name: "بسته‌ها", exact: true }),
   ).toBeVisible();
   await page
     .getByLabel("طول (سانتی‌متر)", { exact: true })
@@ -91,12 +95,18 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
     .getByLabel("طول (سانتی‌متر)", { exact: true })
     .first()
     .press("Tab");
-  await page
-    .getByRole("checkbox", {
-      name: "اندازه‌ها و وزن واقعی این بسته را تأیید می‌کنم",
-    })
-    .first()
-    .check();
+  for (const width of [360, 768, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBeTruthy();
+    await page.screenshot({
+      path: testInfo.outputPath(`packages-${width}.png`),
+      fullPage: true,
+    });
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
@@ -114,7 +124,7 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
   await page.getByRole("dialog").getByRole("button").last().click();
   await checked(
     page.request,
-    "/staff/products/turmeric/publish",
+    `/staff/products/${shippingProduct.id}/publish`,
     "POST",
     undefined,
     headers,
@@ -192,6 +202,19 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
   await expect(
     page.getByRole("heading", { name: "مبدأ ارسال", exact: true }),
   ).toBeVisible();
+  for (const width of [360, 768, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBeTruthy();
+    await page.screenshot({
+      path: testInfo.outputPath(`settings-${width}.png`),
+      fullPage: true,
+    });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: testInfo.outputPath("settings-mobile.png"),
     fullPage: true,
@@ -219,7 +242,7 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
   );
   await checked(
     customer.request,
-    "/cart/items/turmeric",
+    `/cart/items/${shippingProduct.id}`,
     "PUT",
     { packageId: product.packages[0].id, quantity: 2 },
     customerHeaders,
@@ -373,11 +396,11 @@ test("missing pin explicitly accepts post, postal tracking and zero cost stay di
     ch,
   );
   const product = (await (
-    await context.request.get("/api/v1/products/turmeric")
+    await context.request.get(`/api/v1/products/${shippingProduct.slug}`)
   ).json()) as Product;
   await checked(
     context.request,
-    "/cart/items/turmeric",
+    `/cart/items/${shippingProduct.id}`,
     "PUT",
     { packageId: product.packages[0].id, quantity: 2 },
     ch,
@@ -392,7 +415,7 @@ test("missing pin explicitly accepts post, postal tracking and zero cost stay di
   await cp.goto("/checkout");
   await cp.getByLabel("نشانی‌های ذخیره‌شده").selectOption({ index: 1 });
   await expect(
-    cp.getByRole("button", { name: "ارسال با پست را می‌پذیرم" }),
+    cp.getByRole("button", { name: /ارسال با پست به مبلغ/ }),
   ).toBeVisible();
   await expect(
     cp.getByRole("button", { name: "تأیید سفارش و پرداخت" }),
@@ -401,7 +424,7 @@ test("missing pin explicitly accepts post, postal tracking and zero cost stay di
     path: testInfo.outputPath("postal-fallback-mobile.png"),
     fullPage: true,
   });
-  await cp.getByRole("button", { name: "ارسال با پست را می‌پذیرم" }).click();
+  await cp.getByRole("button", { name: /ارسال با پست به مبلغ/ }).click();
   await expect(
     cp.getByRole("button", { name: "تأیید سفارش و پرداخت" }),
   ).toBeEnabled();

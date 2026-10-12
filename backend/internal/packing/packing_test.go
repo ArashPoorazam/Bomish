@@ -112,3 +112,21 @@ func TestPackingSelectionAndManualAllocation(t *testing.T) {
 		t.Fatal("duplicate allocation")
 	}
 }
+
+func TestPackingSkipsUnavailableAndIncompleteCatalogBoxes(t *testing.T) {
+	stocked := box(100, 100, 100)
+	unavailable := stocked
+	unavailable.ID = "unavailable"
+	unavailable.Active = false
+	incomplete := stocked
+	incomplete.ID = "incomplete"
+	incomplete.Verified = false
+	incomplete.Inside = Size{}
+	if _, err := Plan([]Item{item("a", 50, 50, 50, 10)}, []Box{unavailable, incomplete}); err == nil {
+		t.Fatal("unavailable or incomplete box used")
+	}
+	parcels, err := Plan([]Item{item("a", 50, 50, 50, 10)}, []Box{unavailable, incomplete, stocked})
+	if err != nil || len(parcels) != 1 || parcels[0].Box.ID != stocked.ID {
+		t.Fatal("stocked box not selected", err)
+	}
+}

@@ -1052,6 +1052,10 @@
                   },
                   "acceptFallback": {
                     "type": "boolean"
+                  },
+                  "acceptedQuoteId": {
+                    "type": "string",
+                    "description": "Exact displayed postal quote accepted by the customer; does not refresh its price or expiry."
                   }
                 },
                 "required": [],
@@ -1572,7 +1576,23 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Product"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Product"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "confirmMeasurements": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Package IDs explicitly reviewed in the merged package editor. Complete measurements are verified by the server."
+                      }
+                    }
+                  }
+                ]
               }
             }
           }
@@ -7229,6 +7249,21 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/ProviderHealth"
             }
+          },
+          "readiness": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShippingReadinessIssue"
+            }
+          },
+          "boxCatalog": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoxCatalogEntry"
+            }
+          },
+          "simulated": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -8822,6 +8857,12 @@
           },
           "verified": {
             "type": "boolean"
+          },
+          "catalog": {
+            "$ref": "#/components/schemas/BoxCatalogReference"
+          },
+          "simulated": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -9403,6 +9444,95 @@
           "tapin"
         ],
         "additionalProperties": false
+      },
+      "BoxCatalogReference": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "sourceUrl",
+          "nominalOutside"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "nominalOutside": {
+            "$ref": "#/components/schemas/ShippingSize"
+          }
+        }
+      },
+      "BoxCatalogEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "sourceUrl",
+          "nominalOutside",
+          "name",
+          "note"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "nominalOutside": {
+            "$ref": "#/components/schemas/ShippingSize"
+          },
+          "name": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "ShippingReadinessIssue": {
+        "type": "object",
+        "required": [
+          "code",
+          "group",
+          "section",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "merchant",
+              "integration"
+            ]
+          },
+          "section": {
+            "type": "string",
+            "enum": [
+              "origin",
+              "boxes",
+              "products",
+              "technical"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
       }
     },
     "securitySchemes": {

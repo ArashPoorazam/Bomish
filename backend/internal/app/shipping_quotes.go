@@ -25,11 +25,12 @@ type shippingSnapshot struct {
 	FallbackAccepted bool             `json:"fallbackAccepted"`
 }
 type shippingQuoteInput struct {
-	Province       string         `json:"province"`
-	Address        domain.Address `json:"address"`
-	DiscountCode   string         `json:"discountCode"`
-	Method         string         `json:"method"`
-	AcceptFallback bool           `json:"acceptFallback"`
+	AcceptedQuoteID string         `json:"acceptedQuoteId"`
+	Province        string         `json:"province"`
+	Address         domain.Address `json:"address"`
+	DiscountCode    string         `json:"discountCode"`
+	Method          string         `json:"method"`
+	AcceptFallback  bool           `json:"acceptFallback"`
 }
 
 func normalizedDestination(v domain.Address) domain.Address {
@@ -87,8 +88,12 @@ func insideArea(lat, lng float64, polygon [][2]float64) bool {
 	}
 	return inside
 }
+func tehranDestination(c calculatedConfig, d domain.Address) bool {
+	l, ok := findLocality(c, d)
+	return ok && domain.Normalize(l.City) == "تهران" && domain.Normalize(l.Province) == "تهران"
+}
 func snappEligible(c calculatedConfig, d domain.Address, parcels []packing.Parcel) (bool, string) {
-	if d.CityID != c.Snapp.CityID {
+	if !tehranDestination(c, d) || d.CityID != c.Snapp.CityID {
 		return false, "پیک در این شهر فعال نیست"
 	}
 	if !d.PinConfirmed || d.Latitude == nil || d.Longitude == nil {
@@ -114,7 +119,7 @@ func snappEligible(c calculatedConfig, d domain.Address, parcels []packing.Parce
 }
 func postalEligible(c calculatedConfig, d domain.Address, parcels []packing.Parcel) error {
 	l, ok := findLocality(c, d)
-	if !ok || l.TapinCity == "" || l.TapinProvince == "" {
+	if !ok || !l.Verified || l.TapinCity == "" || l.TapinProvince == "" {
 		return &packing.Failure{Code: "unsupported_destination", Detail: "شهر و استان را از فهرست تأیید کنید"}
 	}
 	for _, p := range parcels {
@@ -125,6 +130,20 @@ func postalEligible(c calculatedConfig, d domain.Address, parcels []packing.Parc
 	}
 	return nil
 }
+func postalPacking(items []packing.Item, c calculatedConfig) ([]packing.Parcel, error) {
+	boxes := []packing.Box{}
+	for _, box := range c.Boxes {
+		limit := c.Tapin.MaxSize
+		size := box.Outside
+		if box.PostalSizeID == "" || size.Length > limit.Length || size.Width > limit.Width || size.Height > limit.Height {
+			continue
+		}
+		box.MaxGrams = min(box.MaxGrams, c.Tapin.MaxGrams)
+		boxes = append(boxes, box)
+	}
+	return packing.Plan(items, boxes)
+}
+
 func shippingRequest(s shippingSnapshot) carrier.Request {
 	p := s.Config.Snapp
 	if s.Method == "post" {
@@ -164,39 +183,58 @@ func (a *App) calculateShipping(ctx context.Context, c domain.Cart, in shippingQ
 	if e != nil {
 		return s, e
 	}
-	if e = postalEligible(cfg, s.Destination, s.Parcels); e != nil {
-		return s, e
+	if _, ok := findLocality(cfg, s.Destination); !ok {
+		return s, &packing.Failure{Code: "unsupported_destination", Detail: "شهر و استان را از فهرست انتخاب کنید"}
 	}
-	eligible, reason := snappEligible(cfg, s.Destination, s.Parcels)
-	s.Method = "post"
-	s.FallbackReason = reason
 	if in.Method != "" && in.Method != "snapp" && in.Method != "post" {
 		return s, errors.New("روش ارسال معتبر نیست")
 	}
-	if eligible && in.Method != "post" {
-		s.Method = "snapp"
+	tehran := tehranDestination(cfg, s.Destination)
+	s.Method = "post"
+	if tehran {
+		eligible, reason := snappEligible(cfg, s.Destination, s.Parcels)
+		if !cfg.Snapp.Enabled || !cfg.Snapp.Verified {
+			eligible = false
+			reason = "سرویس پیک فعال نیست"
+		}
+		s.FallbackReason = reason
+		if eligible && in.Method != "post" {
+			s.Method = "snapp"
+		}
+		if in.Method == "post" && reason == "" {
+			s.FallbackReason = "پست به انتخاب شما"
+		}
 	}
-	if s.Method == "snapp" && (!cfg.Snapp.Enabled || !cfg.Snapp.Verified) {
-		eligible = false
-		s.Method = "post"
-		s.FallbackReason = "سرویس پیک فعال نیست"
+	if s.Method == "snapp" {
+		s.CarrierQuote, e = a.shippingProvider("snapp").Quote(ctx, shippingRequest(s))
+		if e != nil {
+			s.Method = "post"
+			s.FallbackReason = "استعلام پیک در دسترس نیست"
+		}
 	}
-	s.CarrierQuote, e = a.shippingProvider(s.Method).Quote(ctx, shippingRequest(s))
-	if e != nil && s.Method == "snapp" {
-		s.Method = "post"
-		s.FallbackReason = "استعلام پیک در دسترس نیست"
+	if s.Method == "post" {
+		if !cfg.Tapin.Enabled || !cfg.Tapin.Verified {
+			return s, &packing.Failure{Code: "provider_unavailable", Detail: "ارسال پستی در دسترس نیست؛ دوباره تلاش کنید یا با پشتیبانی تماس بگیرید"}
+		}
+		// Postal mapping is irrelevant to courier packing. When post is chosen,
+		// re-plan using only boxes that the postal service can accept.
+		if e = postalEligible(cfg, s.Destination, nil); e != nil {
+			return s, e
+		}
+		s.Parcels, e = postalPacking(items, cfg)
+		if e != nil {
+			return s, e
+		}
+		if e = postalEligible(cfg, s.Destination, s.Parcels); e != nil {
+			return s, e
+		}
 		s.CarrierQuote, e = a.shippingProvider("post").Quote(ctx, shippingRequest(s))
 	}
 	if e != nil {
-		return s, &packing.Failure{Code: "provider_unavailable", Detail: e.Error()}
+		return s, &packing.Failure{Code: "provider_unavailable", Detail: "دریافت هزینه ارسال انجام نشد؛ دوباره تلاش کنید یا با پشتیبانی تماس بگیرید"}
 	}
-	if s.Method == "post" && (!cfg.Tapin.Enabled || !cfg.Tapin.Verified) {
-		return s, &packing.Failure{Code: "provider_unavailable", Detail: "سرویس پستی فعال نیست"}
-	}
-	s.FallbackAccepted = in.AcceptFallback || s.Destination.CityID != cfg.Snapp.CityID || s.Method == "snapp"
-	if s.Method == "post" && in.Method == "post" && s.FallbackReason == "" {
-		s.FallbackReason = "پست به انتخاب شما"
-	}
+	// A Tehran postal quote must be accepted by its exact ID; a boolean cannot accept a new price.
+	s.FallbackAccepted = !tehran || s.Method == "snapp"
 	p := cfg.Tapin
 	if s.Method == "snapp" {
 		p = cfg.Snapp
@@ -219,6 +257,10 @@ func (a *App) calculateShipping(ctx context.Context, c domain.Cart, in shippingQ
 	return s, e
 }
 func (a *App) calculatedQuote(w http.ResponseWriter, r *http.Request, c domain.Cart, in shippingQuoteInput, cfg calculatedConfig) {
+	if in.AcceptFallback && in.AcceptedQuoteID != "" {
+		a.acceptPostalQuote(w, r, c, in, cfg)
+		return
+	}
 	s, e := a.calculateShipping(r.Context(), c, in, cfg)
 	if e != nil {
 		code := "provider_unavailable"

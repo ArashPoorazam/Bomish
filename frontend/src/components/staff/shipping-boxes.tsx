@@ -1,5 +1,8 @@
-import type { ShippingBox, ShippingSize } from "@/lib/types";
-import { MeasurementNumber } from "./product-measurements";
+import { simulationBox } from "./shipping-simulation";
+import { useState } from "react";
+import { fa } from "@/lib/format";
+import type { ShippingConfig, ShippingBox, ShippingSize } from "@/lib/types";
+import { MeasurementNumber } from "./measurement-number";
 export const emptySize: ShippingSize = { lengthMm: 0, widthMm: 0, heightMm: 0 };
 export function SizeFields({
   value,
@@ -36,100 +39,218 @@ export function SizeFields({
 }
 export function ShippingBoxes({
   boxes,
+  catalog,
+  simulated,
   onChange,
 }: {
   boxes: ShippingBox[];
+  catalog: NonNullable<ShippingConfig["boxCatalog"]>;
+  simulated: boolean;
   onChange: (b: ShippingBox[]) => void;
 }) {
+  const [editing, setEditing] = useState<string | null>(null);
   const update = (i: number, v: Partial<ShippingBox>) =>
-    onChange(boxes.map((b, j) => (j === i ? { ...b, ...v } : b)));
+    onChange(
+      boxes.map((b, j) =>
+        j === i
+          ? { ...b, ...v, ...(v.verified === false ? { active: false } : {}) }
+          : b,
+      ),
+    );
   return (
-    <section className="stack">
-      <h3>کارتن‌ها و بسته‌بندی</h3>
-      <p>
-        ابعاد داخلی قابل استفاده را اندازه بگیرید. حاشیه محافظ یک بار از هر دو
-        سمت کم می‌شود و وزن پرکننده یک بار اضافه می‌شود.
+    <section id="shipping-boxes" className="shipping-section stack">
+      <div className="section-heading">
+        <span className="section-number">۲</span>
+        <div>
+          <h3>کارتن‌های موجود</h3>
+          <p className="muted">
+            کارتن‌هایی را انتخاب کنید که در فروشگاه موجود دارید؛ چیدمان سفارش
+            خودکار پیشنهاد می‌شود.
+          </p>
+        </div>
+      </div>
+      <div className="box-catalog-grid">
+        {catalog.map((entry) => {
+          const selected = boxes.find(
+            (b) =>
+              b.catalog?.id === entry.id &&
+              b.catalog?.version === entry.version,
+          );
+          return (
+            <article className="box-catalog-card" key={entry.id}>
+              <strong>{entry.name}</strong>
+              <bdi>
+                {fa(entry.nominalOutside.lengthMm / 10)} ×{" "}
+                {fa(entry.nominalOutside.widthMm / 10)} ×{" "}
+                {fa(entry.nominalOutside.heightMm / 10)} سانتی‌متر
+              </bdi>
+              <small className="muted">ابعاد اسمی بیرونی</small>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => {
+                  if (selected) {
+                    setEditing(selected.id);
+                    return;
+                  }
+                  const id = crypto.randomUUID();
+                  onChange([
+                    ...boxes,
+                    {
+                      id,
+                      name: entry.name,
+                      inside: { ...emptySize },
+                      outside: { ...entry.nominalOutside },
+                      emptyGrams: 0,
+                      maxGrams: 0,
+                      fillerGrams: 0,
+                      insetMm: 0,
+                      postalSizeId: "",
+                      active: false,
+                      verified: false,
+                      catalog: {
+                        id: entry.id,
+                        version: entry.version,
+                        sourceUrl: entry.sourceUrl,
+                        nominalOutside: { ...entry.nominalOutside },
+                      },
+                    },
+                  ]);
+                  setEditing(id);
+                }}
+              >
+                {selected
+                  ? selected.active
+                    ? "موجود · مشاهده"
+                    : "تکمیل و فعال‌سازی"
+                  : "این کارتن را داریم"}
+              </button>
+            </article>
+          );
+        })}
+      </div>
+      <p className="muted">
+        فقط بار اول ابعاد داخلی، وزن و ظرفیت کارتن خریداری‌شده را تکمیل کنید.
+        محافظ دور محصول در اندازه‌های محصول محاسبه شده است.
       </p>
       {boxes.map((b, i) => (
-        <details
-          className="product-package"
-          key={b.id}
-          open={b.active || undefined}
-        >
-          <summary>
-            {b.name || "کارتن جدید"} · {b.active ? "فعال" : "غیرفعال"}
-          </summary>
-          <div className="stack">
-            <label>
-              نام کارتن
-              <input
-                value={b.name}
-                onChange={(e) => update(i, { name: e.target.value })}
-              />
-            </label>
-            <SizeFields
-              value={b.inside}
-              label="ابعاد داخلی"
-              onChange={(inside) => update(i, { inside, verified: false })}
-            />
-            <SizeFields
-              value={b.outside}
-              label="ابعاد بیرونی"
-              onChange={(outside) => update(i, { outside, verified: false })}
-            />
-            <div className="form-grid">
-              {(
-                [
-                  ["emptyGrams", "وزن کارتن خالی (گرم)"],
-                  ["maxGrams", "ظرفیت وزن ناخالص (گرم)"],
-                  ["fillerGrams", "وزن پرکننده (گرم)"],
-                  ["insetMm", "حاشیه محافظ هر سمت (سانتی‌متر)"],
-                ] as const
-              ).map(([key, label]) => (
-                <MeasurementNumber
-                  key={key}
-                  label={label}
-                  value={b[key]}
-                  scale={key === "insetMm" ? 10 : 1}
-                  onChange={(v) => update(i, { [key]: v, verified: false })}
-                />
-              ))}
-              <label>
-                شناسه اندازه پستی
-                <input
-                  dir="ltr"
-                  value={b.postalSizeId}
-                  onChange={(e) =>
-                    update(i, { postalSizeId: e.target.value, verified: false })
-                  }
-                />
-              </label>
+        <article className="box-stock-card stack" key={b.id}>
+          <div className="between">
+            <div>
+              <h4>{b.name || "کارتن سفارشی"}</h4>
+              <small>
+                {b.simulated
+                  ? "فقط شبیه‌سازی"
+                  : b.verified
+                    ? "اندازه‌ها تکمیل شده"
+                    : "نیازمند اندازه‌گیری اولیه"}
+              </small>
             </div>
             <label className="check-label">
               <input
                 type="checkbox"
-                checked={b.verified}
-                onChange={(e) => update(i, { verified: e.target.checked })}
-              />
-              اندازه‌های واقعی، ظرفیت و نگاشت پستی بررسی شده‌اند
-            </label>
-            <label className="check-label">
-              <input
-                type="checkbox"
                 checked={b.active}
+                disabled={!b.verified}
                 onChange={(e) => update(i, { active: e.target.checked })}
               />
-              کارتن فعال
+              موجود و قابل استفاده
             </label>
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() => update(i, { active: false })}
-            >
-              بایگانی کارتن
-            </button>
           </div>
-        </details>
+          <details
+            open={editing === b.id}
+            onToggle={(e) => {
+              if (!e.currentTarget.open && editing === b.id) setEditing(null);
+            }}
+          >
+            <summary
+              onClick={(e) => {
+                e.preventDefault();
+                setEditing(editing === b.id ? null : b.id);
+              }}
+            >
+              مشخصات و اندازه‌گیری کارتن
+            </summary>
+            <div className="stack">
+              {b.catalog && (
+                <p className="muted">
+                  نسخه {b.catalog.version} ·{" "}
+                  <a
+                    href={b.catalog.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    مشخصات تأمین‌کننده
+                  </a>{" "}
+                  · ابعاد اسمی با فضای داخلی قابل استفاده یکسان نیست.
+                </p>
+              )}
+              <label>
+                نام کارتن
+                <input
+                  value={b.name}
+                  onChange={(e) => update(i, { name: e.target.value })}
+                />
+              </label>
+              <SizeFields
+                value={b.inside}
+                label="ابعاد داخلی"
+                onChange={(inside) => update(i, { inside, verified: false })}
+              />
+              <SizeFields
+                value={b.outside}
+                label="ابعاد بیرونی"
+                onChange={(outside) => update(i, { outside, verified: false })}
+              />
+              <div className="form-grid">
+                {(
+                  [
+                    ["emptyGrams", "وزن کارتن خالی (گرم)"],
+                    ["maxGrams", "ظرفیت وزن ناخالص (گرم)"],
+                    ["fillerGrams", "وزن پرکننده (گرم)"],
+                    ["insetMm", "حاشیه محافظ هر سمت (سانتی‌متر)"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <MeasurementNumber
+                    key={key}
+                    label={label}
+                    value={b[key]}
+                    scale={key === "insetMm" ? 10 : 1}
+                    onChange={(v) => update(i, { [key]: v, verified: false })}
+                  />
+                ))}
+                <label>
+                  شناسه اندازه پستی
+                  <input
+                    dir="ltr"
+                    value={b.postalSizeId}
+                    onChange={(e) =>
+                      update(i, {
+                        postalSizeId: e.target.value,
+                        verified: false,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+              <label className="check-label">
+                <input
+                  type="checkbox"
+                  checked={b.verified}
+                  onChange={(e) => update(i, { verified: e.target.checked })}
+                />
+                اندازه‌های واقعی و ظرفیت این کارتن را بررسی کردم
+              </label>
+
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => update(i, { active: false })}
+              >
+                بایگانی کارتن
+              </button>
+            </div>
+          </details>
+        </article>
       ))}
       <button
         type="button"
@@ -153,43 +274,17 @@ export function ShippingBoxes({
           ])
         }
       >
-        افزودن کارتن
+        افزودن کارتن سفارشی
       </button>
-      <button
-        type="button"
-        className="button secondary"
-        onClick={() => {
-          const sizes = [
-            [15, 10, 10],
-            [20, 15, 10],
-            [20, 20, 15],
-            [30, 20, 20],
-            [35, 25, 20],
-            [45, 25, 20],
-            [40, 30, 25],
-            [45, 40, 30],
-            [55, 45, 35],
-          ];
-          onChange([
-            ...boxes,
-            ...sizes.map(([l, w, h], i) => ({
-              id: crypto.randomUUID(),
-              name: `نمونه تأمین‌کننده ${i + 1}؛ نیازمند اندازه‌گیری`,
-              inside: { ...emptySize },
-              outside: { lengthMm: l * 10, widthMm: w * 10, heightMm: h * 10 },
-              emptyGrams: 0,
-              maxGrams: 0,
-              fillerGrams: 0,
-              insetMm: 0,
-              postalSizeId: "",
-              active: false,
-              verified: false,
-            })),
-          ]);
-        }}
-      >
-        افزودن نمونه‌های غیرفعال ۱ تا ۹
-      </button>
+      {simulated && (
+        <button
+          type="button"
+          className="button secondary"
+          onClick={() => onChange([...boxes, simulationBox()])}
+        >
+          افزودن کارتن آزمایشی · فقط شبیه‌سازی
+        </button>
+      )}
     </section>
   );
 }

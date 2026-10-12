@@ -164,54 +164,70 @@ func catalogMeasurementIssues(ctx context.Context, q querier) ([]map[string]any,
 	}
 	return out, rows.Err()
 }
-func (a *App) activationBlockers(ctx context.Context, q querier, c calculatedConfig) ([]string, error) {
-	out := []string{}
+func (a *App) shippingReadiness(ctx context.Context, q querier, c calculatedConfig) ([]readinessIssue, error) {
+	out := []readinessIssue{}
 	if c.Origin.Validate() != nil || !c.Origin.PinConfirmed || c.Origin.Latitude == nil {
-		out = append(out, "نشانی و موقعیت تأییدشده مبدأ را کامل کنید")
+		out = append(out, readinessIssue{"origin", "merchant", "origin", "نشانی و موقعیت تأییدشده مبدأ را کامل کنید"})
 	}
 	loc, ok := findLocality(c, c.Origin)
 	if !ok || domain.Normalize(loc.City) != "تهران" {
-		out = append(out, "مبدأ باید شهر تهران با شناسه محلی تأییدشده باشد")
+		out = append(out, readinessIssue{"origin_city", "merchant", "origin", "مبدأ باید شهر تهران با شناسه محلی تأییدشده باشد"})
 	}
 	active := 0
 	for _, b := range c.Boxes {
-		if b.Active && b.Verified && b.Validate() == nil && b.PostalSizeID != "" {
+		if b.Active && b.Verified && b.Validate() == nil {
 			active++
 		}
 	}
 	if active == 0 {
-		out = append(out, "حداقل یک کارتن اندازه‌گیری‌شده و نگاشت پستی لازم است")
+		out = append(out, readinessIssue{"boxes", "merchant", "boxes", "حداقل یک کارتن اندازه‌گیری‌شده و فعال لازم است"})
 	}
 	for name, p := range map[string]providerConfig{"snapp": c.Snapp, "tapin": c.Tapin} {
 		if !p.Enabled || !p.Verified || p.Service == "" || (p.Currency != "rial" && p.Currency != "toman") {
-			out = append(out, "تنظیمات و واحد پول "+name+" تأیید نشده است")
+			out = append(out, readinessIssue{"provider_" + name, "integration", "technical", "تنظیمات و واحد پول " + name + " تأیید نشده است"})
 		}
 	}
 	if c.Tapin.ShopID == "" {
-		out = append(out, "شناسه فروشگاه پستی لازم است")
+		out = append(out, readinessIssue{"postal_shop", "integration", "technical", "شناسه فروشگاه پستی لازم است"})
 	}
 	if c.Snapp.CityID == "" || len(c.Snapp.Area) < 3 || c.Snapp.MaxGrams < 1 || c.Snapp.MaxVolumeCm3 < 1 || c.Snapp.MaxParcels < 1 || !c.Snapp.MaxSize.Valid() {
-		out = append(out, "محدوده خدمت و ظرفیت پیک را تأیید کنید")
+		out = append(out, readinessIssue{"courier_capacity", "integration", "technical", "محدوده خدمت و ظرفیت پیک را تأیید کنید"})
 	}
 	if c.Tapin.MaxGrams < 1 || !c.Tapin.MaxSize.Valid() {
-		out = append(out, "ظرفیت و ابعاد پستی را تأیید کنید")
+		out = append(out, readinessIssue{"postal_capacity", "integration", "technical", "ظرفیت و ابعاد پستی را تأیید کنید"})
 	}
 	if !a.simulatedShipping() {
-		out = append(out, "ارسال زنده تا تأیید قرارداد احراز هویت و عملیات ارائه‌دهندگان غیرفعال است")
+		out = append(out, readinessIssue{"live_disabled", "integration", "technical", "ارسال زنده تا تأیید قرارداد احراز هویت و عملیات ارائه‌دهندگان غیرفعال است"})
 	}
 	missing, e := catalogMeasurementIssues(ctx, q)
 	if e != nil {
 		return nil, e
 	}
 	if len(missing) > 0 {
-		out = append(out, "اطلاعات ارسال محصولات منتشرشده ناقص است")
+		out = append(out, readinessIssue{"measurements", "merchant", "products", "اطلاعات ارسال محصولات منتشرشده ناقص است"})
 	}
 	return out, nil
+}
+
+type readinessIssue struct {
+	Code    string `json:"code"`
+	Group   string `json:"group"`
+	Section string `json:"section"`
+	Message string `json:"message"`
+}
+
+func (a *App) activationBlockers(ctx context.Context, q querier, c calculatedConfig) ([]string, error) {
+	issues, err := a.shippingReadiness(ctx, q, c)
+	blockers := []string{}
+	for _, issue := range issues {
+		blockers = append(blockers, issue.Message)
+	}
+	return blockers, err
 }
 func findLocality(c calculatedConfig, a domain.Address) (locality, bool) {
 	for _, l := range c.Localities {
 		if l.ID == a.CityID && l.ProvinceID == a.ProvinceID && l.City == a.City && l.Province == a.Province {
-			return l, l.Verified
+			return l, true
 		}
 	}
 	return locality{}, false
@@ -250,8 +266,8 @@ func validateConfig(c calculatedConfig) error {
 			if e := b.Validate(); e != nil {
 				return e
 			}
-			if !b.Verified || b.PostalSizeID == "" {
-				return errors.New("کارتن فعال به تأیید اندازه و شناسه پستی نیاز دارد")
+			if !b.Verified {
+				return errors.New("کارتن فعال به تأیید اندازه نیاز دارد")
 			}
 		}
 	}

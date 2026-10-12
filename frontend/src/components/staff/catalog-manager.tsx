@@ -39,7 +39,12 @@ export function CatalogManager({
       }
     }
   }, [products, initialQuery]);
-  const [shippingIncomplete, setShippingIncomplete] = useState("");
+  const [shippingIncomplete, setShippingIncomplete] = useState(() =>
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("shipping") === "missing"
+      ? "true"
+      : "",
+  );
   const [q, setQ] = useState(initialQuery),
     [category, setCategory] = useState(""),
     [status, setStatus] = useState(""),

@@ -12,14 +12,20 @@ import {
   Send,
   X,
 } from "lucide-react";
+import { measurementIssues } from "@/lib/shipping";
 import { api } from "@/lib/api";
 import type { Product, Category } from "@/lib/types";
 import { RichText } from "@/components/rich-text";
 import { fa, money, packageLabel, statuses } from "@/lib/format";
-import { normalizeProduct, productIssues, productSteps } from "./product-form";
+import {
+  normalizeProduct,
+  productIssues,
+  productSteps,
+  type ProductStep,
+} from "./product-form";
 import { ProductBasics, ProductDetails } from "./product-content-fields";
 import { ProductImages } from "./product-images";
-import { ProductMeasurements, MeasurementReview } from "./product-measurements";
+import { MeasurementReview } from "./product-measurements";
 import { ProductPackages } from "./product-packages";
 
 export function newProduct(): Product {
@@ -76,12 +82,27 @@ export function ProductEditor({
   const [saved, setSaved] = useState(() =>
     JSON.stringify(normalizeProduct(product)),
   );
-  const [step, setStep] = useState(() =>
+  const [step, setStep] = useState<ProductStep>(() =>
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("step") === "shipping"
-      ? 3
-      : 0,
+      ? "packages"
+      : "basics",
   );
+  const [packagesReviewed, setPackagesReviewed] = useState(step === "packages");
+  const stepIndex = productSteps.findIndex((item) => item.id === step);
+  const editorProduct = {
+    ...p,
+    packages: p.packages.map((pack) =>
+      packagesReviewed
+        ? {
+            ...pack,
+            shippingVerified:
+              measurementIssues({ ...pack, shippingVerified: true }).length ===
+              0,
+          }
+        : pack,
+    ),
+  };
   const [calculated, setCalculated] = useState(false);
   useEffect(() => {
     api<{ shippingMode: string }>("/settings")
@@ -103,7 +124,7 @@ export function ProductEditor({
   const dirty = JSON.stringify(p) !== saved;
   const locked = !!busy || uploading;
   const existing = products.find((x) => x.id === p.id);
-  const issues = productIssues(p, true, calculated);
+  const issues = productIssues(editorProduct, true, calculated);
   useEffect(() => {
     onStateChange({ dirty, busy: locked });
   }, [dirty, locked, onStateChange]);
@@ -125,15 +146,16 @@ export function ProductEditor({
     setP((current) => ({ ...current, [key]: value }));
     setError("");
   }
-  function go(next: number) {
+  function go(next: ProductStep) {
     setStep(next);
+    if (next === "packages") setPackagesReviewed(true);
     setError("");
     requestAnimationFrame(() => heading.current?.focus());
   }
   async function save(publish: boolean) {
     if (locked) return;
     feedbackTrigger.current = document.activeElement as HTMLElement;
-    const invalid = productIssues(p, publish, calculated);
+    const invalid = productIssues(editorProduct, publish, calculated);
     if (invalid.length) {
       setStep(invalid[0].step);
       setError(invalid[0].text);
@@ -143,11 +165,25 @@ export function ProductEditor({
     setError("");
     let draftSaved = false;
     try {
-      await api("/staff/products/" + p.id, "PUT", p);
+      await api("/staff/products/" + p.id, "PUT", {
+        ...p,
+        confirmMeasurements: packagesReviewed
+          ? p.packages
+              .filter(
+                (pack) =>
+                  measurementIssues({ ...pack, shippingVerified: true })
+                    .length === 0,
+              )
+              .map((pack) => pack.id)
+          : [],
+      });
       draftSaved = true;
       setSaved(JSON.stringify(p));
       if (publish) await api("/staff/products/" + p.id + "/publish", "POST");
-      const next = { ...p, status: publish ? "published" : "draft" } as Product;
+      const next = {
+        ...editorProduct,
+        status: publish ? "published" : "draft",
+      } as Product;
       setP(next);
       setSaved(JSON.stringify(next));
       setMessage(
@@ -221,14 +257,15 @@ export function ProductEditor({
       <nav className="product-steps" aria-label="مراحل محصول">
         {productSteps.map((item, i) => (
           <button
-            key={item.title}
+            key={item.id}
             type="button"
-            aria-current={i === step ? "step" : undefined}
+            aria-current={item.id === step ? "step" : undefined}
             disabled={locked}
-            onClick={() => go(i)}
+            onClick={() => go(item.id)}
           >
             <span className="step-number">
-              {i < step && !issues.some((issue) => issue.step === i) ? (
+              {i < stepIndex &&
+              !issues.some((issue) => issue.step === item.id) ? (
                 <Check size={16} aria-hidden="true" />
               ) : (
                 fa(i + 1)
@@ -242,31 +279,34 @@ export function ProductEditor({
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          if (step < productSteps.length - 1) go(step + 1);
+          if (stepIndex < productSteps.length - 1)
+            go(productSteps[stepIndex + 1].id);
           else void save(false);
         }}
       >
         <fieldset disabled={locked} className="product-step-fields">
           <div className="product-step-heading">
             <h3 ref={heading} tabIndex={-1}>
-              {productSteps[step].title}
+              {productSteps[stepIndex].title}
             </h3>
-            <p>{productSteps[step].description}</p>
+            <p>{productSteps[stepIndex].description}</p>
           </div>
-          {step === 0 && (
+          {step === "basics" && (
             <ProductBasics p={p} field={field} categories={categories} />
           )}
-          {step === 1 && (
+          {step === "images" && (
             <ProductImages p={p} field={field} onBusy={setUploading} />
           )}
-          {step === 2 && (
+          {step === "packages" && (
             <ProductPackages p={p} field={field} owner={canPrice} />
           )}
-          {step === 3 && <ProductMeasurements p={p} field={field} />}
-          {step === 4 && <ProductDetails p={p} field={field} />}
-          {step === 5 && (
+          {step === "details" && <ProductDetails p={p} field={field} />}
+          {step === "review" && (
             <div className="stack">
-              <MeasurementReview packages={p.packages} onFix={() => go(3)} />
+              <MeasurementReview
+                packages={editorProduct.packages}
+                onFix={() => go("packages")}
+              />
               {!calculated && (
                 <p className="notice">
                   تعرفه قبلی فعال است. اندازه‌های ناقص پیش از فعال‌سازی ارسال
@@ -406,12 +446,12 @@ export function ProductEditor({
         )}
         <div className="product-editor-footer">
           <div className="product-navigation">
-            {step > 0 && (
+            {stepIndex > 0 && (
               <button
                 type="button"
                 className="button secondary"
                 disabled={locked}
-                onClick={() => go(step - 1)}
+                onClick={() => go(productSteps[stepIndex - 1].id)}
               >
                 <ArrowRight size={16} aria-hidden="true" />
                 مرحله قبل
@@ -427,12 +467,12 @@ export function ProductEditor({
               {busy === "draft" ? "در حال ذخیره…" : "ذخیره پیش‌نویس"}
             </button>
           </div>
-          {step < productSteps.length - 1 ? (
+          {stepIndex < productSteps.length - 1 ? (
             <button
               className="button"
               type="button"
               disabled={locked}
-              onClick={() => go(step + 1)}
+              onClick={() => go(productSteps[stepIndex + 1].id)}
             >
               مرحله بعد
               <ArrowLeft size={16} aria-hidden="true" />

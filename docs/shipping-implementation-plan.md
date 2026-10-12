@@ -1,6 +1,6 @@
 # Bomish shipping implementation handoff
 
-Implement package measurements, calculated delivery pricing, and staff fulfillment controls in the existing Bomish application. This document replaces the earlier conversational plan and supplies the context needed by an agent with no conversation history. It is an implementation specification; the shipping feature has not yet been built.
+Implement package measurements, calculated delivery pricing, and staff fulfillment controls in the existing Bomish application. This document replaces the earlier conversational plan and supplies the context needed by an agent with no conversation history. This is the historical implementation specification. The simulation workflow is now implemented; the current five-step package editor, sourced carton catalog and shipping setup are described in [the integration guide](integrations.md#simplified-staff-shipping-workflow). Where they differ, that guide supersedes the older wizard and setup instructions below.
 
 Repository: `/home/daedalus/Projects/Bomish`. Baseline inspected on 2026-10-07: Go backend, PostgreSQL, Next.js 16 and React 19 frontend, Persian RTL interface, integer rial storage and toman display. Preserve the existing payment simulator and production startup restrictions. Do not book real couriers, purchase labels, send real SMS, or activate production as part of development verification.
 

@@ -1,0 +1,110 @@
+[
+  {
+    "id": "cartonbank-post-1",
+    "version": "2026-10-12",
+    "name": "کارتن پستی 1 · کارتن بانک",
+    "sourceUrl": "https://cartonbank.com/product/کارتن-پستی-سایز-یک/",
+    "nominalOutside": {
+      "lengthMm": 150,
+      "widthMm": 100,
+      "heightMm": 100
+    },
+    "note": "ابعاد اسمی تأمین‌کننده؛ ابعاد داخلی، وزن خالی و ظرفیت را با کارتن خریداری‌شده تکمیل کنید. در صفحه تأمین‌کننده تلرانس طول ±۱ سانتی‌متر و تفاوت ابعاد داخلی ذکر شده است."
+  },
+  {
+    "id": "cartonbank-post-2",
+    "version": "2026-10-12",
+    "name": "کارتن پستی 2 · کارتن بانک",
+    "sourceUrl": "https://cartonbank.com/product/کارتن-پستی-سایز-دو/",
+    "nominalOutside": {
+      "lengthMm": 200,
+      "widthMm": 150,
+      "heightMm": 100
+    },
+    "note": "ابعاد اسمی تأمین‌کننده؛ ابعاد داخلی، وزن خالی و ظرفیت را با کارتن خریداری‌شده تکمیل کنید."
+  },
+  {
+    "id": "cartonbank-post-3",
+    "version": "2026-10-12",
+    "name": "کارتن پستی 3 · کارتن بانک",
+    "sourceUrl": "https://cartonbank.com/product/کارتن-پستی-سایز-سه-طرح-جدید/",
+    "nominalOutside": {
+      "lengthMm": 200,
+      "widthMm": 200,
+      "heightMm": 150
+    },
+    "note": "ابعاد اسمی تأمین‌کننده؛ ابعاد داخلی، وزن خالی و ظرفیت را با کارتن خریداری‌شده تکمیل کنید."
+  },
+  {
+    "id": "cartonbank-post-4",
+    "version": "2026-10-12",
+    "name": "کارتن پستی 4 · کارتن بانک",
+    "sourceUrl": "https://cartonbank.com/product/کارتن-پستی-سایز-چهار-طرح-جدید/",
+    "nominalOutside": {
+      "lengthMm": 300,
+      "widthMm": 200,
+      "heightMm": 200
+    },
+    "note": "ابعاد اسمی تأمین‌کننده؛ ابعاد داخلی، وزن خالی و ظرفیت را با کارتن خریداری‌شده تکمیل کنید."
+  },
+  {
+    "id": "cartonbank-post-5",
+    "version": "2026-10-12",
+    "name": "کارتن پستی 5 · کارتن بانک",
+    "sourceUrl": "https://cartonbank.com/product/کارتن-پستی-سایز-پنج-طرح-جدید/",
+    "nominalOutside": {
+      "lengthMm": 350,
+      "widthMm": 250,
+      "heightMm": 200
+    },
+    "note": "ابعاد اسمی تأمین‌کننده؛ ابعاد داخلی، وزن خالی و ظرفیت را با کارتن خریداری‌شده تکمیل کنید."
+  },
+  {
+    "id": "cartonbank-post-6",
+    "version": "2026-10-12",
+    "name": "کارتن پستی 6 · کارتن بانک",
+    "sourceUrl": "https://cartonbank.com/product/کارتن-پستی-سایز-شش/",
+    "nominalOutside": {
+      "lengthMm": 450,
+      "widthMm": 250,
+      "heightMm": 200
+    },
+    "note": "ابعاد اسمی تأمین‌کننده؛ ابعاد داخلی، وزن خالی و ظرفیت را با کارتن خریداری‌شده تکمیل کنید."
+  },
+  {
+    "id": "cartonbank-post-7",
+    "version": "2026-10-12",
+    "name": "کارتن پستی 7 · کارتن بانک",
+    "sourceUrl": "https://cartonbank.com/product/کارتن-پستی-سایز-هفت/",
+    "nominalOutside": {
+      "lengthMm": 400,
+      "widthMm": 300,
+      "heightMm": 250
+    },
+    "note": "ابعاد اسمی تأمین‌کننده؛ ابعاد داخلی، وزن خالی و ظرفیت را با کارتن خریداری‌شده تکمیل کنید."
+  },
+  {
+    "id": "cartonbank-post-8",
+    "version": "2026-10-12",
+    "name": "کارتن پستی 8 · کارتن بانک",
+    "sourceUrl": "https://cartonbank.com/product/کارتن-پستی-سایزهشت/",
+    "nominalOutside": {
+      "lengthMm": 450,
+      "widthMm": 400,
+      "heightMm": 300
+    },
+    "note": "ابعاد اسمی تأمین‌کننده؛ ابعاد داخلی، وزن خالی و ظرفیت را با کارتن خریداری‌شده تکمیل کنید."
+  },
+  {
+    "id": "cartonbank-post-9",
+    "version": "2026-10-12",
+    "name": "کارتن پستی 9 · کارتن بانک",
+    "sourceUrl": "https://cartonbank.com/product/کارتن-پستی-سایز-نه/",
+    "nominalOutside": {
+      "lengthMm": 550,
+      "widthMm": 450,
+      "heightMm": 350
+    },
+    "note": "ابعاد اسمی تأمین‌کننده؛ ابعاد داخلی، وزن خالی و ظرفیت را با کارتن خریداری‌شده تکمیل کنید."
+  }
+]

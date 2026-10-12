@@ -67,8 +67,6 @@ export function Checkout() {
     [busy, setBusy] = useState(false),
     [key, setKey] = useState("");
   const [calculated, setCalculated] = useState(false),
-    [method, setMethod] = useState(""),
-    [acceptFallback, setAcceptFallback] = useState(false),
     [quoteBusy, setQuoteBusy] = useState(false),
     [quoteRetry, setQuoteRetry] = useState(0);
   const quoteSequence = useRef(0);
@@ -136,8 +134,6 @@ export function Checkout() {
         address,
         province: address.province,
         discountCode: appliedCode,
-        method,
-        acceptFallback,
       })
         .then((q) => {
           if (sequence === quoteSequence.current) {
@@ -161,8 +157,6 @@ export function Checkout() {
     destinationKey,
     cartSnapshot,
     appliedCode,
-    method,
-    acceptFallback,
     orderId,
     quoteRetry,
     user?.authenticated,
@@ -209,8 +203,6 @@ export function Checkout() {
       const result = await api<Quote>("/checkout/quote", "POST", {
         province: address.province,
         address,
-        method,
-        acceptFallback,
         discountCode: next,
       });
       // Only an address-validated quote can unlock placing the order.
@@ -515,13 +507,38 @@ export function Checkout() {
                     <button
                       type="button"
                       className="button secondary"
-                      onClick={() => {
-                        setMethod("post");
-                        setAcceptFallback(true);
-                        setQuote(null);
+                      disabled={busy || quoteBusy}
+                      onClick={async () => {
+                        const sequence = quoteSequence.current;
+                        setQuoteBusy(true);
+                        setError("");
+                        try {
+                          const accepted = await api<Quote>(
+                            "/checkout/quote",
+                            "POST",
+                            {
+                              address,
+                              discountCode: appliedCode,
+                              method: "post",
+                              acceptFallback: true,
+                              acceptedQuoteId: quote.shippingQuoteId,
+                            },
+                          );
+                          if (sequence === quoteSequence.current)
+                            setQuote(accepted);
+                        } catch (e) {
+                          if (sequence === quoteSequence.current) {
+                            setError((e as Error).message);
+                            setQuote(null);
+                          }
+                        } finally {
+                          if (sequence === quoteSequence.current)
+                            setQuoteBusy(false);
+                        }
                       }}
                     >
-                      ارسال با پست را می‌پذیرم
+                      ارسال با پست به مبلغ {money(quote.shippingRials)} تومان را
+                      می‌پذیرم
                     </button>
                   )}
                   <small>

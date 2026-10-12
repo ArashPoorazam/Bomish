@@ -4,6 +4,7 @@ import type { Address, Product, ShippingSnapshot } from "@/lib/types";
 import { money, packageLabel } from "@/lib/format";
 import { ShippingLocalities, PinConfirmation } from "../shipping-address";
 import { providerName } from "@/lib/shipping";
+import { AddressMap } from "../address-map";
 import { ParcelView } from "./shipping-parcel";
 export const blankShippingAddress: Address = {
   id: "",
@@ -121,6 +122,14 @@ export function ShippingPreview() {
           setAddress(v);
           setResult(null);
         }}
+      />
+      <AddressMap
+        address={address}
+        onChange={(v) => {
+          setAddress(v);
+          setResult(null);
+        }}
+        reverse={false}
       />
       <PinConfirmation
         address={address}
