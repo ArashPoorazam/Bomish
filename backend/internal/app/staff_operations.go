@@ -3,7 +3,6 @@ package app
 import (
 	"bomish/internal/domain"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -130,7 +129,7 @@ func (a *App) updateOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 type shippingRule struct {
-	ID       string `json:"id"`
+	ID       string `json:"id,omitempty"`
 	Province string `json:"province"`
 	MaxGrams int64  `json:"maxGrams"`
 	FeeRials int64  `json:"feeRials"`
@@ -213,24 +212,9 @@ func (a *App) saveShipping(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if e := validateConfig(v.calculatedConfig); e != nil {
-		fail(w, 400, e.Error())
-		return
-	}
-	if v.FreeShippingRials < 0 || v.FreeShippingRials > 100000000000 || !validSupportURL(v.SupportURL) || v.PackagingGrams < 0 || v.PackagingGrams > 10000 || len(v.Rules) > 500 {
+	if v.FreeShippingRials < 0 || v.FreeShippingRials > 100000000000 || !validSupportURL(v.SupportURL) {
 		fail(w, 400, "تنظیمات ارسال معتبر نیست")
 		return
-	}
-	seen := map[string]bool{}
-	for i := range v.Rules {
-		x := &v.Rules[i]
-		key := fmt.Sprintf("%s/%d", x.Province, x.MaxGrams)
-		if seen[key] || x.Province == "" || x.MaxGrams < 1 || x.MaxGrams > 10000000 || x.FeeRials < 0 || x.FeeRials > 10000000000 {
-			fail(w, 400, "بازه‌ها و هزینه‌ها را بررسی کنید")
-			return
-		}
-		seen[key] = true
-		x.ID = token()
 	}
 	tx, e := a.Pool.Begin(r.Context())
 	if e != nil {
@@ -249,6 +233,26 @@ func (a *App) saveShipping(w http.ResponseWriter, r *http.Request) {
 		shippingError(w, 409, "stale_version", "تنظیمات توسط همکار تغییر کرده؛ نسخه تازه را دریافت کنید")
 		return
 	}
+	// Technical settings are owned by the configuration file, never by a browser draft.
+	var previous calculatedConfig
+	if e = json.Unmarshal(previousRaw, &previous); e != nil {
+		a.dbError(w, e)
+		return
+	}
+	v.Mode, v.Localities, v.Snapp, v.Tapin = previous.Mode, previous.Localities, previous.Snapp, previous.Tapin
+	// Browser edits can change physical measurements, but never provider mappings.
+	savedSizes := postalBoxSizes(previous)
+	for i := range v.Boxes {
+		size, exists := savedSizes[v.Boxes[i].ID]
+		v.Boxes[i].PostalSizeID = size
+		if !exists && v.Boxes[i].Simulated && a.simulatedShipping() {
+			v.Boxes[i].PostalSizeID = "sim-box"
+		}
+	}
+	if e = validateConfig(v.calculatedConfig); e != nil {
+		fail(w, 400, e.Error())
+		return
+	}
 	if v.Mode == "calculated" {
 		blockers, err := a.activationBlockers(r.Context(), tx, v.calculatedConfig)
 		if err != nil {
@@ -260,8 +264,6 @@ func (a *App) saveShipping(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	var previous calculatedConfig
-	_ = json.Unmarshal(previousRaw, &previous)
 	before, _ := json.Marshal(previous.Origin)
 	after, _ := json.Marshal(v.Origin)
 	v.OriginRevision = previous.OriginRevision
@@ -278,15 +280,7 @@ func (a *App) saveShipping(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	_, e = tx.Exec(r.Context(), "DELETE FROM shipping_rules")
-	if e == nil {
-		_, e = tx.Exec(r.Context(), "UPDATE settings SET packaging_grams=$1,free_shipping_rials=$2,support_url=$3 WHERE id=true", v.PackagingGrams, v.FreeShippingRials, v.SupportURL)
-	}
-	for _, x := range v.Rules {
-		if e == nil {
-			_, e = tx.Exec(r.Context(), "INSERT INTO shipping_rules(id,province,max_grams,fee_rials) VALUES($1,$2,$3,$4)", x.ID, x.Province, x.MaxGrams, x.FeeRials)
-		}
-	}
+	_, e = tx.Exec(r.Context(), "UPDATE settings SET free_shipping_rials=$1,support_url=$2 WHERE id=true", v.FreeShippingRials, v.SupportURL)
 	if e == nil {
 		e = audit(r, tx, "shipping.update", "settings")
 	}

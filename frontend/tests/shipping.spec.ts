@@ -1,4 +1,8 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { loginStaffAPI } from "./staff-login";
 import type {
   ShippingConfig,
@@ -195,6 +199,40 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
     },
   };
   await checked(page.request, "/staff/shipping", "PUT", config, headers);
+  // File-owned settings are applied through the backend CLI against this disposable database.
+  expect(
+    process.env.DATABASE_URL,
+    "Set DATABASE_URL to the isolated acceptance database",
+  ).toBeTruthy();
+  const directory = mkdtempSync(join(tmpdir(), "bomish-shipping-"));
+  try {
+    const file = join(directory, "shipping.json");
+    writeFileSync(
+      file,
+      JSON.stringify({
+        mode: config.mode,
+        localities: config.localities,
+        snapp: config.snapp,
+        tapin: config.tapin,
+        postalBoxSizes: Object.fromEntries(
+          config.boxes.map((box) => [box.id, box.postalSizeId]),
+        ),
+      }),
+    );
+    execFileSync("go", ["run", "./cmd/server", "apply-shipping-config"], {
+      cwd: "../backend",
+      env: {
+        ...process.env,
+        APP_ENV: "development",
+        SHIPPING_SIMULATED: "true",
+        SHIPPING_CONFIG_FILE: file,
+        SEED_DEMO: "false",
+      },
+    });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+
   await page.goto("/staff?section=shipping");
   // Navigation is owned by the dashboard; visit the explicit shipping section link.
   const shippingNav = page.getByRole("link", { name: "ارسال", exact: true });

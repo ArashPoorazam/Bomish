@@ -1,11 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { ShippingConfig, ProviderHealth } from "@/lib/types";
+import type { ShippingConfig } from "@/lib/types";
 import { AddressMap } from "../address-map";
 import { ShippingLocalities, PinConfirmation } from "../shipping-address";
 import { ShippingBoxes } from "./shipping-boxes";
-import { ShippingTechnical } from "./shipping-technical";
 import { ShippingReadiness } from "./shipping-readiness";
 import { AddressTextFields, ShippingPreview } from "./shipping-preview";
 import { MeasurementNumber } from "./measurement-number";
@@ -132,32 +131,6 @@ export function ShippingEditor({
             </label>
           </div>
         </section>
-        <ShippingTechnical
-          v={v}
-          setV={setV}
-          busy={busy}
-          dirty={dirty}
-          onCheck={async (name) => {
-            setBusy(true);
-            setError("");
-            try {
-              const health = await api<ProviderHealth>(
-                `/staff/shipping/providers/${name}/check`,
-                "POST",
-              );
-              const next = {
-                ...v,
-                providers: { ...v.providers, [name]: health },
-              };
-              setV(next);
-              setSaved(JSON.stringify(next));
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        />
         <div className="shipping-save-bar">
           <span>
             {dirty

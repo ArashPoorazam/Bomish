@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import type { ShippingConfig } from "../src/lib/types";
 
 // Exercise staff setup itself; carrier/payment lifecycle is covered by shipping.spec.ts.
-test("shipping setup keeps technical details secondary and saves a sourced box", async ({
+test("shipping setup keeps technical details out of the interface and saves a sourced box", async ({
   page,
 }, testInfo) => {
   const zeroSize = { lengthMm: 0, widthMm: 0, heightMm: 0 };
@@ -151,7 +151,12 @@ test("shipping setup keeps technical details secondary and saves a sourced box",
       fullPage: true,
     });
   }
-  await page.getByText("تنظیمات فنی و راه‌اندازی", { exact: true }).click();
-  await expect(page.getByLabel("شناسه فروشگاه", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("تنظیمات فنی و راه‌اندازی", { exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator('a[href="#shipping-technical"]')).toHaveCount(0);
+  await expect(
+    page.getByLabel("شناسه اندازه پستی", { exact: true }),
+  ).toHaveCount(0);
   expect(errors).toEqual([]);
 });

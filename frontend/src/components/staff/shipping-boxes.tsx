@@ -218,19 +218,6 @@ export function ShippingBoxes({
                     onChange={(v) => update(i, { [key]: v, verified: false })}
                   />
                 ))}
-                <label>
-                  شناسه اندازه پستی
-                  <input
-                    dir="ltr"
-                    value={b.postalSizeId}
-                    onChange={(e) =>
-                      update(i, {
-                        postalSizeId: e.target.value,
-                        verified: false,
-                      })
-                    }
-                  />
-                </label>
               </div>
               <label className="check-label">
                 <input

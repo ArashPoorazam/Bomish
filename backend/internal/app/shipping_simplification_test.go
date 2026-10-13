@@ -8,7 +8,7 @@ import (
 )
 
 func TestTehranCourierIndependentOfPostalMappings(t *testing.T) {
-	_, owner, customer, address := shippingFixture(t)
+	a, owner, customer, address := shippingFixture(t)
 	var cfg shippingConfig
 	owner.ok(t, "GET", "/staff/shipping", nil, &cfg)
 	cfg.Localities[0].TapinCity = ""
@@ -16,6 +16,7 @@ func TestTehranCourierIndependentOfPostalMappings(t *testing.T) {
 	cfg.Localities[0].Verified = false
 	cfg.Boxes[0].PostalSizeID = ""
 	owner.ok(t, "PUT", "/staff/shipping", cfg, nil)
+	applyTechnicalFixture(t, a, cfg)
 	var q quoteResult
 	customer.ok(t, "POST", "/checkout/quote", shippingQuoteInput{Address: address}, &q)
 	if q.Method != "snapp" || q.RequiresAcceptance {
@@ -28,7 +29,7 @@ func TestTehranCourierIndependentOfPostalMappings(t *testing.T) {
 }
 
 func TestOtherCityInTehranProvinceUsesPost(t *testing.T) {
-	_, owner, customer, address := shippingFixture(t)
+	a, owner, customer, address := shippingFixture(t)
 	var cfg shippingConfig
 	owner.ok(t, "GET", "/staff/shipping", nil, &cfg)
 	l := cfg.Localities[0]
@@ -37,6 +38,7 @@ func TestOtherCityInTehranProvinceUsesPost(t *testing.T) {
 	l.TapinCity = "3"
 	cfg.Localities = append(cfg.Localities, l)
 	owner.ok(t, "PUT", "/staff/shipping", cfg, nil)
+	applyTechnicalFixture(t, a, cfg)
 	address.CityID = l.ID
 	address.City = l.City
 	var q quoteResult

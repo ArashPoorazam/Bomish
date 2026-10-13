@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -36,7 +38,10 @@ func shippingFixture(t *testing.T) (*App, *client, *client, domain.Address) {
 	cfg.Boxes = []packing.Box{{ID: "box-1", Name: "کارتن آزمایش", Inside: packing.Size{Length: 200, Width: 200, Height: 200}, Outside: packing.Size{Length: 210, Width: 210, Height: 210}, EmptyGrams: 100, FillerGrams: 20, MaxGrams: 10000, InsetMm: 5, PostalSizeID: "1", Active: true, Verified: true}}
 	cfg.Snapp = providerConfig{Enabled: true, Service: "sim-bike", Currency: "rial", Verified: true, CityID: addr.CityID, Area: [][2]float64{{35, 51}, {36, 51}, {36, 52}, {35, 52}}, MaxGrams: 10000, MaxVolumeCm3: 100000, MaxParcels: 4, MaxSize: packing.Size{Length: 500, Width: 500, Height: 500}}
 	cfg.Tapin = providerConfig{Enabled: true, Service: "0", ShopID: "sim-shop", Currency: "rial", Verified: true, MaxGrams: 10000, MaxSize: packing.Size{Length: 1000, Width: 1000, Height: 1000}}
+	// Save merchant fields first, then activate the file-owned technical setup.
 	owner.ok(t, "PUT", "/staff/shipping", cfg, nil)
+	applyTechnicalFixture(t, a, cfg)
+
 	c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "test500", "quantity": 2}, nil)
 	return a, owner, c, addr
 }
@@ -393,7 +398,7 @@ func TestShippingMeasurementDraftPublicationAndRollback(t *testing.T) {
 	var cfg shippingConfig
 	owner.ok(t, "GET", "/staff/shipping", nil, &cfg)
 	cfg.Mode = "legacy"
-	owner.ok(t, "PUT", "/staff/shipping", cfg, nil)
+	applyTechnicalFixture(t, a, cfg)
 	owner.ok(t, "POST", "/staff/products/turmeric/publish", nil, nil)
 	var retry map[string]string
 	c.ok(t, "POST", "/checkout", body, &retry)
@@ -466,5 +471,20 @@ func TestShippingUnknownDoesNotForgetPickup(t *testing.T) {
 	owner.ok(t, "GET", "/staff/orders/"+id, nil, &order)
 	if order.Status != "shipped" {
 		t.Fatal("lost shipped milestone", order.Status)
+	}
+}
+
+func applyTechnicalFixture(t *testing.T, a *App, cfg shippingConfig) {
+	t.Helper()
+	raw, err := json.Marshal(shippingTechnical{Mode: cfg.Mode, Localities: cfg.Localities, Snapp: cfg.Snapp, Tapin: cfg.Tapin, PackagingGrams: cfg.PackagingGrams, Rules: cfg.Rules, PostalBoxSizes: postalBoxSizes(cfg.calculatedConfig)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "shipping.json")
+	if err = os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = a.ApplyShippingConfig(context.Background(), path); err != nil {
+		t.Fatal(err)
 	}
 }

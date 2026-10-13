@@ -2342,6 +2342,7 @@ export interface paths {
                 };
             };
         };
+        /** @description Updates merchant settings (origin, boxes, freeShippingRials and supportUrl) using optimistic version checks. Technical fields returned by GET are ignored on PUT; manage mode, localities, providers, packagingGrams, rules and box postalSizeId mappings through SHIPPING_CONFIG_FILE. */
         put: {
             parameters: {
                 query?: never;

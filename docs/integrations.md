@@ -1,6 +1,6 @@
 # Private configuration and operations
 
-All integration values live in the root `.env` file (ignored by Git, permissions 0600). `.env.example` is the shareable template. The native launcher loads it; Docker Compose forwards server-only keys to the Go service. Restart the services after changing values. Never use `NEXT_PUBLIC_` for service credentials.
+Private credentials and deployment environment values live in the root `.env` file (ignored by Git, permissions 0600). `.env.example` is the shareable template. The native launcher loads it; Docker Compose forwards server-only keys to the Go service. Restart the services after changing values. Never use `NEXT_PUBLIC_` for service credentials.
 
 | Setting | Purpose |
 |---|---|
@@ -68,7 +68,7 @@ Live adapters are deliberately **not wired for activation**. `SNAPP_API_KEY` and
 
 The Snapp HTTP transport supports separate quote/create/lookup/cancel capabilities, bounded responses, credential-safe redirects and no automatic mutation retries. It requires a `SnappContract` implementation for the merchant's **verified current B2B schema**. That live wire-contract binding remains an activation prerequisite: the published documentation URLs were inaccessible during this implementation, and no old API route or booking/authentication schema was invented. Fixture contracts exercise the transport; the application uses only `Disabled` or the durable simulator. Complete and test this binding in the authorized provider environment before installing a live adapter.
 
-Operations must enter a measured Tehran origin with confirmed pin, verified active boxes and actual locality mappings in the existing staff Shipping section. Locality IDs are stable internal IDs; provider codes are separate. The catalog begins empty rather than fabricating nationwide mappings. Staff imports/enters and verifies the merchant's supported cities. Unmapped old addresses retain their text and prompt for city confirmation. Nominal box templates are optional inactive supplier examples and contain no invented inside dimensions, weight, padding, capacity or provider mappings.
+Operations must enter a measured Tehran origin with confirmed pin and verified active boxes in the staff Shipping section. Technical operators enter locality and postal carton mappings in `config/shipping.json`. Locality IDs are stable internal IDs; provider codes are separate. The catalog begins empty rather than fabricating nationwide mappings. The technical operator enters and verifies the merchant's supported cities in the file. Unmapped old addresses retain their text and prompt for city confirmation. Nominal box templates are optional inactive supplier examples and contain no invented inside dimensions, weight, padding, capacity or provider mappings.
 
 Provider checks are read-only. No settings save, checkout quote, payment or packing completion creates a courier. Staff explicitly requests the courier after review. Postal label purchase and booking remain outside the application; record a distinct barcode and nullable actual cost for each parcel. Zero cost means zero; blank means unknown.
 
@@ -80,10 +80,74 @@ For recovery: refresh an uncertain shipment first. Do not delete attempts or rec
 
 The product wizard has five steps. In **بسته‌ها**, each stable package card combines selling details and shipping measurements. Measurement help and copying are secondary controls. Saving complete measurements after visiting this step explicitly confirms them on the server; unrelated edits do not certify old estimates. Partial drafts remain allowed, calculated-mode publication requires complete confirmed measurements, and legacy mode retains preparation warnings. Changing contents does not rescale dimensions. Old `step=shipping` links open the merged package step.
 
-In **ارسال**, complete the pickup address, select stocked cartons, then review delivery policy and the free-shipping threshold. Readiness separates merchant preparation from integration setup. Provider settings and legacy tariffs are under technical setup; quotation testing is a separate expandable section. Saves are explicit and retain concurrent-edit protection. Existing stores remain in their saved mode; calculated activation in this release requires simulation.
+In **ارسال**, complete the pickup address, select stocked cartons, then review delivery policy and the free-shipping threshold. Readiness separates merchant preparation from integration setup. Provider settings, city and postal carton mappings, calculation mode and legacy tariffs are managed in `config/shipping.json`; quotation testing remains a separate expandable section. The interface retains read-only integration readiness and directs staff to the technical operator when setup is incomplete. Saves are explicit and retain concurrent-edit protection. Existing stores remain in their saved mode; calculated activation in this release requires simulation.
 
 The routing rule is **Tehran city: Snapp; all other cities: post**, including other cities in Tehran province. Internal locality identity is independent of postal provider mappings. Missing postal mappings do not block an eligible Snapp quote. Postal orders select among boxes with eligible postal mappings and limits. When Snapp is unavailable or over capacity, checkout shows the postal reason and price. Acceptance refers to that exact unexpired quote ID, bound to the customer, cart, address, discount and configuration revision; it neither silently requotes nor enables future automatic fallback.
 
 The versioned Cartonbank catalog is embedded in `backend/internal/app/shipping_box_catalog.json`. Each listing has its own source URL and nominal exterior dimensions; these are supplier specifications, not a universal national size standard. For example, [the size-one supplier listing](https://cartonbank.com/product/کارتن-پستی-سایز-یک/) distinguishes usable interior dimensions and manufacturing tolerance. Selecting a catalog entry copies its reference into the store configuration. Staff must supply and confirm actual usable interior dimensions, empty weight, capacity and shared padding before activating it. Postal mappings are separate technical configuration. Incomplete entries are excluded from packing. Existing custom boxes and historical snapshots are preserved; catalog updates never rewrite them. Development fixtures have a separate simulation label and cannot be activated outside simulation.
 
 Packing remains a bounded suggested arrangement: products stay upright, may rotate on their base, and can use supported stacking across multiple parcels within weight and interior-clearance limits. Product measurements already include individual wrapping; box padding is applied separately. Staff confirms the actual packing before explicitly dispatching. Postal booking stays manual. Customer charges remain immutable, duplicate-booking protection remains in place, and later method changes require customer consent. No live carrier activation or label purchases are included.
+
+
+## Shipping configuration file
+
+Edit **`config/shipping.json`** for shipping integration setup. This file is initialized from the local store's existing settings. `config/shipping.example.json` shows the available fields with providers disabled; its tariff and locality are illustrative, so do not replace an existing store's complete configuration with the example.
+
+The native launcher (`scripts/dev-local.sh`) loads this file at API startup. Docker Compose mounts the `config` directory read-only and uses the same file. Restart the API after editing (`docker compose restart api` for Compose; stop and rerun the native launcher for local development). Running the native launcher while it is already running does not restart it. Direct backend launches must set `SHIPPING_CONFIG_FILE` to the absolute filename.
+
+Keep API keys in the root `.env`: `SNAPP_API_KEY`, `TAPIN_API_KEY`, and the development-only `SHIPPING_SIMULATED` switch. Never put keys in the JSON or frontend code. Compose now forwards these variables to the API. Environment changes in Compose require `docker compose up -d --force-recreate api`.
+
+| Field | What to enter |
+| --- | --- |
+| `mode` | `legacy` for existing weight-band tariffs; `calculated` only after completing activation prerequisites. |
+| `localities` | Supported cities. Each entry has stable internal `id` and `provinceId`, Persian `province` and `city`, and provider-issued `tapinProvince` / `tapinCity`. Set `verified` only after confirming the postal mappings. The array replaces the full saved city list; keep IDs used by saved addresses. |
+| `snapp`, `tapin` | Provider account and service settings described below. Omitted properties retain their saved values. |
+| `postalBoxSizes` | Provider-issued postal size ID for each saved carton, keyed by its stable box `id`. Export the current configuration after adding cartons to get these keys. Omitted keys keep their mappings; an empty string clears a mapping. Unknown box IDs are rejected. |
+| `packagingGrams` | Packaging weight added by legacy pricing, in grams (0–10,000). |
+| `rules` | Full replacement list of legacy tariff bands: `province`, `maxGrams`, and `feeRials`. Amounts are **rials**, so 65,000 toman is `650000`. Do not repeat the same province/weight boundary. IDs are generated automatically. |
+
+Provider objects accept `enabled`, `service` (provider service ID), `shopId` (Tapin merchant/shop ID), `currency` (`rial` or `toman`, matching the provider response), and `verified` (confirmation of the configured provider contract). Snapp also needs `cityId` and an `area` polygon of `[latitude, longitude]` pairs. Capacity fields are `maxGrams`, `maxVolumeCm3`, `maxParcels`, and `maxSize` (`lengthMm`, `widthMm`, `heightMm` in **millimetres**). Obtain actual IDs, coverage and limits from your provider; the example deliberately does not invent them. These verification flags never enable the currently disabled live adapters.
+
+Omitted top-level fields retain saved settings; `{}` preserves the entire current setup. Arrays replace their saved lists; `[]` explicitly clears a list. `postalBoxSizes` merges individual keys; `{}` keeps existing mappings. Unknown fields, malformed JSON and invalid configuration cause startup/import to fail without changing saved settings. Successful changes are applied atomically, recorded in configuration history and the audit log, and increment the revision so existing quotes must be refreshed. Reapplying unchanged values does not increment the revision.
+
+Pickup address, stocked cartons, free-shipping threshold and support link remain managed through **ارسال**. File imports never overwrite physical carton details or other merchant settings; they only update the postal mapping within each carton. Interface saves cannot overwrite technical settings, even when a browser submits old or modified technical fields.
+
+To export an existing deployment's configuration before editing, run from `backend/` with the same `DATABASE_URL` and `APP_ENV=development` as that API:
+
+```bash
+go run ./cmd/server export-shipping-config > ../config/shipping.json
+```
+
+Export does not apply the configured file. For Compose, use `docker compose exec -T api /app/server export-shipping-config > config/shipping.json` from the repository root. The output contains no API keys or merchant address.
+
+To apply the file immediately without restarting an already-running API:
+
+```bash
+# From backend/, with the target API's database and simulation environment:
+SHIPPING_CONFIG_FILE="$PWD/../config/shipping.json" go run ./cmd/server apply-shipping-config
+```
+
+Compose equivalent: `docker compose exec -T api /app/server apply-shipping-config`. For a new calculated setup, first import provider settings and city mappings with `mode: "legacy"`, complete pickup address/cartons/product measurements in the interface, then change the file to `mode: "calculated"` and apply it again. Activation retains all existing readiness checks and requires the development simulator in this release.
+
+The opt-in shipping browser acceptance suite also needs `DATABASE_URL` pointing to its disposable API database; it uses this CLI to set up integrations. It must never target a real store database.
+
+
+### Postal carton mappings
+
+The provider's box-size code is technical setup and is no longer an editable carton field. First save the physical carton in **ارسال**, then export the configuration. The `postalBoxSizes` object lists each saved carton ID, including unmapped cartons with an empty value. To identify a carton, match that ID to the `id` and `name` in the authenticated `GET /api/v1/staff/shipping` response (`boxes`). Enter the provider-issued code for that ID and apply the file:
+
+```json
+{
+  "postalBoxSizes": {
+    "YOUR_SAVED_BOX_ID": "PROVIDER_SIZE_ID"
+  }
+}
+```
+
+Do not use a carton name as the key; names can change. Renaming a carton or editing its measurements retains its provider mapping. New ordinary cartons start unmapped and are excluded from postal packing until configured. The explicit development-only simulated carton gets the fixed `sim-box` mapping on creation; it never establishes a live provider mapping. Clearing its mapping in the file is respected on later interface saves. Historical shipment snapshots are unchanged.
+
+### Other technical variables
+
+The remaining integration and runtime controls already live in `.env`, not the staff interface. `.env.example` includes the full set: carrier/map/SMS credentials and switches, SMS sender/template, postal tracking URL template, default support URL, public site URL/indexing, app origin, database connection, listen address, uploads path, demo seeding, frontend API address and optional build directory. These remain environment settings because they include secrets or are needed before the database/configuration importer starts. The native launcher and Compose supply their own database/service paths; commented direct-run examples should only be enabled when launching services manually.
+
+Physical dimensions, carton weights/capacities, free-shipping threshold, customer-facing support link, order tracking numbers, prices and discounts remain everyday business controls in the interface.

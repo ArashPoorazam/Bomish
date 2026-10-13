@@ -25,6 +25,7 @@ if curl -fsS --max-time 2 http://localhost:3000/api/v1/health >/dev/null 2>&1; t
   printf 'Bomish is already running at http://localhost:3000\n'
   exit 0
 fi
+export SHIPPING_CONFIG_FILE="${SHIPPING_CONFIG_FILE:-$bomish_root/config/shipping.json}"
 export APP_ENV=development APP_ORIGIN=http://localhost:3000 SEED_DEMO=true
 export DATABASE_URL="postgres://$(id -un)@127.0.0.1:55432/bomish?sslmode=disable"
 export GOCACHE="$bomish_data/go-cache" UPLOAD_DIR="$bomish_data/uploads"

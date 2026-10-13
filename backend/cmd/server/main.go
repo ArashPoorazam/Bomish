@@ -94,6 +94,25 @@ func main() {
 			panic(e)
 		}
 	}
+	if len(os.Args) > 1 && os.Args[1] == "export-shipping-config" {
+		if e = a.ExportShippingConfig(ctx, os.Stdout); e != nil {
+			panic(e)
+		}
+		return
+	}
+	configPath := os.Getenv("SHIPPING_CONFIG_FILE")
+	if configPath != "" {
+		if e = a.ApplyShippingConfig(ctx, configPath); e != nil {
+			panic(e)
+		}
+	}
+	if len(os.Args) > 1 && os.Args[1] == "apply-shipping-config" {
+		if configPath == "" {
+			panic("SHIPPING_CONFIG_FILE required")
+		}
+		fmt.Println("Shipping configuration applied.")
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "totp" {
 		if !dev {
 			os.Exit(1)

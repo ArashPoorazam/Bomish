@@ -20,6 +20,10 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
       DATABASE_URL: postgres://bomish:${POSTGRES_PASSWORD:-bomish-local-only}@db:5432/bomish?sslmode=disable
       SEED_DEMO: "true"
+      SHIPPING_CONFIG_FILE: /app/config/shipping.json
+      SHIPPING_SIMULATED: ${SHIPPING_SIMULATED:-false}
+      SNAPP_API_KEY: ${SNAPP_API_KEY:-}
+      TAPIN_API_KEY: ${TAPIN_API_KEY:-}
       NESHAN_API_KEY: ${NESHAN_API_KEY:-}
       SMS_ENABLED: ${SMS_ENABLED:-false}
       KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY:-}
@@ -32,6 +36,7 @@ services:
         condition: service_healthy
     volumes:
       - uploads:/data/uploads
+      - ./config:/app/config:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/api/v1/health"]
       interval: 10s

@@ -81,15 +81,9 @@ export function ShippingReadiness({
                   <li key={i.code}>{i.message}</li>
                 ))}
               </ul>
-              <a
-                href="#shipping-technical"
-                onClick={() => {
-                  const el = document.getElementById("shipping-technical");
-                  if (el instanceof HTMLDetailsElement) el.open = true;
-                }}
-              >
-                باز کردن تنظیمات فنی
-              </a>
+              <p className="muted">
+                برای تکمیل راه‌اندازی سرویس‌ها با مسئول فنی فروشگاه هماهنگ کنید.
+              </p>
             </details>
           ) : (
             <p>پیش‌نیازهای محیط آزمایش کامل است.</p>

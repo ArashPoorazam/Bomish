@@ -1,0 +1,162 @@
+{
+  "mode": "legacy",
+  "localities": [],
+  "snapp": {
+    "enabled": false,
+    "service": "",
+    "shopId": "",
+    "currency": "",
+    "verified": false,
+    "cityId": "",
+    "area": null,
+    "maxGrams": 0,
+    "maxVolumeCm3": 0,
+    "maxParcels": 0,
+    "maxSize": {
+      "lengthMm": 0,
+      "widthMm": 0,
+      "heightMm": 0
+    }
+  },
+  "tapin": {
+    "enabled": false,
+    "service": "",
+    "shopId": "",
+    "currency": "",
+    "verified": false,
+    "cityId": "",
+    "area": null,
+    "maxGrams": 0,
+    "maxVolumeCm3": 0,
+    "maxParcels": 0,
+    "maxSize": {
+      "lengthMm": 0,
+      "widthMm": 0,
+      "heightMm": 0
+    }
+  },
+  "packagingGrams": 200,
+  "rules": [
+    {
+      "province": "آذربایجان شرقی",
+      "maxGrams": 2200,
+      "feeRials": 650000
+    },
+    {
+      "province": "آذربایجان شرقی",
+      "maxGrams": 5200,
+      "feeRials": 950000
+    },
+    {
+      "province": "آذربایجان شرقی",
+      "maxGrams": 25200,
+      "feeRials": 1800000
+    },
+    {
+      "province": "اصفهان",
+      "maxGrams": 2200,
+      "feeRials": 650000
+    },
+    {
+      "province": "اصفهان",
+      "maxGrams": 5200,
+      "feeRials": 950000
+    },
+    {
+      "province": "اصفهان",
+      "maxGrams": 25200,
+      "feeRials": 1800000
+    },
+    {
+      "province": "البرز",
+      "maxGrams": 2200,
+      "feeRials": 650000
+    },
+    {
+      "province": "البرز",
+      "maxGrams": 5200,
+      "feeRials": 950000
+    },
+    {
+      "province": "البرز",
+      "maxGrams": 25200,
+      "feeRials": 1800000
+    },
+    {
+      "province": "تهران",
+      "maxGrams": 2200,
+      "feeRials": 650000
+    },
+    {
+      "province": "تهران",
+      "maxGrams": 5200,
+      "feeRials": 950000
+    },
+    {
+      "province": "تهران",
+      "maxGrams": 25200,
+      "feeRials": 1800000
+    },
+    {
+      "province": "خراسان رضوی",
+      "maxGrams": 2200,
+      "feeRials": 650000
+    },
+    {
+      "province": "خراسان رضوی",
+      "maxGrams": 5200,
+      "feeRials": 950000
+    },
+    {
+      "province": "خراسان رضوی",
+      "maxGrams": 25200,
+      "feeRials": 1800000
+    },
+    {
+      "province": "فارس",
+      "maxGrams": 2200,
+      "feeRials": 650000
+    },
+    {
+      "province": "فارس",
+      "maxGrams": 5200,
+      "feeRials": 950000
+    },
+    {
+      "province": "فارس",
+      "maxGrams": 25200,
+      "feeRials": 1800000
+    },
+    {
+      "province": "مازندران",
+      "maxGrams": 2200,
+      "feeRials": 650000
+    },
+    {
+      "province": "مازندران",
+      "maxGrams": 5200,
+      "feeRials": 950000
+    },
+    {
+      "province": "مازندران",
+      "maxGrams": 25200,
+      "feeRials": 1800000
+    },
+    {
+      "province": "گیلان",
+      "maxGrams": 2200,
+      "feeRials": 650000
+    },
+    {
+      "province": "گیلان",
+      "maxGrams": 5200,
+      "feeRials": 950000
+    },
+    {
+      "province": "گیلان",
+      "maxGrams": 25200,
+      "feeRials": 1800000
+    }
+  ],
+  "postalBoxSizes": {}
+}
