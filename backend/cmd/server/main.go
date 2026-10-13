@@ -120,6 +120,10 @@ func main() {
 		fmt.Println(app.TOTP(app.DemoTOTP, time.Now().Unix()/30))
 		return
 	}
+	if e = app.ValidateSMSConfig(origin); e != nil {
+		slog.Error("SMS configuration invalid", "error", e)
+		os.Exit(1)
+	}
 	go func() {
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
@@ -145,11 +149,23 @@ func main() {
 				if e := a.ProcessShipments(ctx); e != nil {
 					slog.Error("shipping worker failed")
 				}
-				if e := a.ProcessSMS(ctx); e != nil {
-					slog.Error("SMS processing failed")
-				}
 				if e := a.ExpireReservations(ctx); e != nil {
 					slog.Error("reservation expiry failed", "error", e)
+				}
+			}
+		}
+	}()
+	// Carrier requests can be slow; SMS has its own independent worker.
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if e := a.ProcessSMS(ctx); e != nil {
+					slog.Error("SMS processing failed")
 				}
 			}
 		}

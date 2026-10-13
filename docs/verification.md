@@ -45,3 +45,12 @@ Manual review remains required for real packing trials, live account wire contra
 - All 10 targeted Playwright tests passed: seven product-editor cases, one historical staff-order case, and two real API/database simulated shipping journeys. Narrow mobile measurements, checkout/postal fallback and customer progress, plus desktop dispatch review were visually inspected. Screenshots are in the ignored frontend `test-results` directory.
 - Migration 012 applied successfully to the disposable database. No merchant database or credentials were used. The preexisting edit in migration 001 and the supplied handoff were preserved. No real courier, postage purchase or SMS was issued.
 - Live shipping remains unavailable. The Snapp wire-contract implementation and installation of verified live adapters are still required, in addition to the operational prerequisites in `launch.md`; passing simulation does not complete that activation work.
+
+## Kavenegar authentication and order notifications — 2026-10-13
+
+- Backend tests and the full `go test -race ./...` suite passed against isolated schemas in a disposable PostgreSQL database. Focused race tests additionally covered the final migration and reopened-packing behavior; `go vet ./...` and SQL schema/query compilation passed.
+- Provider calls were mocked. Coverage includes all six Lookup templates, OTP expiry/replay/attempt limits and failure cleanup, purchaser-number routing, milestone deduplication, concurrent workers, temporary rejection backoff, ambiguous results, interrupted workers, suppression of outdated messages, and disabled/pre-activation backlog exclusion.
+- Calculated shipping tests verified that Snapp booking/acceptance sends no shipment SMS, pickup sends the Snapp template, delivery sends the delivered template, and multiple postal parcels retain their individual tracking links on the order page.
+- Four browser journeys passed: customer/staff order progress and refresh, packing checklist controls, logged-in/logged-out/other-customer access through the same SMS order URL, and the existing owner/referral/fulfillment journey.
+- Frontend type checks, formatting checks and production build passed. Test-generated preview configuration was removed; the merchant database and private integration settings were not changed.
+- No live Kavenegar call or real SMS was issued. Account funding, template approval for the actual HTTPS domain, and merchant test-phone delivery remain activation prerequisites. Production payments and live Snapp activation remain separate work.

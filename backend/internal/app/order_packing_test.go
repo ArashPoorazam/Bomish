@@ -51,3 +51,66 @@ func TestOrderPackingChecklist(t *testing.T) {
 		t.Fatalf("order leaked: %d", status)
 	}
 }
+
+func TestPackingConfirmationRequiresCompleteChecklist(t *testing.T) {
+	a := setup(t)
+	staff := couponOwner(t, a)
+	ctx := context.Background()
+	smsOrder(t, a, "checklist-sms")
+	if _, err := a.Pool.Exec(ctx, `INSERT INTO order_items(order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity) VALUES('checklist-sms','turmeric','زردچوبه',500,0,0,'test500','۵۰۰ گرم',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := staff.call("PATCH", "/staff/orders/checklist-sms", map[string]string{"status": "packing"}); status != 409 {
+		t.Fatal("incomplete checklist accepted", status)
+	}
+	var count int
+	if err := a.Pool.QueryRow(ctx, "SELECT count(*) FROM jobs WHERE payload->>'orderId'='checklist-sms'").Scan(&count); err != nil || count != 0 {
+		t.Fatal(count, err)
+	}
+	packAllItems(t, staff, "checklist-sms")
+	staff.ok(t, "PATCH", "/staff/orders/checklist-sms", map[string]string{"status": "packing"}, nil)
+	if status, _ := staff.call("PATCH", "/staff/orders/checklist-sms", map[string]string{"status": "packing"}); status != 409 {
+		t.Fatal("repeated confirmation accepted")
+	}
+	if err := a.Pool.QueryRow(ctx, "SELECT count(*) FROM jobs WHERE payload->>'orderId'='checklist-sms'").Scan(&count); err != nil || count != 1 {
+		t.Fatal(count, err)
+	}
+	staff.ok(t, "PATCH", "/staff/orders/checklist-sms/packing", map[string]any{"productId": "turmeric", "packageId": "test500", "packed": false}, nil)
+	if status, _ := staff.call("PATCH", "/staff/orders/checklist-sms", map[string]string{"status": "shipped", "tracking": "12345678901234567890"}); status != 409 {
+		t.Fatal("incomplete repacking allowed handoff")
+	}
+}
+
+func TestSMSWaitsForReopenedPacking(t *testing.T) {
+	a := setup(t)
+	smsTestConfig(t)
+	ctx := context.Background()
+	smsOrder(t, a, "reopened-packing")
+	if _, err := a.Pool.Exec(ctx, `INSERT INTO order_items(order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity,packed) VALUES('reopened-packing','turmeric','زردچوبه',500,0,0,'test500','۵۰۰ گرم',1,true)`); err != nil {
+		t.Fatal(err)
+	}
+	smsQueue(t, a, "reopened-packing", "packing")
+	if _, err := a.Pool.Exec(ctx, `UPDATE order_items SET packed=false WHERE order_id='reopened-packing'`); err != nil {
+		t.Fatal(err)
+	}
+	job, err := a.claimSMS(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.AttemptID != 0 {
+		t.Fatal("announced incomplete packing")
+	}
+	if status, n, reason := smsJobStatus(t, a, "reopened-packing", "packing"); status != "pending" || n != 0 || reason != "awaiting_packing" {
+		t.Fatal(status, n, reason)
+	}
+	if _, err = a.Pool.Exec(ctx, `UPDATE order_items SET packed=true WHERE order_id='reopened-packing'; UPDATE jobs SET available_at=now() WHERE payload->>'orderId'='reopened-packing'`); err != nil {
+		t.Fatal(err)
+	}
+	job, err = a.claimSMS(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.AttemptID == 0 {
+		t.Fatal("completed packing not claimed")
+	}
+}

@@ -3,6 +3,7 @@ package app
 import (
 	"bomish/internal/domain"
 	"encoding/json"
+	"github.com/jackc/pgx/v5"
 	"io"
 	"net/http"
 	"strings"
@@ -53,12 +54,28 @@ func (a *App) updateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	if calculated {
-		var currentStatus string
-		if e = tx.QueryRow(r.Context(), "SELECT status FROM orders WHERE id=$1 FOR UPDATE", r.PathValue("id")).Scan(&currentStatus); e != nil {
+	// Checklist edits lock the same order, making validation and confirmation atomic.
+	var currentStatus string
+	if e = tx.QueryRow(r.Context(), "SELECT status FROM orders WHERE id=$1 FOR UPDATE", r.PathValue("id")).Scan(&currentStatus); e != nil {
+		if e == pgx.ErrNoRows {
+			fail(w, 404, "سفارش پیدا نشد")
+			return
+		}
+		a.dbError(w, e)
+		return
+	}
+	if !calculated && (in.Status == "packing" || in.Status == "shipped") {
+		var complete bool
+		if e = tx.QueryRow(r.Context(), "SELECT count(*)>0 AND coalesce(bool_and(packed),false) FROM order_items WHERE order_id=$1", r.PathValue("id")).Scan(&complete); e != nil {
 			a.dbError(w, e)
 			return
 		}
+		if !complete {
+			fail(w, 409, "همه ردیف‌های سفارش را در چک‌لیست بسته‌بندی تأیید کنید")
+			return
+		}
+	}
+	if calculated {
 		d, err := loadDelivery(r.Context(), tx, r.PathValue("id"), true)
 		if err != nil {
 			a.dbError(w, err)

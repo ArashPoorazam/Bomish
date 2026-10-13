@@ -220,6 +220,9 @@ export function StaffOrderDetail({
                     busy ||
                     loading ||
                     !!error ||
+                    ((next === "packing" || next === "shipped") &&
+                      (order.items.length === 0 ||
+                        packed !== order.items.length)) ||
                     (next === "shipped" && !/^[0-9]{10,30}$/.test(tracking))
                   }
                   onClick={() =>

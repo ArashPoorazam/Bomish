@@ -128,6 +128,9 @@ func TestCustomerSessionSurvivesStaffLoginAndOrderUpdates(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	if _, e = a.Pool.Exec(context.Background(), `INSERT INTO order_items(order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity,packed) VALUES('session-order','turmeric','زردچوبه',500,0,0,'test500','۵۰۰ گرم',1,true)`); e != nil {
+		t.Fatal(e)
+	}
 	for _, status := range []string{"packing", "shipped", "received"} {
 		c.ok(t, "PATCH", "/staff/orders/session-order", map[string]string{"status": status, "tracking": "123456789012345678901234"}, nil)
 		var orders []domain.Order

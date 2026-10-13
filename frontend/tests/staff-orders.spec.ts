@@ -96,12 +96,22 @@ test("compact orders open clear details and retain per-package packing checks", 
   ).toBeVisible();
   const checks = detail.getByRole("checkbox");
   await expect(checks).toHaveCount(2);
+  await expect(
+    detail.getByRole("button", { name: "تأیید بسته‌بندی", exact: true }),
+  ).toBeDisabled();
   await checks.first().check();
   await expect(detail.getByRole("status")).toHaveText(
     "وضعیت بسته‌بندی ذخیره شد.",
   );
   await expect(checks.first()).toBeChecked();
   await expect(checks.nth(1)).not.toBeChecked();
+  await expect(
+    detail.getByRole("button", { name: "تأیید بسته‌بندی", exact: true }),
+  ).toBeDisabled();
+  await checks.nth(1).check();
+  await expect(
+    detail.getByRole("button", { name: "تأیید بسته‌بندی", exact: true }),
+  ).toBeEnabled();
   await detail.screenshot({
     path: "test-results/staff-order-detail-desktop.png",
   });

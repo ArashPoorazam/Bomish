@@ -2,6 +2,7 @@ package app
 
 import (
 	"bomish/internal/domain"
+	"context"
 	"crypto/hmac"
 	"crypto/pbkdf2"
 	"crypto/rand"
@@ -62,8 +63,10 @@ func (a *App) requestOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if smsEnabled() {
-		if e := sendSMS(r.Context(), in.Phone, "", code); e != nil {
-			a.Pool.Exec(r.Context(), "DELETE FROM otp_challenges WHERE phone=$1 AND code_hash=$2", in.Phone, hash(in.Phone+code))
+		if e := a.sendLoginSMS(r.Context(), in.Phone, code); e != nil {
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
+			a.Pool.Exec(cleanupCtx, "DELETE FROM otp_challenges WHERE phone=$1 AND code_hash=$2", in.Phone, hash(in.Phone+code))
+			cancel()
 			fail(w, 502, "ارسال پیامک انجام نشد؛ دوباره تلاش کنید")
 			return
 		}

@@ -7,7 +7,11 @@ Private credentials and deployment environment values live in the root `.env` fi
 | `NESHAN_API_KEY` | Neshan service key for reverse geocoding. The supplied key is stored only in local `.env`. |
 | `SMS_ENABLED` | Keep `false` while testing. Set `true` only after configuring and validating Kavenegar. |
 | `KAVENEGAR_API_KEY` | Kavenegar account API key. |
-| `KAVENEGAR_SENDER` | Approved sender for order-stage messages. |
+| `KAVENEGAR_PAID_TEMPLATE` | Approved payment-confirmed template. |
+| `KAVENEGAR_PACKED_TEMPLATE` | Approved packing-complete template. |
+| `KAVENEGAR_POST_TEMPLATE` | Approved postal-handoff template. |
+| `KAVENEGAR_SNAPP_TEMPLATE` | Approved Snapp-pickup template. |
+| `KAVENEGAR_DELIVERED_TEMPLATE` | Approved delivered template. |
 | `KAVENEGAR_VERIFY_TEMPLATE` | Approved verification template containing `%token`. |
 | `SUPPORT_URL` | Full `https://wa.me/989…` or `https://t.me/…` support link. An owner-panel support link overrides this default. |
 | `POST_TRACKING_URL_TEMPLATE` | Defaults to `https://pishkhan24.com/posttracking/?barcode={tracking}`. The code is URL-encoded. |
@@ -16,9 +20,50 @@ Private credentials and deployment environment values live in the root `.env` fi
 
 Neshan reverse geocoding uses [the v5 API](https://platform.neshan.org/docs/api/search-category/reverse-geocoding/). The map uses Leaflet/OpenStreetMap tiles; the private service key never reaches the browser. Selecting a point fills the editable street, city and province. Customers must check the address and add apartment details and postal code. Manual entry remains available when location permission or the provider fails. Saved latitude/longitude stay with the address and order snapshot.
 
-Kavenegar uses [verification lookup and SMS send](https://kavenegar.com/rest.html). With real SMS enabled, no OTP is returned in browser responses. Order transitions save both their history and an SMS job in the same transaction. The worker processes jobs every 30 seconds, checks provider acceptance, and retries failures with exponential backoff up to eight attempts. The analytics screen shows pending, sent-to-provider, and failed counts. Provider acceptance is not handset delivery confirmation. Network timeouts can cause duplicate messages on retry; delivery is at least once. Use a clean deployment database before enabling SMS so development orders do not produce real notifications.
+Kavenegar uses [verification Lookup](https://kavenegar.com/rest.html) for both login and essential order notifications. Configure all six approved templates and the account API key; the Lookup service requires the appropriate account tier. A sender number is no longer used. With real SMS enabled, startup validates template settings and requires an HTTPS `APP_ORIGIN`. Template names use English letters/digits/hyphens, start with a letter, and contain no spaces or underscores. No API key or OTP is exposed in browser responses or application logs.
 
-Pishkhan24's public tracking-page implementation was inspected on 2026-09-26: its initialization reads `route.query.barcode` into `TrackingCode`. Both shipment SMS and customer order views use this supported prefill parameter. The copy-code action provides a fallback if the provider changes its interface.
+### Kavenegar templates and activation
+
+Register these six templates in the Kavenegar console. Replace `https://YOUR-DOMAIN` below with the public `APP_ORIGIN`, without a trailing slash, **before submitting for approval**. The hostname and `/account/orders/` path are fixed template text; only `%token` is substituted. Order tokens are the full opaque order ID, not its abbreviated display value. Login tokens are six digits. The backend sends `type=sms`; no automatic voice fallback is requested.
+
+| Environment setting | Suggested template name | Persian template text |
+|---|---|---|
+| `KAVENEGAR_VERIFY_TEMPLATE` | `bomish-login` | بومیش: کد ورود شما %token است. اعتبار: ۵ دقیقه. این کد را در اختیار دیگران نگذارید. |
+| `KAVENEGAR_PAID_TEMPLATE` | `bomish-paid` | بومیش: پرداخت شما تأیید و سفارش ثبت شد. پیگیری: https://YOUR-DOMAIN/account/orders/%token |
+| `KAVENEGAR_PACKED_TEMPLATE` | `bomish-packed` | بومیش: بسته‌بندی سفارش شما کامل شد. پیگیری: https://YOUR-DOMAIN/account/orders/%token |
+| `KAVENEGAR_POST_TEMPLATE` | `bomish-post` | بومیش: سفارش شما به پست تحویل داده شد و در مسیر ارسال است. پیگیری: https://YOUR-DOMAIN/account/orders/%token |
+| `KAVENEGAR_SNAPP_TEMPLATE` | `bomish-snapp` | بومیش: سفارش شما تحویل پیک اسنپ شد و در مسیر شماست. پیگیری: https://YOUR-DOMAIN/account/orders/%token |
+| `KAVENEGAR_DELIVERED_TEMPLATE` | `bomish-delivered` | بومیش: تحویل سفارش شما تأیید شد. جزئیات: https://YOUR-DOMAIN/account/orders/%token |
+
+Keep `SMS_ENABLED=false` until the account is funded and each template, including its link, is approved. Configure the key and template names privately in the deployment environment; Compose forwards them to the Go server only. Restart after configuration changes. Test all six templates with a designated merchant test phone in an isolated environment before customer activation. For an HTTPS staging domain, register matching staging templates; the native local launcher intentionally uses HTTP and cannot activate real SMS. Verify the Kavenegar account is not in debug mode when checking real handset receipt. Login expiry, resend cooldown, attempt limits and one-time consumption remain unchanged.
+
+The production/payment gate and live Snapp adapter gate remain in place. This change does not activate real payments, purchase labels, book couriers or configure your Kavenegar account. Postal status changes are staff-confirmed. Snapp shipment notifications require confirmed pickup/delivery from its adapter; booking and driver acceptance do not mean pickup.
+
+### Notification delivery and recovery
+
+Order transitions save history and one deduplicated notification job per milestone in the same transaction. Messages go to the purchaser's verified account number, not the recipient phone in the shipping address. The job snapshots the phone and delivery method. A separate worker runs every five seconds, independently of carrier processing; queued work may take longer under load. Before submission it suppresses jobs whose milestone is no longer current. Reopened packing postpones its pending message until the checklist and applicable readiness confirmation are complete. In-flight submissions cannot be recalled if a newer milestone arrives while the provider is processing them.
+
+Migration 014 skips all pre-existing pending order messages (`pre_activation`); it preserves history and marks old `sent` jobs as `accepted`. Any new job created with SMS disabled is permanently `skipped` (`sms_disabled`). Enabling SMS never replays those jobs. Accepted and skipped milestones are never automatically recreated.
+
+The `sms_attempts` table records login/order attempts, template, receptor, provider message ID/status, timestamps and fixed error categories. It never stores OTP tokens, API URLs, provider response text or rendered message bodies. Restrict database access because receptors are customer data. The existing owner notifications report groups jobs by creation time and shows queued, sending, provider-accepted, unknown, failed and skipped counts. **Provider acceptance is not handset delivery confirmation.** No delivery callback endpoint is introduced.
+
+Only an explicit temporary Kavenegar rejection (409) retries, up to eight total submissions with 1, 2, 4, 8, 16, 32 and 64 minute delays. Credit, credentials and template rejection failures stop for operator action. Transport errors, truncated/malformed responses and a missing message ID become `unknown` without automatic retry. A send is durably marked `sending` before the HTTP call; interrupted jobs become `unknown` after two minutes. An OTP provider failure returns a generic error, and the login challenge is invalidated; customers may request a new code within the existing rate limits.
+
+Investigate unknown/failed messages from the private database and Kavenegar console. This read-only query includes the latest attempt without exposing message bodies or credentials:
+
+```sql
+SELECT j.id, j.payload->>'orderId' AS order_id, j.payload->>'stage' AS stage,
+       j.status, j.attempts, j.last_error, a.template, a.receptor,
+       a.provider_message_id, a.provider_status, a.created_at, a.finished_at
+FROM jobs j
+LEFT JOIN LATERAL (SELECT * FROM sms_attempts WHERE job_id=j.id ORDER BY id DESC LIMIT 1) a ON true
+WHERE j.kind='order_sms' AND j.status IN ('failed','unknown')
+ORDER BY j.id;
+```
+
+Reconcile accepted/unknown attempts in the provider console using message ID when available, otherwise receptor, template and attempt time. Never blindly reset unknown jobs. After confirming a message was **not accepted**, fixing the cause and checking its milestone is still current, an operator may deliberately reset that specific failed/unknown job to `pending`, reset its attempt budget and set `available_at=now()` in a database transaction with an operational audit record. There is no public resend endpoint. A later milestone should be allowed to notify instead of resending an obsolete update.
+
+Pishkhan24's public tracking-page implementation was inspected on 2026-09-26: its initialization reads `route.query.barcode` into `TrackingCode`. Customer order views use this supported prefill parameter; shipment SMS links to the Bomish order page. The copy-code action provides a fallback if the provider changes its interface.
 
 ## Package catalog
 
@@ -32,7 +77,7 @@ The owner can set the free-shipping subtotal threshold in **ارسال**. Zero d
 
 ## Tracking and analytics
 
-Customers are sent to `/account/orders/{id}` after successful payment. The four stages are paid, packaged, shipped and received. Staff can advance one step at a time; shipping requires a numeric tracking code. Tracking numbers and events are retained in the customer account. Each completed stage creates one notification job; repeated stage requests cannot duplicate jobs.
+Customers are sent to `/account/orders/{id}` after successful payment. The four stages are paid, packaged, shipped and received. Staff can advance one step at a time; packing completion requires every item checked, and postal handoff requires tracking codes for every parcel. Tracking numbers and events are retained in the customer account. Each completed stage creates one notification job; repeated stage requests cannot duplicate jobs.
 
 The owner-only `/omnisire/analytics` workspace includes daily sales, product clicks and purchases, package quantities, price history, customers, categories, and searches. The sidebar contains report navigation. Date controls default to the past seven Tehran calendar days and accept up to 366 days. Line charts compare up to 12 selected entities, with a keyboard-accessible daily scrubber and accessible data table. Pie charts use all matching results, independent of table pagination and line selections; smaller shares are grouped as “Other”. Package breakdowns follow selected products. Prices carry the last recorded effective package price forward; unknown earlier history stays empty. Excel exports include every filtered report row. Visits and searches start accumulating after installation and are deduplicated per session for 30 minutes; no historical click data is fabricated.
 

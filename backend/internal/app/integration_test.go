@@ -91,6 +91,15 @@ func (c *client) staff(t *testing.T, role string) {
 	c.csrf = s.CSRF
 	c.ok(t, "POST", "/staff/login", map[string]string{"username": role, "password": "Bomish-demo-2026!", "code": TOTP(DemoTOTP, time.Now().Unix()/30)}, nil)
 }
+func packAllItems(t *testing.T, staff *client, id string) {
+	t.Helper()
+	var order domain.Order
+	staff.ok(t, "GET", "/staff/orders/"+id, nil, &order)
+	for _, item := range order.Items {
+		staff.ok(t, "PATCH", "/staff/orders/"+id+"/packing", map[string]any{"productId": item.ProductID, "packageId": item.PackageID, "packed": true}, nil)
+	}
+}
+
 func setup(t *testing.T) *App {
 	t.Helper()
 	return setupCatalog(t, true)
@@ -98,6 +107,7 @@ func setup(t *testing.T) *App {
 
 func setupCatalog(t *testing.T, legacy bool) *App {
 	t.Helper()
+	t.Setenv("SMS_ENABLED", "false")
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
 		t.Skip("set TEST_DATABASE_URL for isolated PostgreSQL integration tests")
@@ -299,6 +309,7 @@ func TestStoreIntegration(t *testing.T) {
 		if code, _ := other.call("POST", "/orders/"+id+"/simulate", map[string]bool{"success": true}); code != 409 {
 			t.Fatal("other customer's payment accessible")
 		}
+		packAllItems(t, operator, id)
 		operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "packing", "tracking": ""}, nil)
 		operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped", "tracking": "123456789012345678901234"}, nil)
 	})

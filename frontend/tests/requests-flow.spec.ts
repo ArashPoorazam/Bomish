@@ -99,6 +99,23 @@ test("customer session, five stages, refresh, support and custom requests work a
     .getByRole("button", { name: "مدیریت فروشگاه", exact: true })
     .click();
 
+  const detail = await (
+    await request.get(`/api/v1/staff/orders/${order.orderId}`)
+  ).json();
+  for (const item of detail.items) {
+    expect(
+      (
+        await request.patch(`/api/v1/staff/orders/${order.orderId}/packing`, {
+          headers: staffHeaders,
+          data: {
+            productId: item.productId,
+            packageId: item.packageId,
+            packed: true,
+          },
+        })
+      ).ok(),
+    ).toBeTruthy();
+  }
   expect(
     (
       await request.patch(`/api/v1/staff/orders/${order.orderId}`, {

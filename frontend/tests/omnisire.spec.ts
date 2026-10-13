@@ -126,6 +126,12 @@ test("owner creates salesperson, referral earns commission, payout appears in sa
         name: new RegExp(`جزئیات سفارش ${orderId.slice(0, 8)}`),
       })
       .click();
+    for (const item of await operator
+      .locator(".staff-packing-items input[type=checkbox]")
+      .all()) {
+      await item.check();
+      await expect(item).toBeEnabled();
+    }
     await operator
       .getByRole("button", { name: "تأیید بسته‌بندی", exact: true })
       .click();

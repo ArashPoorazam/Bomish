@@ -72,6 +72,7 @@ func TestPackagesOperations(t *testing.T) {
 	if code, _ := operator.call("PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped", "tracking": "123456789012345678901234"}); code != 409 {
 		t.Fatal("skipped stage")
 	}
+	packAllItems(t, operator, id)
 	operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "packing"}, nil)
 	if code, _ := operator.call("PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped"}); code != 400 {
 		t.Fatal("missing tracking accepted")

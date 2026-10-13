@@ -67,7 +67,7 @@ cd backend
 go run ./cmd/server totp
 ```
 
-A TOTP cannot be reused for the same account. Customer login instead displays a newly generated development SMS code in the login form. Codes expire after five minutes and are single-use. With the default `SMS_ENABLED=false`, no text messages or money are sent.
+A TOTP cannot be reused for the same account. Customer login instead displays a newly generated development SMS code in the login form. Codes expire after five minutes and are single-use. Real SMS uses six approved Kavenegar templates and requires an HTTPS origin; see the integration guide. With the default `SMS_ENABLED=false`, no text messages or money are sent.
 
 **Never use fixture credentials, the fixture authenticator secret, or seeded inventory for live sales.**
 
@@ -91,7 +91,7 @@ The old five-product fixture is retained only in backend test files for historic
 - Responsive Persian storefront, local Vazirmatn font, specified cream/green palette, product guides and blog.
 - Category filtering, normalized Persian search, typo similarity, aliases and related products.
 - Product-specific gram/kilogram/milliliter/liter packages, per-package prices and purchase limits, separate cart lines, and price ranges. Discounted package prices round upward to 1,000 toman, capped at the original package price; undiscounted prices and coupon rules remain unchanged.
-- Kavenegar-ready SMS account verification, a customer overview, order history, map-assisted address creation/editing/deletion, and five-stage order tracking with automatic and manual refresh with queued notifications. Saved-address changes never alter existing order snapshots.
+- Kavenegar-ready SMS account verification, a customer overview, order history, map-assisted address creation/editing/deletion, and five-stage order tracking with automatic and manual refresh and four milestone SMS templates. Saved-address changes never alter existing order snapshots.
 - Regional/weight-based delivery, server-authoritative checkout, 15-minute reservations, repeat-safe simulated payments and late-payment review.
 - Separate password/TOTP staff login, backend-enforced roles, draft preview, uploads, editor publication, manual availability and delivery editing.
 - Owner-only Omnisire with member management, referral commission accounting, searchable event history, paginated analytics, cross-page comparison and background Excel exports.
