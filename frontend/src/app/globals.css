@@ -4138,6 +4138,9 @@ details[open] > summary {
 .catalog-workspace {
   grid-template-columns: minmax(0, 1fr);
 }
+.catalog-workspace .staff-main > .form-card {
+  min-width: 0;
+}
 .catalog-toolbar-area {
   display: grid;
   gap: 16px;
@@ -4203,6 +4206,18 @@ details[open] > summary {
   .catalog-add-product {
     justify-self: stretch;
   }
+}
+
+/* Fit the product filters to the workspace, including the staff sidebar. */
+.catalog-product-filters {
+  display: flex;
+  flex-wrap: wrap;
+}
+.catalog-product-filters > label {
+  flex: 1 1 180px;
+}
+.catalog-product-filters > .catalog-product-search {
+  flex-basis: 100%;
 }
 
 /* Journal toolbar and article composition. */
@@ -4551,10 +4566,32 @@ details[open] > summary {
 
 /* Compact staff orders and focused packing details. */
 .staff-orders-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: end;
   gap: 16px;
+}
+.staff-orders-toolbar > label {
+  flex: 1 1 180px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.staff-orders-toolbar > label:first-child {
+  flex-basis: 100%;
+}
+.staff-orders-toolbar select,
+.staff-orders-toolbar input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  background-color: white;
+}
+.staff-orders-toolbar > .button {
+  flex: 1 1 180px;
+  min-width: 0;
+  min-height: 44px;
+  justify-content: center;
 }
 .staff-order-search {
   display: flex;
@@ -4565,7 +4602,11 @@ details[open] > summary {
   border-radius: 9px;
   padding-inline-start: 12px;
 }
+.staff-order-search > svg {
+  flex-shrink: 0;
+}
 .staff-order-search input {
+  flex: 1;
   border: 0;
   background: transparent;
 }
@@ -4875,12 +4916,6 @@ details[open] > summary {
   }
 }
 @media (max-width: 700px) {
-  .staff-orders-toolbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .staff-orders-toolbar > label:first-child {
-    grid-column: 1 / -1;
-  }
   .staff-order-detail-grid {
     grid-template-columns: minmax(0, 1fr);
   }

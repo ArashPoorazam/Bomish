@@ -115,18 +115,30 @@ export function CatalogManager({
               <strong>جستجو و فیلتر</strong>
               <button
                 className="button secondary filter-reset"
-                disabled={!q && !category && !status && !stock}
+                disabled={
+                  !q && !category && !status && !stock && !shippingIncomplete
+                }
                 onClick={() => {
                   setQ("");
                   setCategory("");
                   setStatus("");
                   setStock("");
+                  setShippingIncomplete("");
                 }}
               >
                 <RotateCcw size={16} aria-hidden="true" /> پاک کردن فیلترها
               </button>
             </div>
-            <div className="catalog-filters">
+            <div className="catalog-filters catalog-product-filters">
+              <label className="catalog-product-search">
+                جستجوی محصول
+                <input
+                  type="search"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="نام یا نشانی محصول"
+                />
+              </label>
               <label>
                 اطلاعات ارسال
                 <select
@@ -136,15 +148,6 @@ export function CatalogManager({
                   <option value="">همه محصولات</option>
                   <option value="true">اطلاعات ارسال ناقص</option>
                 </select>
-              </label>
-              <label>
-                جستجوی محصول
-                <input
-                  type="search"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="نام یا نشانی محصول"
-                />
               </label>
               <label>
                 دسته‌بندی
