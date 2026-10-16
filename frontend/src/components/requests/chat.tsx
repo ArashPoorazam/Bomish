@@ -6,6 +6,7 @@ import {
   MessageComposer,
   WelcomeMessage,
   emptyDraft,
+  chatPayload,
   type ChatDraft,
 } from "./chat-parts";
 import type { ChatMessage } from "./types";
@@ -17,18 +18,20 @@ export function Chat({
   draft,
   onDraftChange,
   onBusyChange,
+  customerOrdersUrl,
 }: {
   id: string;
   staff?: boolean;
   active?: boolean;
   draft?: ChatDraft;
   onDraftChange?: (draft: ChatDraft) => void;
+  customerOrdersUrl?: string;
   onBusyChange?: (busy: boolean) => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [localDraft, setLocalDraft] = useState<ChatDraft>(emptyDraft);
   const currentDraft = draft || localDraft;
-  const { body } = currentDraft;
+  const { body, image } = currentDraft;
   const updateDraft = onDraftChange || setLocalDraft;
   const activeRef = useRef(active);
   activeRef.current = active;
@@ -147,15 +150,19 @@ export function Chat({
       log.current.scrollTop = log.current.scrollHeight;
   }, [messages, active]);
   async function send() {
-    if (sending.current || !body.trim()) return;
+    if (sending.current || (!body.trim() && !image)) return;
     sending.current = true;
     onBusyChange?.(true);
     setBusy(true);
     setSendError("");
     const key = currentDraft.key || crypto.randomUUID();
-    updateDraft({ body, key });
+    updateDraft({ body, key, image });
     try {
-      await api(`${prefix}/messages`, "POST", { body, idempotencyKey: key });
+      await api(
+        `${prefix}/messages`,
+        "POST",
+        chatPayload({ body, idempotencyKey: key }, image),
+      );
       updateDraft(emptyDraft);
       if (!mounted.current) return;
       atBottom.current = true;
@@ -218,11 +225,43 @@ export function Chat({
               <article
                 className={`chat-message ${m.fromStaff ? "from-staff" : "from-customer"} ${outgoing ? "is-outgoing" : "is-incoming"}`}
               >
-                <ChatAvatar support={m.fromStaff} seed={id} />
+                {staff && !m.fromStaff && customerOrdersUrl ? (
+                  <a
+                    href={customerOrdersUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="مشاهده همه سفارش‌های مشتری"
+                  >
+                    <ChatAvatar seed={id} />
+                  </a>
+                ) : (
+                  <ChatAvatar support={m.fromStaff} seed={id} />
+                )}
                 <div className="chat-bubble">
                   <strong>
                     {m.fromStaff ? "پشتیبانی بومیش" : staff ? "مشتری" : "شما"}
                   </strong>
+                  {m.hasImage && (
+                    <a
+                      href={`/api/v1${prefix}/messages/${m.id}/image`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        className="chat-picture"
+                        src={`/api/v1${prefix}/messages/${m.id}/image`}
+                        alt="تصویر ارسال‌شده"
+                        onLoad={() => {
+                          if (
+                            activeRef.current &&
+                            atBottom.current &&
+                            log.current
+                          )
+                            log.current.scrollTop = log.current.scrollHeight;
+                        }}
+                      />
+                    </a>
+                  )}
                   <p>{m.body}</p>
                   <time dateTime={m.createdAt}>
                     {new Intl.DateTimeFormat("fa-IR", {
@@ -257,7 +296,9 @@ export function Chat({
         body={body}
         busy={busy}
         onSend={send}
-        onChange={(body) => updateDraft({ body, key: "" })}
+        image={image}
+        onImageChange={(image) => updateDraft({ body, image, key: "" })}
+        onChange={(body) => updateDraft({ body, image, key: "" })}
       />
     </div>
   );

@@ -4657,6 +4657,26 @@
               "schema": {
                 "$ref": "#/components/schemas/RequestInput"
               }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "payload",
+                  "image"
+                ],
+                "properties": {
+                  "payload": {
+                    "type": "string",
+                    "description": "JSON matching the application/json body; a picture may be sent with empty text."
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG or WebP, at most 5 MiB."
+                  }
+                }
+              }
             }
           }
         }
@@ -4995,6 +5015,26 @@
               "schema": {
                 "$ref": "#/components/schemas/MessageInput"
               }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "payload",
+                  "image"
+                ],
+                "properties": {
+                  "payload": {
+                    "type": "string",
+                    "description": "JSON matching the application/json body; a picture may be sent with empty text."
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG or WebP, at most 5 MiB."
+                  }
+                }
+              }
             }
           }
         },
@@ -5137,6 +5177,26 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/MessageInput"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "payload",
+                  "image"
+                ],
+                "properties": {
+                  "payload": {
+                    "type": "string",
+                    "description": "JSON matching the application/json body; a picture may be sent with empty text."
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG or WebP, at most 5 MiB."
+                  }
+                }
               }
             }
           }
@@ -6563,6 +6623,151 @@
                 "additionalProperties": false
               }
             }
+          }
+        }
+      }
+    },
+    "/requests/{id}/messages/{message}/image": {
+      "get": {
+        "summary": "Read a picture with conversation access checks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private image",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/staff/requests/{id}/messages/{message}/image": {
+      "get": {
+        "summary": "Read a picture with conversation access checks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private image",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not owned"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/staff/requests/{id}/orders": {
+      "get": {
+        "summary": "All orders belonging to the conversation customer; requires requests permission",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated customer orders"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       }
@@ -8622,6 +8827,10 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "hasImage": {
+            "type": "boolean",
+            "description": "Whether this message includes a private picture."
           }
         },
         "required": [

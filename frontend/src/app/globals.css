@@ -4780,7 +4780,9 @@ details[open] > summary {
 .staff-order-stage.is-current .staff-stage-dot {
   box-shadow: 0 0 0 3px #e3efdc;
 }
-.staff-order-stages.is-stopped .staff-stage-dot {
+.staff-order-stages.is-stopped
+  .staff-order-stage:not(.is-done)
+  .staff-stage-dot {
   background: #e9e5dc;
   border-color: #9c9486;
   color: #635d54;
@@ -5199,4 +5201,59 @@ details[open] > summary {
 .catalog-shipping-badge:focus-visible {
   outline: 2px solid #805c16;
   outline-offset: 3px;
+}
+
+@property --order-stage-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.staff-stage-dot {
+  position: relative;
+}
+.staff-order-stage.is-current {
+  color: #805c16;
+}
+.staff-order-stage.is-current .staff-stage-dot,
+.is-expanded .staff-order-stage.is-current .staff-stage-dot {
+  border-color: #bb8525;
+  background: #fff4d6;
+  color: #805c16;
+  box-shadow: 0 0 0 3px #fff0cd;
+}
+.staff-order-stage.is-current .staff-stage-dot::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--order-stage-angle),
+    transparent 35%,
+    #c38924 75%,
+    transparent
+  );
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: order-stage-border 2.4s linear infinite;
+}
+.staff-stage-state {
+  font-size: 11px;
+  font-weight: 400;
+  white-space: normal;
+  text-align: center;
+}
+@keyframes order-stage-border {
+  to {
+    --order-stage-angle: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .staff-order-stage.is-current .staff-stage-dot::before {
+    animation: none;
+    background: #bb8525;
+  }
 }

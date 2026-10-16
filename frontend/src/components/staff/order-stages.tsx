@@ -19,26 +19,42 @@ export function StaffOrderStages({
         ),
       )
     : current;
+  const active = stopped || current === stages.length - 1 ? -1 : current + 1;
+  const actionLabel =
+    order.status === "pending"
+      ? "در انتظار پرداخت"
+      : order.status === "shipped"
+        ? "در انتظار تحویل"
+        : "اقدام اکنون";
   return (
     <span
       className={`staff-order-stages ${stopped ? "is-stopped" : ""} ${expanded ? "is-expanded" : ""}`}
       role="img"
-      aria-label={`وضعیت سفارش: ${statuses[order.status] || order.status}`}
+      aria-label={`وضعیت سفارش: ${statuses[order.status] || order.status}${active >= 0 ? `؛ مرحله بعد: ${stages[active].label}` : ""}`}
     >
       {stages.map(({ id, label, icon: Icon }, index) => (
         <span
           key={id}
-          className={`staff-order-stage ${index <= reached ? "is-done" : ""} ${!stopped && index === current ? "is-current" : ""}`}
+          className={`staff-order-stage ${index <= reached ? "is-done" : ""} ${index === active ? "is-current" : ""}`}
           aria-hidden="true"
         >
           <span className="staff-stage-dot">
-            {expanded ? (
+            {index <= reached ? (
+              <Check size={expanded ? 30 : 11} strokeWidth={2.5} />
+            ) : expanded ? (
               <Icon size={30} strokeWidth={1.7} />
-            ) : index < reached || current === 4 ? (
-              <Check size={11} />
             ) : null}
           </span>
           <span>{label}</span>
+          {expanded && (
+            <small className="staff-stage-state">
+              {index <= reached
+                ? "انجام شد"
+                : index === active
+                  ? actionLabel
+                  : "در انتظار"}
+            </small>
+          )}
         </span>
       ))}
     </span>

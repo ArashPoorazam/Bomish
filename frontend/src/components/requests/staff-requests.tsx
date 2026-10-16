@@ -281,10 +281,23 @@ export function StaffRequests({
               >
                 <ArrowRight size={20} />
               </button>
-              <ChatAvatar seed={selected.id} />
+              <a
+                href={`/staff/customer-orders/${encodeURIComponent(selected.id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="مشاهده همه سفارش‌های مشتری"
+              >
+                <ChatAvatar seed={selected.id} />
+              </a>
               <div>
                 <h2>
-                  مشتری <bdi>{selected.phone}</bdi>
+                  <a
+                    href={`/staff/customer-orders/${encodeURIComponent(selected.id)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    مشتری <bdi>{selected.phone}</bdi>
+                  </a>
                 </h2>
                 <p>
                   {kind === "support"
@@ -303,6 +316,7 @@ export function StaffRequests({
                 key={selected.id}
                 id={selected.id}
                 staff
+                customerOrdersUrl={`/staff/customer-orders/${encodeURIComponent(selected.id)}`}
                 draft={drafts[selected.id] || emptyDraft}
                 onDraftChange={(draft) =>
                   setDrafts((old) => ({ ...old, [selected.id]: draft }))

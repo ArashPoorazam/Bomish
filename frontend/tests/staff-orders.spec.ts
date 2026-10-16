@@ -59,6 +59,19 @@ test("compact orders open clear details and retain per-package packing checks", 
       )!.packed = body.packed;
       return route.fulfill({ json: { ok: true } });
     }
+    if (
+      path === `/staff/orders/${order.id}` &&
+      route.request().method() === "PATCH"
+    ) {
+      const body = route.request().postDataJSON();
+      order.status = body.status;
+      order.tracking = body.tracking || order.tracking;
+      order.events.push({
+        status: body.status,
+        createdAt: new Date().toISOString(),
+      });
+      return route.fulfill({ json: { ok: true } });
+    }
     const values: Record<string, unknown> = {
       "/session": {
         csrf: "test",
@@ -91,6 +104,28 @@ test("compact orders open clear details and retain per-package packing checks", 
     detail.getByRole("heading", { name: "قدم بعدی", exact: true }),
   ).toBeVisible();
   await expect(detail).toBeVisible();
+  const stages = detail.locator(".staff-order-stages");
+  await expect(stages.locator(".is-done")).toHaveCount(2);
+  await expect(stages.locator(".is-current")).toContainText("بسته‌بندی");
+  await expect(stages.locator(".is-current")).not.toHaveClass(/is-done/);
+  await expect(stages.getByText("انجام شد", { exact: true })).toHaveCount(2);
+  await expect
+    .poll(() =>
+      stages
+        .locator(".is-current .staff-stage-dot")
+        .evaluate((el) => getComputedStyle(el, "::before").animationName),
+    )
+    .toBe("order-stage-border");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect
+    .poll(() =>
+      stages
+        .locator(".is-current .staff-stage-dot")
+        .evaluate((el) => getComputedStyle(el, "::before").animationName),
+    )
+    .toBe("none");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+
   await expect(
     detail.getByText(order.address.street, { exact: false }),
   ).toBeVisible();
@@ -138,4 +173,21 @@ test("compact orders open clear details and retain per-package packing checks", 
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  await row.click();
+  await detail
+    .getByRole("button", { name: "تأیید بسته‌بندی", exact: true })
+    .click();
+  await expect(stages.locator(".is-done")).toHaveCount(3);
+  await expect(stages.locator(".is-current")).toContainText("ارسال");
+  await detail.getByLabel("کد رهگیری مرسوله").fill("12345678901234567890");
+  await detail
+    .getByRole("button", { name: "ثبت ارسال و اطلاع‌رسانی", exact: true })
+    .click();
+  await expect(stages.locator(".is-done")).toHaveCount(4);
+  await expect(stages.locator(".is-current")).toContainText("تحویل");
+  await detail
+    .getByRole("button", { name: "تأیید تحویل به مشتری", exact: true })
+    .click();
+  await expect(stages.locator(".is-done")).toHaveCount(5);
+  await expect(stages.locator(".is-current")).toHaveCount(0);
 });

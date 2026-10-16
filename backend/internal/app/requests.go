@@ -9,6 +9,9 @@ import (
 )
 
 func (a *App) requestRoutes(m *http.ServeMux) {
+	m.HandleFunc("GET /api/v1/requests/{id}/messages/{message}/image", func(w http.ResponseWriter, r *http.Request) { a.messageImage(w, r, false) })
+	m.HandleFunc("GET /api/v1/staff/requests/{id}/messages/{message}/image", a.permit(func(w http.ResponseWriter, r *http.Request) { a.messageImage(w, r, true) }, "requests"))
+	m.HandleFunc("GET /api/v1/staff/requests/{id}/orders", a.permit(a.requestOrders, "requests"))
 	m.HandleFunc("GET /api/v1/requests", a.customerRequests)
 	m.HandleFunc("POST /api/v1/requests", a.createRequest)
 	m.HandleFunc("GET /api/v1/requests/{id}/messages", a.customerMessages)
@@ -81,10 +84,18 @@ func (a *App) createRequest(w http.ResponseWriter, r *http.Request) {
 		Budget      int64  `json:"budgetRials"`
 		Key         string `json:"idempotencyKey"`
 	}
-	if !decode(w, r, &in) {
+	picture, ok := decodeChat(w, r, &in)
+	if !ok {
 		return
 	}
 	in.Description = strings.TrimSpace(in.Description)
+	if in.Description == "" && len(picture) > 0 {
+		in.Description = "تصویر"
+	}
+	if len(picture) > 0 && in.Kind != "support" {
+		fail(w, 400, "تصویر فقط برای گفتگو مجاز است")
+		return
+	}
 	in.Quantity = strings.TrimSpace(in.Quantity)
 	if (in.Kind != "support" && in.Kind != "custom") || !validText(in.Description, 4000) || !validRequestKey(in.Key) || in.Budget < 0 || in.Budget > 100000000000 || (in.Kind == "support" && (in.Quantity != "" || in.Budget != 0)) || (in.Kind == "custom" && (!validText(in.Quantity, 200) || in.Budget == 0)) {
 		fail(w, 400, "شرح، مقدار و بودجه معتبر وارد کنید")
@@ -119,7 +130,7 @@ func (a *App) createRequest(w http.ResponseWriter, r *http.Request) {
 		_, e = tx.Exec(r.Context(), `INSERT INTO customer_requests(id,user_id,kind,description,quantity,budget_rials,idempotency_key) VALUES($1,$2,$3,$4,$5,$6,$7)`, id, current(r).UserID, in.Kind, in.Description, in.Quantity, in.Budget, in.Key)
 	}
 	if e == nil && in.Kind == "support" {
-		_, e = saveRequestMessage(r.Context(), tx, id, nil, in.Description, in.Key)
+		_, e = saveRequestMessage(r.Context(), tx, id, nil, in.Description, in.Key, picture)
 		if e == pgx.ErrNoRows {
 			fail(w, 409, "شناسه پیام قبلاً استفاده شده است")
 			return

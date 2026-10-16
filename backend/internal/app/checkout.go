@@ -244,7 +244,18 @@ func loadOrderPage(ctx context.Context, q querier, user, id, status, search stri
 	if len(deliveryFilters) > 1 {
 		attention = deliveryFilters[1]
 	}
-	rows, e := q.Query(ctx, `SELECT id,status,address,subtotal_rials,shipping_rials,total_rials,tracking,created_at,coalesce(discount_code,''),discount_rials FROM orders WHERE ($1='' OR user_id=$1) AND ($2='' OR id=$2) AND ($3='' OR status=$3 OR ($3='active' AND status IN ('paid','packing','shipped','review'))) AND ($4='' OR id||' '||address::text||' '||tracking ILIKE '%'||$4||'%') `+deliveryFilterSQL(7, 8)+` ORDER BY created_at DESC,id LIMIT $5 OFFSET $6`, user, id, status, search, limit, offset, provider, attention)
+	orderBy := "created_at DESC,id"
+	if user == "" && id == "" {
+		// Prioritize staff work before pagination, without changing customer history.
+		orderBy = `CASE
+ WHEN status IN ('paid','packing','review') OR (status='shipped' AND EXISTS (
+ SELECT 1 FROM order_shipping ds WHERE ds.order_id=orders.id AND ds.delivery_status IN ('failed','returning','unknown')
+ )) THEN 0
+ WHEN status='pending' THEN 1
+ WHEN status='shipped' THEN 2
+ ELSE 3 END,created_at DESC,id`
+	}
+	rows, e := q.Query(ctx, `SELECT id,status,address,subtotal_rials,shipping_rials,total_rials,tracking,created_at,coalesce(discount_code,''),discount_rials FROM orders WHERE ($1='' OR user_id=$1) AND ($2='' OR id=$2) AND ($3='' OR status=$3 OR ($3='active' AND status IN ('paid','packing','shipped','review'))) AND ($4='' OR id||' '||address::text||' '||tracking ILIKE '%'||$4||'%') `+deliveryFilterSQL(7, 8)+` ORDER BY `+orderBy+` LIMIT $5 OFFSET $6`, user, id, status, search, limit, offset, provider, attention)
 	if e != nil {
 		return nil, e
 	}

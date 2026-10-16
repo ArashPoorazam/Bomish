@@ -59,7 +59,7 @@ func (a *App) messages(w http.ResponseWriter, r *http.Request, staff bool) {
 			*target = value
 		}
 	}
-	query := `SELECT id,body,staff_id IS NOT NULL AS "fromStaff",created_at AS "createdAt" FROM request_messages WHERE request_id=$1 AND id>$2 ORDER BY id LIMIT 100`
+	query := `SELECT id,body,image IS NOT NULL AS "hasImage",staff_id IS NOT NULL AS "fromStaff",created_at AS "createdAt" FROM request_messages WHERE request_id=$1 AND id>$2 ORDER BY id LIMIT 100`
 	cursor := after
 	if latest || before > 0 {
 		condition := ""
@@ -67,7 +67,7 @@ func (a *App) messages(w http.ResponseWriter, r *http.Request, staff bool) {
 			condition = " AND id<$2"
 			cursor = before
 		}
-		query = `SELECT * FROM (SELECT id,body,staff_id IS NOT NULL AS "fromStaff",created_at AS "createdAt" FROM request_messages WHERE request_id=$1` + condition + ` ORDER BY id DESC LIMIT 100) page ORDER BY id`
+		query = `SELECT * FROM (SELECT id,body,image IS NOT NULL AS "hasImage",staff_id IS NOT NULL AS "fromStaff",created_at AS "createdAt" FROM request_messages WHERE request_id=$1` + condition + ` ORDER BY id DESC LIMIT 100) page ORDER BY id`
 	}
 	args := []any{r.PathValue("id")}
 	if !latest {
@@ -88,10 +88,14 @@ func (a *App) sendMessage(w http.ResponseWriter, r *http.Request, staff bool) {
 		Body string `json:"body"`
 		Key  string `json:"idempotencyKey"`
 	}
-	if !decode(w, r, &in) {
+	picture, ok := decodeChat(w, r, &in)
+	if !ok {
 		return
 	}
 	in.Body = strings.TrimSpace(in.Body)
+	if in.Body == "" && len(picture) > 0 {
+		in.Body = "تصویر"
+	}
 	if !validText(in.Body, 4000) || !validRequestKey(in.Key) {
 		fail(w, 400, "پیام باید بین ۱ و ۴۰۰۰ نویسه باشد")
 		return
@@ -117,7 +121,7 @@ func (a *App) sendMessage(w http.ResponseWriter, r *http.Request, staff bool) {
 		a.dbError(w, e)
 		return
 	}
-	id, e := saveRequestMessage(r.Context(), tx, r.PathValue("id"), staffID, in.Body, in.Key)
+	id, e := saveRequestMessage(r.Context(), tx, r.PathValue("id"), staffID, in.Body, in.Key, picture)
 	if e == pgx.ErrNoRows {
 		fail(w, 409, "شناسه پیام قبلاً استفاده شده است")
 		return
@@ -134,11 +138,11 @@ func (a *App) sendMessage(w http.ResponseWriter, r *http.Request, staff bool) {
 
 // The caller holds the thread lock. Retries must match both sender and body;
 // ErrNoRows identifies an idempotency key already used for a different message.
-func saveRequestMessage(ctx context.Context, tx pgx.Tx, requestID string, staffID any, body, key string) (int64, error) {
+func saveRequestMessage(ctx context.Context, tx pgx.Tx, requestID string, staffID any, body, key string, image []byte) (int64, error) {
 	var id int64
-	err := tx.QueryRow(ctx, `INSERT INTO request_messages(request_id,staff_id,body,idempotency_key) VALUES($1,$2,$3,$4) ON CONFLICT(request_id,idempotency_key) DO NOTHING RETURNING id`, requestID, staffID, body, key).Scan(&id)
+	err := tx.QueryRow(ctx, `INSERT INTO request_messages(request_id,staff_id,body,idempotency_key,image) VALUES($1,$2,$3,$4,$5) ON CONFLICT(request_id,idempotency_key) DO NOTHING RETURNING id`, requestID, staffID, body, key, image).Scan(&id)
 	if err == pgx.ErrNoRows {
-		err = tx.QueryRow(ctx, `SELECT id FROM request_messages WHERE request_id=$1 AND idempotency_key=$2 AND staff_id IS NOT DISTINCT FROM $3 AND body=$4`, requestID, key, staffID, body).Scan(&id)
+		err = tx.QueryRow(ctx, `SELECT id FROM request_messages WHERE request_id=$1 AND idempotency_key=$2 AND staff_id IS NOT DISTINCT FROM $3 AND body=$4 AND image IS NOT DISTINCT FROM $5`, requestID, key, staffID, body, image).Scan(&id)
 	}
 	if err == nil {
 		_, err = tx.Exec(ctx, `UPDATE customer_requests SET updated_at=now() WHERE id=$1`, requestID)

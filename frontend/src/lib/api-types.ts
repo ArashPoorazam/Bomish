@@ -4906,6 +4906,15 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["RequestInput"];
+                    "multipart/form-data": {
+                        /** @description JSON matching the application/json body; a picture may be sent with empty text. */
+                        payload: string;
+                        /**
+                         * Format: binary
+                         * @description JPEG, PNG or WebP, at most 5 MiB.
+                         */
+                        image: string;
+                    };
                 };
             };
             responses: {
@@ -5291,6 +5300,15 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["MessageInput"];
+                    "multipart/form-data": {
+                        /** @description JSON matching the application/json body; a picture may be sent with empty text. */
+                        payload: string;
+                        /**
+                         * Format: binary
+                         * @description JPEG, PNG or WebP, at most 5 MiB.
+                         */
+                        image: string;
+                    };
                 };
             };
             responses: {
@@ -5459,6 +5477,15 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["MessageInput"];
+                    "multipart/form-data": {
+                        /** @description JSON matching the application/json body; a picture may be sent with empty text. */
+                        payload: string;
+                        /**
+                         * Format: binary
+                         * @description JPEG, PNG or WebP, at most 5 MiB.
+                         */
+                        image: string;
+                    };
                 };
             };
             responses: {
@@ -7033,6 +7060,162 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/requests/{id}/messages/{message}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a picture with conversation access checks */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    message: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Private image */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/png": string;
+                        "image/jpeg": string;
+                        "image/webp": string;
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found or not owned */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/requests/{id}/messages/{message}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a picture with conversation access checks */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    message: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Private image */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/png": string;
+                        "image/jpeg": string;
+                        "image/webp": string;
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found or not owned */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/requests/{id}/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All orders belonging to the conversation customer; requires requests permission */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Paginated customer orders */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7593,6 +7776,8 @@ export interface components {
             fromStaff: boolean;
             /** Format: date-time */
             createdAt: string;
+            /** @description Whether this message includes a private picture. */
+            hasImage?: boolean;
         };
         RequestInput: {
             /** @enum {string} */

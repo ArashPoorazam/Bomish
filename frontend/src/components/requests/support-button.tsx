@@ -7,7 +7,12 @@ import { api } from "@/lib/api";
 import { useLiveQuery } from "@/hooks/use-live-query";
 import type { CustomerRequest } from "./types";
 import { Chat } from "./chat";
-import { ChatAvatar, MessageComposer, WelcomeMessage } from "./chat-parts";
+import {
+  ChatAvatar,
+  MessageComposer,
+  WelcomeMessage,
+  chatPayload,
+} from "./chat-parts";
 
 export function SupportButton() {
   const { user } = useStore();
@@ -113,6 +118,7 @@ function SupportConversation({ active }: { active: boolean }) {
     0,
   );
   const [created, setCreated] = useState("");
+  const [image, setImage] = useState<File>();
   const [body, setBody] = useState("");
   const [failure, setFailure] = useState("");
   const [busy, setBusy] = useState(false);
@@ -166,17 +172,24 @@ function SupportConversation({ active }: { active: boolean }) {
       </p>
     );
   async function send() {
-    if (sending.current || !body.trim()) return;
+    if (sending.current || (!body.trim() && !image)) return;
     sending.current = true;
     setBusy(true);
     setFailure("");
     key.current ||= crypto.randomUUID();
     try {
-      const result = await api<{ id: string }>("/requests", "POST", {
-        kind: "support",
-        description: body,
-        idempotencyKey: key.current,
-      });
+      const result = await api<{ id: string }>(
+        "/requests",
+        "POST",
+        chatPayload(
+          {
+            kind: "support",
+            description: body,
+            idempotencyKey: key.current,
+          },
+          image,
+        ),
+      );
       if (mounted.current) setCreated(result.id);
     } catch (e) {
       if (mounted.current) setFailure((e as Error).message);
@@ -202,6 +215,11 @@ function SupportConversation({ active }: { active: boolean }) {
       )}
       <MessageComposer
         first
+        image={image}
+        onImageChange={(file) => {
+          setImage(file);
+          key.current = "";
+        }}
         body={body}
         busy={busy}
         onSend={send}
