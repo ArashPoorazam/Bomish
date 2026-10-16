@@ -7744,6 +7744,14 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "maxUsesPerCustomer": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 1000000000,
+            "default": 0,
+            "description": "Maximum uses per authenticated customer account. Zero means unlimited; pending orders reserve a use, cancelled and expired orders do not count."
           }
         },
         "required": [
@@ -7809,6 +7817,14 @@
           "reservedCount": {
             "type": "integer",
             "format": "int64"
+          },
+          "maxUsesPerCustomer": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 1000000000,
+            "default": 0,
+            "description": "Maximum uses per authenticated customer account. Zero means unlimited; pending orders reserve a use, cancelled and expired orders do not count."
           }
         },
         "required": [
@@ -7822,7 +7838,8 @@
           "active",
           "createdAt",
           "usedCount",
-          "reservedCount"
+          "reservedCount",
+          "maxUsesPerCustomer"
         ],
         "additionalProperties": false
       },

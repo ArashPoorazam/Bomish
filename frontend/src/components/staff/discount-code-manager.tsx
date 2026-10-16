@@ -163,10 +163,18 @@ export function DiscountCodeManager({
                         </dd>
                       </div>
                       <div>
-                        <dt>استفاده موفق</dt>
+                        <dt>استفاده موفق کل</dt>
                         <dd>
                           {fa(c.usedCount)}
                           {c.maxUses ? ` از ${fa(c.maxUses)}` : " · نامحدود"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>سقف استفاده هر مشتری</dt>
+                        <dd>
+                          {c.maxUsesPerCustomer
+                            ? `${fa(c.maxUsesPerCustomer)} بار`
+                            : "نامحدود"}
                         </dd>
                       </div>
                     </dl>
@@ -313,6 +321,7 @@ function CodeForm({
       minSubtotalRials: number("minimum") * 10,
       maxDiscountRials: kind === "percent" ? number("cap") * 10 : 0,
       maxUses: number("limit"),
+      maxUsesPerCustomer: number("customerLimit"),
       expiresAt: end ? new Date(end).toISOString() : null,
     };
     try {
@@ -386,6 +395,33 @@ function CodeForm({
             max={kind === "percent" ? 90 : 10000000000}
           />
         </div>
+        <section
+          className="discount-usage-limits"
+          aria-labelledby="discount-usage-title"
+        >
+          <h3 id="discount-usage-title">تعداد دفعات استفاده</h3>
+          <p className="muted">
+            برای کد یک‌بارمصرف برای هر مشتری، سقف هر مشتری را ۱ وارد کنید.
+          </p>
+          <div className="form-grid">
+            <MoneyField
+              name="customerLimit"
+              label="سقف استفاده هر مشتری"
+              max={1000000000}
+              hint="بر اساس حساب کاربری مشتری؛ مثلاً ۱ یعنی هر مشتری فقط یک بار. خالی یا صفر یعنی نامحدود."
+            />
+            <MoneyField
+              name="limit"
+              label="سقف استفاده کل کد"
+              max={1000000000}
+              hint="مجموع استفاده همه مشتری‌ها؛ مثلاً ۱۰۰ یعنی این کد در مجموع ۱۰۰ بار قابل استفاده است. خالی یا صفر یعنی نامحدود."
+            />
+          </div>
+          <p className="muted">
+            سفارش در انتظار پرداخت یک استفاده را رزرو می‌کند؛ با لغو یا انقضای
+            سفارش، آن استفاده آزاد می‌شود.
+          </p>
+        </section>
         <details>
           <summary>شرایط استفاده · اختیاری</summary>
           <div className="form-grid">
@@ -393,11 +429,6 @@ function CodeForm({
             {kind === "percent" && (
               <MoneyField name="cap" label="سقف تخفیف (تومان)" />
             )}
-            <MoneyField
-              name="limit"
-              label="حداکثر تعداد استفاده"
-              max={1000000000}
-            />
             <label>
               زمان پایان
               <input type="datetime-local" name="expiry" />
@@ -429,17 +460,21 @@ function MoneyField({
   label,
   required,
   max = 10000000000,
+  hint,
 }: {
   name: string;
   label: string;
   required?: boolean;
   max?: number;
+  hint?: string;
 }) {
   return (
     <label>
       {label}
       <input
         name={name}
+        aria-label={label}
+        aria-describedby={hint ? `discount-${name}-hint` : undefined}
         required={required}
         inputMode="numeric"
         dir="ltr"
@@ -460,6 +495,11 @@ function MoneyField({
           }
         }}
       />
+      {hint && (
+        <small id={`discount-${name}-hint`} className="muted">
+          {hint}
+        </small>
+      )}
     </label>
   );
 }

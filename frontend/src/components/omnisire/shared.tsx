@@ -144,7 +144,9 @@ export function Workspace({
       </div>
     );
   return (
-    <div className="omni-shell">
+    <div
+      className={`omni-shell ${activeSection === "support" || activeSection === "custom" ? "omni-requests" : ""}`}
+    >
       <aside
         id="workspace-navigation"
         className={`omni-sidebar ${open ? "is-open" : ""}`}

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
-import { Plus, RotateCcw, ArrowRight } from "lucide-react";
+import { Plus, RotateCcw, ArrowRight, PackageX } from "lucide-react";
 import type { Product, Category } from "@/lib/types";
 import { fa, priceRange, statuses, inStock } from "@/lib/format";
 import { ProductEditor, newProduct } from "./product-editor";
@@ -232,15 +232,19 @@ export function CatalogManager({
                   {visible.map((p) => (
                     <tr key={p.id}>
                       <td>
-                        <strong>{p.name}</strong>
-                        {!p.publishedShippingReady && (
-                          <Link
-                            className="badge"
-                            href={`/staff?section=products&q=${encodeURIComponent(p.id)}&step=shipping`}
-                          >
-                            اطلاعات ارسال ناقص
-                          </Link>
-                        )}
+                        <div className="catalog-product-name">
+                          <strong>{p.name}</strong>
+                          {!p.publishedShippingReady && (
+                            <Link
+                              className="catalog-shipping-badge"
+                              href={`/staff?section=products&q=${encodeURIComponent(p.id)}&step=shipping`}
+                              aria-label={`اطلاعات ارسال ناقص برای ${p.name}؛ تکمیل اطلاعات ارسال`}
+                              title="اطلاعات ارسال ناقص؛ برای تکمیل کلیک کنید"
+                            >
+                              <PackageX size={17} aria-hidden="true" />
+                            </Link>
+                          )}
+                        </div>
                         <small className="muted">
                           {categories.find((c) => c.id === p.categoryId)?.name}
                         </small>

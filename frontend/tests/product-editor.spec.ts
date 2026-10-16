@@ -301,7 +301,7 @@ test("manual availability is independent of editor drafts and stock fields are g
   expect(availability).toEqual([{ outOfStock: true }, { outOfStock: false }]);
 });
 
-test("shipping measurements preserve variants, Persian decimals, copy and incomplete drafts", async ({
+test("shipping measurements preserve variants, Persian decimals and incomplete drafts", async ({
   page,
 }) => {
   const saved = await workspace(page);
@@ -316,14 +316,11 @@ test("shipping measurements preserve variants, Persian decimals, copy and incomp
   await widths.first().fill("۸");
   await heights.first().fill("۱۰");
   await weights.first().fill("۱۵۰");
-  await page
-    .getByText("راهنمای اندازه‌گیری و کپی اندازه‌ها", { exact: true })
-    .nth(1)
-    .click();
-  await page
-    .getByLabel("کپی اندازه‌ها از بسته دیگر", { exact: true })
-    .nth(1)
-    .selectOption("legacy");
+  await lengths.nth(1).fill("۱۲٫۵");
+  await widths.nth(1).fill("۸");
+  await heights.nth(1).fill("۱۰");
+  await weights.nth(1).fill("۱۵۰");
+  await lengths.nth(1).press("Tab");
   await expect(lengths.nth(1)).toHaveValue("12.5");
   await lengths.first().fill("۱۴");
   await lengths.first().press("Tab");
@@ -370,4 +367,70 @@ test("removing a middle package retains the other packages and their numeric dra
   const packages = saved.at(-1)!.packages as { id: string; lengthMm: number }[];
   expect(packages.map((p) => p.lengthMm)).toEqual([125, 300]);
   expect(packages[0].id).toBe("legacy");
+});
+
+test("supplementary content previews only in the final step and reflects edits", async ({
+  page,
+}) => {
+  await workspace(page);
+  await page.getByRole("button", { name: "ویرایش", exact: true }).click();
+  await step(page, "اطلاعات تکمیلی");
+  await page
+    .getByRole("button", { name: "+ افزودن بخش توضیحات", exact: true })
+    .click();
+  await page
+    .getByLabel("عنوان بخش · انتخاب یا عنوان دلخواه")
+    .fill("راهنمای دم کردن");
+  await page
+    .getByRole("textbox", { name: "متن بخش", exact: true })
+    .fill("**آب گرم**\n\n- پنج دقیقه صبر کنید");
+  await expect(page.locator(".product-step-fields .prose")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "+ افزودن بخش توضیحات", exact: true })
+    .click();
+  await page
+    .getByLabel("عنوان بخش · انتخاب یا عنوان دلخواه")
+    .nth(1)
+    .fill("بخش خالی");
+  await page
+    .getByRole("navigation", { name: "مراحل محصول" })
+    .getByRole("button")
+    .last()
+    .click();
+  await page.getByRole("button", { name: "پیش‌نمایش", exact: true }).click();
+  const preview = page.locator("#product-preview");
+  await expect(
+    preview.getByRole("heading", { name: "داستان این طعم", exact: true }),
+  ).toBeVisible();
+  const section = preview.locator("section").filter({
+    has: page.getByRole("heading", { name: "راهنمای دم کردن", exact: true }),
+  });
+  await expect(section.locator('[data-streamdown="strong"]')).toHaveText(
+    "آب گرم",
+  );
+  await expect(section.getByRole("listitem")).toHaveText("پنج دقیقه صبر کنید");
+  await expect(
+    preview.getByRole("heading", { name: "بخش خالی", exact: true }),
+  ).toHaveCount(0);
+  await step(page, "اطلاعات تکمیلی");
+  await page
+    .getByRole("textbox", { name: "متن بخش", exact: true })
+    .first()
+    .fill("متن تازه");
+  await page
+    .getByRole("textbox", { name: "متن بخش", exact: true })
+    .first()
+    .press("Tab");
+  await expect(
+    page.getByRole("textbox", { name: "متن بخش", exact: true }).first(),
+  ).toHaveValue("متن تازه");
+  await page
+    .getByRole("navigation", { name: "مراحل محصول" })
+    .getByRole("button")
+    .last()
+    .click();
+  await expect(section).toContainText("متن تازه");
+  await expect(
+    preview.locator('[data-streamdown="strong"]').filter({ hasText: "آب گرم" }),
+  ).toHaveCount(0);
 });

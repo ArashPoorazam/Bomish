@@ -108,7 +108,6 @@ export function ProductPackages({
           </div>
           <PackageMeasurements
             pack={pack}
-            packages={p.packages}
             onChange={(patch) => update(i, patch)}
           />
           <div className="package-footer">

@@ -186,3 +186,87 @@ func TestDiscountConcurrentLimitAndLatePayment(t *testing.T) {
 		t.Fatalf("late payment overused code: %s %v", status, e)
 	}
 }
+
+func TestDiscountPerCustomerLimits(t *testing.T) {
+	a := setup(t)
+	owner := couponOwner(t, a)
+	for _, limit := range []int64{-1, 1000000001} {
+		if status, _ := owner.call("POST", "/staff/discount-codes", map[string]any{"code": "BADLIMIT", "kind": "percent", "value": 10, "maxUsesPerCustomer": limit}); status != 400 {
+			t.Fatalf("invalid customer limit accepted: %d", status)
+		}
+	}
+	var created discountCode
+	owner.ok(t, "POST", "/staff/discount-codes", map[string]any{"code": "ONCE-EACH", "kind": "percent", "value": 10, "maxUsesPerCustomer": 1}, &created)
+	if created.MaxUsesPerCustomer != 1 || created.MaxUses != 0 {
+		t.Fatalf("wrong limits: %+v", created)
+	}
+	var codes []discountCode
+	owner.ok(t, "GET", "/staff/discount-codes", nil, &codes)
+	if codes[0].MaxUsesPerCustomer != 1 {
+		t.Fatal("limit missing from list")
+	}
+	c := couponCustomer(t, a, "09120000121", "turmeric")
+	otherSession := couponCustomer(t, a, "09120000121", "cumin")
+	otherCustomer := couponCustomer(t, a, "09120000122", "turmeric")
+	q := couponQuote(t, c, "ONCE-EACH")
+	var order, retry map[string]string
+	body := couponOrderBody("ONCE-EACH", "per-customer-first", q)
+	c.ok(t, "POST", "/checkout", body, &order)
+	c.ok(t, "POST", "/checkout", body, &retry)
+	if order["orderId"] != retry["orderId"] {
+		t.Fatal("retry used another allowance")
+	}
+	if status, raw := otherSession.call("POST", "/checkout/quote", map[string]string{"province": "تهران", "discountCode": "ONCE-EACH"}); status != 400 {
+		t.Fatalf("same customer in new session bypassed limit: %d %s", status, raw)
+	}
+	couponQuote(t, otherCustomer, "ONCE-EACH")
+	c.ok(t, "POST", "/orders/"+order["orderId"]+"/simulate", map[string]bool{"success": false}, nil)
+	q = couponQuote(t, c, "ONCE-EACH")
+	c.ok(t, "POST", "/checkout", couponOrderBody("ONCE-EACH", "per-customer-second", q), &order)
+	c.ok(t, "POST", "/orders/"+order["orderId"]+"/simulate", map[string]bool{"success": true}, nil)
+	if status, _ := otherSession.call("POST", "/checkout/quote", map[string]string{"province": "تهران", "discountCode": "ONCE-EACH"}); status != 400 {
+		t.Fatal("paid use did not consume allowance")
+	}
+	couponQuote(t, otherCustomer, "ONCE-EACH")
+}
+
+func TestDiscountPerCustomerConcurrentAndLatePayment(t *testing.T) {
+	a := setup(t)
+	owner := couponOwner(t, a)
+	owner.ok(t, "POST", "/staff/discount-codes", map[string]any{"code": "PER-TWO", "kind": "fixed", "value": 100, "maxUsesPerCustomer": 2}, nil)
+	// Separate sessions and carts for the same account must share one allowance.
+	customers := []*client{couponCustomer(t, a, "09120000123", "turmeric"), couponCustomer(t, a, "09120000123", "cumin")}
+	q := []quoteResult{couponQuote(t, customers[0], "PER-TWO"), couponQuote(t, customers[1], "PER-TWO")}
+	var initial map[string]string
+	customers[0].ok(t, "POST", "/checkout", couponOrderBody("PER-TWO", "per-two-initial-0001", q[0]), &initial)
+	statuses := make([]int, 2)
+	var wg sync.WaitGroup
+	for i := range customers {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			statuses[i], _ = customers[i].call("POST", "/checkout", couponOrderBody("PER-TWO", fmt.Sprintf("per-two-race-000%d", i), q[i]))
+		}(i)
+	}
+	wg.Wait()
+	if !((statuses[0] == 201 && statuses[1] == 409) || (statuses[0] == 409 && statuses[1] == 201)) {
+		t.Fatalf("customer allowance race: %v", statuses)
+	}
+	ctx := context.Background()
+	if _, e := a.Pool.Exec(ctx, "UPDATE orders SET reservation_expires_at=now()-interval '1 minute' WHERE id=$1", initial["orderId"]); e != nil {
+		t.Fatal(e)
+	}
+	if e := a.ExpireReservations(ctx); e != nil {
+		t.Fatal(e)
+	}
+	replacement := couponQuote(t, customers[0], "PER-TWO")
+	customers[0].ok(t, "POST", "/checkout", couponOrderBody("PER-TWO", "per-two-replacement", replacement), nil)
+	var user string
+	if e := a.Pool.QueryRow(ctx, "SELECT user_id FROM orders WHERE id=$1", initial["orderId"]).Scan(&user); e != nil {
+		t.Fatal(e)
+	}
+	status, e := a.settle(ctx, initial["orderId"], user, true)
+	if e != nil || status != "review" {
+		t.Fatalf("late payment bypassed customer limit: %s %v", status, e)
+	}
+}

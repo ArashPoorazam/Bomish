@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
+  Archive,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -12,6 +13,7 @@ import {
   Send,
   X,
 } from "lucide-react";
+import { productSections } from "@/lib/product-sections";
 import { measurementIssues } from "@/lib/shipping";
 import { api } from "@/lib/api";
 import type { Product, Category } from "@/lib/types";
@@ -254,6 +256,77 @@ export function ProductEditor({
           </small>
         </div>
       </div>
+      {existing && (
+        <section className="product-availability" aria-label="وضعیت فروش محصول">
+          <div className="product-availability-copy">
+            <h3>وضعیت فروش محصول</h3>
+            <p>تغییر موجودی بلافاصله در فروشگاه اعمال می‌شود.</p>
+          </div>
+          <div
+            className="product-availability-controls"
+            role="group"
+            aria-label="موجودی محصول"
+          >
+            <button
+              type="button"
+              className="button secondary"
+              disabled={locked}
+              aria-pressed={!p.outOfStock}
+              onClick={() => void availability(false)}
+            >
+              <CheckCircle2 size={16} aria-hidden="true" />
+              موجود
+            </button>
+            <button
+              type="button"
+              className="button secondary"
+              disabled={locked}
+              aria-pressed={p.outOfStock}
+              onClick={() => void availability(true)}
+            >
+              <X size={16} aria-hidden="true" />
+              ناموجود
+            </button>
+          </div>
+          <div className="product-archive-action">
+            <button
+              type="button"
+              className="button subtle-danger"
+              disabled={locked}
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    "محصول بایگانی و از فروشگاه پنهان شود؟ تغییرات ذخیره‌نشده در این فرم حفظ می‌شوند.",
+                  )
+                )
+                  return;
+                feedbackTrigger.current = document.activeElement as HTMLElement;
+                setBusy("archive");
+                setError("");
+                try {
+                  await api(`/staff/products/${p.id}/archive`, "POST");
+                  field("status", "archived");
+                  if (!dirty)
+                    setSaved(JSON.stringify({ ...p, status: "archived" }));
+                  setMessage({
+                    title: "محصول بایگانی شد",
+                    body: "این محصول دیگر در فروشگاه نمایش داده نمی‌شود.",
+                  });
+                  await onSaved();
+                } catch (e) {
+                  setError((e as Error).message);
+                } finally {
+                  setBusy("");
+                }
+              }}
+            >
+              <Archive size={16} aria-hidden="true" />
+              بایگانی محصول
+            </button>
+            <small>پنهان کردن محصول از فروشگاه</small>
+          </div>
+        </section>
+      )}
       <nav className="product-steps" aria-label="مراحل محصول">
         {productSteps.map((item, i) => (
           <button
@@ -400,22 +473,10 @@ export function ProductEditor({
                       </div>
                     ))}
                   </div>
-                  {[
-                    p.description,
-                    p.uses,
-                    p.preparation,
-                    p.storage,
-                    p.ingredients,
-                    p.allergens,
-                  ]
-                    .filter(Boolean)
-                    .map((text, i) => (
-                      <RichText key={i} text={text} />
-                    ))}
-                  {p.sections.map((s, i) => (
-                    <section key={i}>
-                      <h3>{s.title}</h3>
-                      <RichText text={s.body} />
+                  {productSections(p).map((section) => (
+                    <section key={section.id}>
+                      <h3>{section.title}</h3>
+                      <RichText text={section.body} />
                     </section>
                   ))}
                   {p.nutrients.length > 0 && (
@@ -492,68 +553,6 @@ export function ProductEditor({
           )}
         </div>
       </form>
-      {existing && (
-        <section
-          className="product-availability stack"
-          aria-label="وضعیت فروش محصول"
-        >
-          <h3>وضعیت فروش محصول</h3>
-          <div className="inline-actions">
-            <button
-              type="button"
-              className="button secondary"
-              disabled={locked}
-              aria-pressed={!p.outOfStock}
-              onClick={() => void availability(false)}
-            >
-              موجود
-            </button>
-            <button
-              type="button"
-              className="button secondary"
-              disabled={locked}
-              aria-pressed={p.outOfStock}
-              onClick={() => void availability(true)}
-            >
-              ناموجود
-            </button>
-          </div>
-          <p>محصول بایگانی‌شده در فروشگاه نمایش داده نمی‌شود.</p>
-          <button
-            type="button"
-            className="button subtle-danger"
-            disabled={locked}
-            onClick={async () => {
-              if (
-                !window.confirm(
-                  "محصول بایگانی و از فروشگاه پنهان شود؟ تغییرات ذخیره‌نشده در این فرم حفظ می‌شوند.",
-                )
-              )
-                return;
-              feedbackTrigger.current = document.activeElement as HTMLElement;
-              setBusy("archive");
-              setError("");
-              try {
-                await api(`/staff/products/${p.id}/archive`, "POST");
-                field("status", "archived");
-                if (!dirty)
-                  setSaved(JSON.stringify({ ...p, status: "archived" }));
-                setMessage({
-                  title: "محصول بایگانی شد",
-                  body: "این محصول دیگر در فروشگاه نمایش داده نمی‌شود.",
-                });
-                await onSaved();
-              } catch (e) {
-                setError((e as Error).message);
-              } finally {
-                setBusy("");
-              }
-            }}
-          >
-            بایگانی محصول
-          </button>
-        </section>
-      )}
       <dialog
         ref={feedback}
         className="product-feedback"

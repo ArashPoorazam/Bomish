@@ -1,3 +1,4 @@
+import { productSections } from "@/lib/product-sections";
 import { ProductEvent } from "@/components/product-event";
 import { inStock } from "@/lib/format";
 import Link from "next/link";
@@ -52,19 +53,7 @@ export default async function Detail({
     )
     .slice(0, 4);
   const guides = articles.filter((a) => a.productIds.includes(p.id));
-  const sections = [
-    { body: p.description, title: "داستان این طعم", id: "intro" },
-    { body: p.uses, title: "برای چه غذاهایی مناسب است؟", id: "uses" },
-    { body: p.preparation, title: "چطور استفاده کنیم؟", id: "preparation" },
-    { body: p.storage, title: "چطور نگهداری کنیم؟", id: "storage" },
-    { body: p.ingredients, title: "ترکیبات", id: "ingredients" },
-    { body: p.allergens, title: "اطلاعات حساسیت‌زا", id: "allergens" },
-    ...(p.sections || []).map((section, i) => ({
-      body: section.body,
-      title: section.title,
-      id: `section-${i}`,
-    })),
-  ].filter((s) => s.body.trim());
+  const sections = productSections(p);
   return (
     <div className="container section shop-detail">
       <ProductEvent productId={p.id} />

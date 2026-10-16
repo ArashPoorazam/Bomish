@@ -5,11 +5,9 @@ import { MeasurementNumber } from "./measurement-number";
 
 export function PackageMeasurements({
   pack,
-  packages,
   onChange,
 }: {
   pack: Package;
-  packages: Package[];
   onChange: (patch: Partial<Package>) => void;
 }) {
   return (
@@ -57,7 +55,7 @@ export function PackageMeasurements({
         />
       </div>
       <details className="package-help">
-        <summary>راهنمای اندازه‌گیری و کپی اندازه‌ها</summary>
+        <summary>راهنمای اندازه‌گیری</summary>
         <div className="stack">
           <div
             className="shipping-box-diagram"
@@ -90,35 +88,6 @@ export function PackageMeasurements({
             و محافظ است. پهن‌ترین قسمت را اندازه بگیرید. محصول ایستاده می‌ماند و
             فقط روی قاعده می‌چرخد.
           </p>
-          {packages.length > 1 && (
-            <label>
-              کپی اندازه‌ها از بسته دیگر
-              <select
-                aria-label="کپی اندازه‌ها از بسته دیگر"
-                value=""
-                onChange={(e) => {
-                  const source = packages.find((p) => p.id === e.target.value);
-                  if (source)
-                    onChange({
-                      lengthMm: source.lengthMm,
-                      widthMm: source.widthMm,
-                      heightMm: source.heightMm,
-                      shippingGrams: source.shippingGrams,
-                      shippingVerified: false,
-                    });
-                }}
-              >
-                <option value="">انتخاب بسته</option>
-                {packages
-                  .filter((p) => p.id !== pack.id)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {packageLabel(p)}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          )}
         </div>
       </details>
     </section>

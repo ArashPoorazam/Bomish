@@ -790,3 +790,58 @@
       box-shadow 0.15s;
   }
 }
+
+/* Request workspaces occupy the viewport; only their content panes scroll. */
+.omni-shell.omni-requests {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.omni-requests .omni-main {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.omni-requests .omni-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: 16px;
+  overflow: hidden;
+}
+.omni-requests .omni-heading {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+.omni-requests .requests-workbench {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  grid-template-rows: minmax(0, 1fr);
+}
+.omni-requests .request-list,
+.omni-requests .custom-review {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.omni-requests .requests-inbox > :not(.request-list) {
+  flex-shrink: 0;
+}
+.omni-requests .request-list-item {
+  flex-shrink: 0;
+}
+@media (max-width: 800px) {
+  .omni-requests .omni-content {
+    padding: 10px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .omni-requests .omni-heading {
+    margin-bottom: 8px;
+  }
+  .omni-requests .requests-workbench {
+    border-radius: 14px;
+  }
+}

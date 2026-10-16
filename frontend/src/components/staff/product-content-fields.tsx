@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { RichText } from "@/components/rich-text";
 import type { Category } from "@/lib/types";
 import type { ProductFields } from "./product-form";
 
@@ -57,12 +56,6 @@ export function ProductBasics({
           />
         </label>
       </div>
-      {p.description && (
-        <details>
-          <summary>پیش‌نمایش معرفی</summary>
-          <RichText text={p.description} />
-        </details>
-      )}
     </div>
   );
 }
@@ -115,7 +108,6 @@ export function ProductDetails({ p, field }: ProductFields) {
                   }
                 />
               </label>
-              <RichText text={section.body} />
               <button
                 type="button"
                 className="button subtle-danger"
@@ -164,7 +156,6 @@ export function ProductDetails({ p, field }: ProductFields) {
                   value={p[k]}
                   onChange={(e) => field(k, e.target.value)}
                 />
-                <RichText text={p[k]} />
               </label>
             ))}
         </div>

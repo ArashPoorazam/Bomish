@@ -170,7 +170,7 @@ func (a *App) courier() carrier.Courier {
 	}
 	return carrier.Disabled{}
 }
-func (a *App) calculateShipping(ctx context.Context, c domain.Cart, in shippingQuoteInput, cfg calculatedConfig) (shippingSnapshot, error) {
+func (a *App) calculateShipping(ctx context.Context, c domain.Cart, in shippingQuoteInput, cfg calculatedConfig, userID string) (shippingSnapshot, error) {
 	s := shippingSnapshot{Config: cfg, Destination: normalizedDestination(in.Address), Algorithm: packing.Version}
 	if e := s.Destination.Validate(); e != nil {
 		return s, e
@@ -253,7 +253,7 @@ func (a *App) calculateShipping(ctx context.Context, c domain.Cart, in shippingQ
 	for _, p := range s.Parcels {
 		s.Totals.WeightGrams += p.Weight()
 	}
-	e = applyDiscount(ctx, a.Pool, &s.Totals, in.DiscountCode, false)
+	e = applyDiscount(ctx, a.Pool, &s.Totals, in.DiscountCode, userID, false)
 	return s, e
 }
 func (a *App) calculatedQuote(w http.ResponseWriter, r *http.Request, c domain.Cart, in shippingQuoteInput, cfg calculatedConfig) {
@@ -261,7 +261,7 @@ func (a *App) calculatedQuote(w http.ResponseWriter, r *http.Request, c domain.C
 		a.acceptPostalQuote(w, r, c, in, cfg)
 		return
 	}
-	s, e := a.calculateShipping(r.Context(), c, in, cfg)
+	s, e := a.calculateShipping(r.Context(), c, in, cfg, current(r).UserID)
 	if e != nil {
 		code := "provider_unavailable"
 		var f *packing.Failure
@@ -353,7 +353,7 @@ func (a *App) shippingPreview(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	s, e := a.calculateShipping(r.Context(), c, shippingQuoteInput{Address: in.Address}, cfg)
+	s, e := a.calculateShipping(r.Context(), c, shippingQuoteInput{Address: in.Address}, cfg, "")
 	if e != nil {
 		shippingError(w, 422, "preview_unavailable", e.Error())
 		return

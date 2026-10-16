@@ -79,7 +79,7 @@ func (a *App) quote(w http.ResponseWriter, r *http.Request) {
 	}
 	v, e := calculateQuote(r.Context(), a.Pool, c, in.Province)
 	if e == nil {
-		e = applyDiscount(r.Context(), a.Pool, &v, in.DiscountCode, false)
+		e = applyDiscount(r.Context(), a.Pool, &v, in.DiscountCode, current(r).UserID, false)
 	}
 	if e != nil {
 		fail(w, 400, e.Error())
@@ -183,7 +183,7 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		v.DiscountRials = 0
 		v.DiscountCode = ""
 		v.TotalRials = v.SubtotalRials + v.ShippingRials
-		e = applyDiscount(r.Context(), tx, &v, in.DiscountCode, true)
+		e = applyDiscount(r.Context(), tx, &v, in.DiscountCode, s.UserID, true)
 	}
 	if e != nil {
 		fail(w, 409, e.Error())
@@ -378,7 +378,7 @@ func (a *App) settle(ctx context.Context, id, user string, success bool) (string
 	}
 	available := true
 	if success && status == "expired" {
-		capacity, err := reclaimDiscount(ctx, tx, discountCode)
+		capacity, err := reclaimDiscount(ctx, tx, discountCode, user)
 		if err != nil {
 			return "", err
 		}

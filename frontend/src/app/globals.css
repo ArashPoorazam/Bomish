@@ -3953,15 +3953,74 @@ details[open] > summary {
   }
 }
 .product-availability {
-  padding: 20px;
-  border: 1px solid #dce3d8;
-  border-radius: 12px;
-  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  margin-top: 24px;
+  background: #f5f7f1;
 }
-.product-availability button[aria-pressed="true"] {
+.product-availability-copy {
+  flex: 1 1 220px;
+}
+.product-availability-copy h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+.product-availability-copy p,
+.product-archive-action small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.product-availability-controls {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+}
+.product-availability-controls .button {
+  min-height: 44px;
+  border-color: transparent;
+  background: transparent;
+}
+.product-availability-controls button[aria-pressed="true"] {
   background: #203b32;
   color: white;
   border-color: #203b32;
+  box-shadow: 0 2px 4px #203b3220;
+}
+.product-archive-action {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+  padding-inline-start: 20px;
+  border-inline-start: 1px solid var(--line);
+}
+@media (max-width: 600px) {
+  .product-availability {
+    gap: 16px;
+    padding: 16px;
+  }
+  .product-availability-copy,
+  .product-availability-controls {
+    flex-basis: 100%;
+  }
+  .product-availability-controls .button {
+    flex: 1;
+  }
+  .product-archive-action {
+    width: 100%;
+    padding-inline-start: 0;
+    padding-top: 12px;
+    border-inline-start: 0;
+    border-top: 1px solid var(--line);
+  }
 }
 .omni-content > .omni-panel,
 .omni-content > .chart-pies {
@@ -5096,4 +5155,48 @@ details[open] > summary {
   .order-timeline small {
     font-size: 0.6rem;
   }
+}
+
+.discount-usage-limits {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f5f7f1;
+}
+.discount-usage-limits h3,
+.discount-usage-limits p {
+  margin: 0;
+}
+.discount-usage-limits p,
+.discount-usage-limits small {
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.catalog-product-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.catalog-shipping-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #e6cc8b;
+  border-radius: 9px;
+  background: #fff4d6;
+  color: #805c16;
+}
+.catalog-shipping-badge:hover {
+  background: #ffe8ad;
+  border-color: #bc8b30;
+}
+.catalog-shipping-badge:focus-visible {
+  outline: 2px solid #805c16;
+  outline-offset: 3px;
 }

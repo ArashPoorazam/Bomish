@@ -7361,6 +7361,12 @@ export interface components {
             maxUses: number;
             /** Format: date-time */
             expiresAt: string | null;
+            /**
+             * Format: int64
+             * @description Maximum uses per authenticated customer account. Zero means unlimited; pending orders reserve a use, cancelled and expired orders do not count.
+             * @default 0
+             */
+            maxUsesPerCustomer: number;
         };
         DiscountCode: {
             code: string;
@@ -7383,6 +7389,12 @@ export interface components {
             usedCount: number;
             /** Format: int64 */
             reservedCount: number;
+            /**
+             * Format: int64
+             * @description Maximum uses per authenticated customer account. Zero means unlimited; pending orders reserve a use, cancelled and expired orders do not count.
+             * @default 0
+             */
+            maxUsesPerCustomer: number;
         };
         ReportColumn: {
             key: string;
