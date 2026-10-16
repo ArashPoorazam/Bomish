@@ -5,6 +5,7 @@ import { fa } from "@/lib/format";
 import { usePathname } from "next/navigation";
 import {
   Store,
+  Truck,
   Inbox,
   ChartNoAxesCombined,
   LayoutDashboard,
@@ -23,7 +24,6 @@ export const sectionLabels: Record<string, string> = {
   support: "گفتگو با مشتری",
   custom: "سفارش‌های اختصاصی",
   suggestions: "مدیریت خانه",
-  shipping: "ارسال",
   sales: "فروش من",
 };
 export const reportSections = [
@@ -80,6 +80,12 @@ export function WorkspaceNavigation({
           label: "تحلیل داده‌ها",
           Icon: ChartNoAxesCombined,
           children: reportSections,
+        },
+        {
+          id: "shipping",
+          href: "/omnisire/shipping",
+          label: "ارسال",
+          Icon: Truck,
         },
         {
           id: "events",

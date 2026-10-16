@@ -97,6 +97,12 @@ test("shipping setup keeps technical details out of the interface and saves a so
     return route.fulfill({ json: [] });
   });
   await page.goto("/staff?section=shipping");
+  await expect(page).toHaveURL(/\/omnisire\/shipping$/);
+  await expect(
+    page
+      .getByRole("navigation", { name: "ناوبری فضای کار" })
+      .getByRole("link", { name: "ارسال", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
   await expect(
     page.getByRole("heading", { name: "مبدأ ارسال", exact: true }),
   ).toBeVisible();

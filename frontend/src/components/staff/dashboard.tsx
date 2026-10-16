@@ -4,13 +4,7 @@ import Link from "next/link";
 import { useStore } from "@/components/store-provider";
 import { api } from "@/lib/api";
 import { fa } from "@/lib/format";
-import type {
-  Product,
-  Category,
-  Article,
-  Order,
-  ShippingConfig,
-} from "@/lib/types";
+import type { Product, Category, Article, Order } from "@/lib/types";
 import {
   Workspace,
   Feedback,
@@ -20,7 +14,6 @@ import {
 import { CatalogManager, CategoryManager } from "./catalog-manager";
 import { ArticleManager } from "./article-manager";
 import { PriceManager } from "./price-manager";
-import { ShippingEditor } from "./operations";
 import {
   sectionLabels,
   sectionPermission,
@@ -45,8 +38,7 @@ export function Dashboard({
   const [products, setProducts] = useState<Product[]>([]),
     [categories, setCategories] = useState<Category[]>([]),
     [articles, setArticles] = useState<Article[]>([]),
-    [orders, setOrders] = useState<Order[]>([]),
-    [shipping, setShipping] = useState<ShippingConfig | null>(null);
+    [orders, setOrders] = useState<Order[]>([]);
   const [editingArticle, setEditingArticle] = useState(false);
   const [viewingOrder, setViewingOrder] = useState(false);
   const [editor, setEditor] = useState({ dirty: false, busy: false });
@@ -66,10 +58,9 @@ export function Dashboard({
     if (!user?.role) return;
     if (!permissions.includes(sectionPermission(tab)))
       setTab(
-        (permissions.find((x) => x !== "omnisire") || "").replace(
-          /^requests$/,
-          "support",
-        ),
+        (
+          permissions.find((x) => x !== "omnisire" && x !== "shipping") || ""
+        ).replace(/^requests$/, "support"),
       );
   }, [key, tab]);
   const reload = useCallback(async () => {
@@ -116,10 +107,6 @@ export function Dashboard({
         if (request !== requestVersion.current) return;
         setOrders(d.items as unknown as Order[]);
         setListData(d);
-      }
-      if (tab === "shipping") {
-        const config = await api<ShippingConfig>("/staff/shipping");
-        if (request === requestVersion.current) setShipping(config);
       }
     } catch (e) {
       if (request === requestVersion.current) setError((e as Error).message);
@@ -232,9 +219,6 @@ export function Dashboard({
         <StaffRequests key="custom" kind="custom" onStateChange={setEditor} />
       )}
       {tab === "suggestions" && <HomeManagement onState={setEditor} />}
-      {tab === "shipping" && shipping && (
-        <ShippingEditor initial={shipping} onStateChange={setEditor} />
-      )}{" "}
       {tab === "sales" && (
         <div className="omni-welcome">
           <h2>فروش‌های شما، دستاورد شما</h2>

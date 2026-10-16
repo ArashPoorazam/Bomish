@@ -1,6 +1,12 @@
 "use client";
 import Link from "next/link";
-import { Users, ArrowUpLeft, ChartNoAxesCombined, History } from "lucide-react";
+import {
+  Users,
+  ArrowUpLeft,
+  ChartNoAxesCombined,
+  History,
+  Truck,
+} from "lucide-react";
 import { Workspace, Stats, Feedback, useLoad } from "./shared";
 export function OmnisireHome() {
   const { data, error, loading } = useLoad<{
@@ -53,6 +59,12 @@ export function OmnisireHome() {
             label: "تحلیل داده‌ها",
             text: "گزارش فروش، مقایسه و دریافت اکسل.",
             Icon: ChartNoAxesCombined,
+          },
+          {
+            href: "shipping",
+            label: "ارسال",
+            text: "تنظیم مبدأ، بسته‌بندی و روش‌های ارسال.",
+            Icon: Truck,
           },
           {
             href: "events",

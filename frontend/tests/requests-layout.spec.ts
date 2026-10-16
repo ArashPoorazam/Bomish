@@ -102,6 +102,7 @@ for (const kind of ["support", "custom"] as const) {
         ),
       ).toBe(true);
       const bounds = await page.locator(".requests-workbench").boundingBox();
+      expect(bounds!.y).toBe(0);
       expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height);
       expect(bounds!.y + bounds!.height).toBeGreaterThan(viewport.height - 25);
       if (kind === "support") {

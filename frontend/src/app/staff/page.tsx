@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { Dashboard } from "@/components/staff/dashboard";
 export const metadata = {
   title: "فضای کار بومیش",
@@ -9,5 +10,6 @@ export default async function Page({
   searchParams: Promise<{ section?: string; q?: string }>;
 }) {
   const query = await searchParams;
+  if (query.section === "shipping") redirect("/omnisire/shipping");
   return <Dashboard initialSection={query.section} initialQuery={query.q} />;
 }

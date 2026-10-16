@@ -809,18 +809,24 @@
   min-height: 0;
   max-width: none;
   margin: 0;
-  padding: 16px;
+  position: relative;
+  padding: 0;
   overflow: hidden;
 }
 .omni-requests .omni-heading {
-  flex-shrink: 0;
-  margin-bottom: 12px;
+  position: absolute;
+  inset-inline-start: 12px;
+  top: 16px;
+  z-index: 5;
+  margin: 0;
 }
 .omni-requests .requests-workbench {
   flex: 1;
   min-height: 0;
   height: auto;
   grid-template-rows: minmax(0, 1fr);
+  border: 0;
+  border-radius: 0;
 }
 .omni-requests .request-list,
 .omni-requests .custom-review {
@@ -833,15 +839,13 @@
 .omni-requests .request-list-item {
   flex-shrink: 0;
 }
+@media (max-width: 850px) {
+  .omni-requests .requests-inbox-toolbar {
+    padding-inline-start: 56px;
+  }
+}
 @media (max-width: 800px) {
-  .omni-requests .omni-content {
-    padding: 10px;
-    padding-bottom: max(10px, env(safe-area-inset-bottom));
-  }
-  .omni-requests .omni-heading {
-    margin-bottom: 8px;
-  }
-  .omni-requests .requests-workbench {
-    border-radius: 14px;
+  .omni-requests .request-detail-header {
+    padding-inline-start: 56px;
   }
 }

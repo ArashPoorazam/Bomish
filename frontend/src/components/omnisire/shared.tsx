@@ -89,6 +89,7 @@ export function Workspace({
   description?: string;
 }) {
   const { user, refresh, sessionError } = useStore();
+  const requests = activeSection === "support" || activeSection === "custom";
   const notifications = useRequestNotifications();
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -218,7 +219,9 @@ export function Workspace({
             >
               <Menu />
             </button>
-            {titleDetail || description ? (
+            {requests ? (
+              <h1 className="sr-only">{title}</h1>
+            ) : titleDetail || description ? (
               <div className="workspace-heading-copy">
                 <div className="workspace-heading-title">
                   <h1>{title}</h1>
