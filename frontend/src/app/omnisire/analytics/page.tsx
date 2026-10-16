@@ -1,8 +1,9 @@
+import "../../analytics.css";
 import { AnalyticsPage } from "@/components/omnisire/analytics";
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ section?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  return <AnalyticsPage initialSection={(await searchParams).section} />;
+  return <AnalyticsPage initialParams={await searchParams} />;
 }

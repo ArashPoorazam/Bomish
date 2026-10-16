@@ -39,8 +39,8 @@ func (a *App) reportCharts(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "بازه باید بین ۱ تا ۳۶۶ روز باشد")
 		return
 	}
-	ids := []string{}
-	if s := r.URL.Query().Get("ids"); s != "" {
+	ids := r.URL.Query()["id"]
+	if s := r.URL.Query().Get("ids"); len(ids) == 0 && s != "" {
 		ids = strings.Split(s, ",")
 	}
 	if len(ids) > 12 {
@@ -77,34 +77,45 @@ func (a *App) reportCharts(w http.ResponseWriter, r *http.Request) {
 		facts += ` UNION ALL SELECT id,name,$1::timestamptz,0,0,0,0,0 FROM (` + candidate + `) candidates`
 	}
 	base := `WITH facts AS (` + facts + `) SELECT id,max(name) name,` + chartDay + ` AS "day",sum(revenue)::float8 revenue,sum(quantity)::float8 quantity,sum(orders)::float8 orders,sum(clicks)::float8 clicks,sum(views)::float8 views FROM facts WHERE ($3='' OR name ILIKE '%'||$3||'%' OR id ILIKE '%'||$3||'%') GROUP BY id,"day"`
-	rows, e := queryMaps(r.Context(), a.Pool, base, from, to, q)
+	metric := r.URL.Query().Get("metric")
+	if metric == "" {
+		metric = "revenue"
+		if section == "searches" {
+			metric = "orders"
+		}
+	}
+	switch metric {
+	case "revenue", "quantity", "orders", "clicks", "views":
+	default:
+		fail(w, 400, "شاخص معتبر نیست")
+		return
+	}
+	// Aggregate in PostgreSQL; never transfer every entity's daily history to Go.
+	totalSQL := `WITH facts AS (` + facts + `) SELECT id,max(name) name,sum(revenue)::float8 revenue,sum(quantity)::float8 quantity,sum(orders)::float8 orders,sum(clicks)::float8 clicks,sum(views)::float8 views FROM facts WHERE ($3='' OR name ILIKE '%'||$3||'%' OR id ILIKE '%'||$3||'%') GROUP BY id`
+	summary, e := queryMaps(r.Context(), a.Pool, `SELECT count(*)::float8 AS "entityCount",count(*) FILTER(WHERE revenue>0 OR quantity>0 OR orders>0)::float8 AS "activeCount",coalesce(sum(revenue),0)::float8 revenue,coalesce(sum(quantity),0)::float8 quantity,coalesce(sum(orders),0)::float8 orders,coalesce(sum(clicks),0)::float8 clicks,coalesce(sum(views),0)::float8 views FROM (`+totalSQL+`) t`, from, to, q)
 	if e != nil {
 		a.dbError(w, e)
 		return
 	}
-	// Totals include every matching entity, independent of table pagination and comparison selection.
-	totals, e := queryMaps(r.Context(), a.Pool, `SELECT id,max(name) name,sum(revenue)::float8 revenue,sum(quantity)::float8 quantity,sum(orders)::float8 orders,sum(clicks)::float8 clicks,sum(views)::float8 views FROM (`+base+`) d GROUP BY id ORDER BY revenue DESC,quantity DESC,clicks DESC,id`, from, to, q)
+	// Rankings and denominators always cover the whole period, regardless of selected series.
+	totals, e := queryMaps(r.Context(), a.Pool, `SELECT * FROM (`+totalSQL+`) t ORDER BY `+metric+` DESC,id LIMIT 8`, from, to, q)
 	if e != nil {
 		a.dbError(w, e)
 		return
 	}
-	selected := map[string]bool{}
-	for _, id := range ids {
-		selected[id] = true
-	}
+	selected := append([]string{}, ids...)
 	if len(selected) == 0 {
 		for i, t := range totals {
-			if i >= 5 {
+			if i == 5 {
 				break
 			}
-			selected[t["id"].(string)] = true
+			selected = append(selected, t["id"].(string))
 		}
 	}
-	lines := []map[string]any{}
-	for _, row := range rows {
-		if selected[row["id"].(string)] {
-			lines = append(lines, row)
-		}
+	lines, e := queryMaps(r.Context(), a.Pool, `SELECT * FROM (`+base+`) d WHERE id=ANY($4::text[]) ORDER BY id,"day"`, from, to, q, selected)
+	if e != nil {
+		a.dbError(w, e)
+		return
 	}
 	packages := []map[string]any{}
 	if section == "products" || section == "packages" {
@@ -117,35 +128,42 @@ func (a *App) reportCharts(w http.ResponseWriter, r *http.Request) {
 ), packages AS (
  SELECT coalesce(c.product_id,s.product_id) AS "productId",coalesce(c.package_id,s.package_id) AS "packageId",coalesce(c.name,s.name) name,coalesce(c.label,s.label,'بسته قدیمی') package,coalesce(s.quantity,0)::bigint quantity,coalesce(s.revenue,0)::bigint revenue
  FROM current_packages c FULL JOIN sold s ON s.product_id=c.product_id AND s.package_id=c.package_id
-) SELECT * FROM packages WHERE ($3='' OR name ILIKE '%'||$3||'%') AND ($4::text[]='{}' OR "productId"=ANY($4::text[]) OR "productId"||':'||"packageId"=ANY($4::text[])) ORDER BY name,package`, from, to, q, ids)
+) SELECT * FROM packages WHERE ($3='' OR name ILIKE '%'||$3||'%') AND ($4::text[]='{}' OR "productId"=ANY($4::text[]) OR "productId"||':'||"packageId"=ANY($4::text[])) ORDER BY name,package LIMIT 100`, from, to, q, selected)
 		if e != nil {
 			a.dbError(w, e)
 			return
 		}
 	}
-	write(w, 200, map[string]any{"days": days, "points": lines, "totals": totals, "packages": packages})
+	write(w, 200, map[string]any{"days": days, "points": lines, "totals": totals, "summary": summary[0], "packages": packages})
 }
 
 func (a *App) priceCharts(w http.ResponseWriter, r *http.Request, from, to time.Time, days, ids []string, q string) {
-	// Carry forward the last recorded effective package price. Unknown history stays null.
-	base := `WITH packs AS (SELECT h.product_id,h.package_id,max(p.name||' · '||h.package_label) name FROM price_history h JOIN products p ON p.id=h.product_id WHERE h.created_at<$2 AND ($3='' OR p.name ILIKE '%'||$3||'%') GROUP BY h.product_id,h.package_id) SELECT p.product_id||':'||p.package_id id,p.product_id AS "productId",p.name,to_char(d,'YYYY-MM-DD') AS "day",h.price::float8 price FROM packs p CROSS JOIN generate_series(($1::timestamptz AT TIME ZONE 'Asia/Tehran')::date,($2::timestamptz AT TIME ZONE 'Asia/Tehran')::date-1,interval '1 day') d LEFT JOIN LATERAL (SELECT floor((new_rials*(100-new_discount)+500)/1000)*10 price FROM price_history WHERE product_id=p.product_id AND package_id=p.package_id AND created_at < ((d+interval '1 day') AT TIME ZONE 'Asia/Tehran') ORDER BY created_at DESC,id DESC LIMIT 1) h ON true WHERE ($4::text[]='{}' OR p.product_id=ANY($4::text[])) ORDER BY p.name,p.product_id,p.package_id,d`
-	totals, e := queryMaps(r.Context(), a.Pool, `SELECT p.id,p.name,count(*) FILTER(WHERE h.created_at>=$1 AND NOT h.baseline AND (h.old_rials IS DISTINCT FROM h.new_rials OR h.old_discount IS DISTINCT FROM h.new_discount))::float8 changes FROM products p JOIN price_history h ON h.product_id=p.id WHERE h.created_at<$2 AND ($3='' OR p.name ILIKE '%'||$3||'%') GROUP BY p.id ORDER BY p.name,p.id`, from, to, q)
+	// Rank and compare packages: prices of different package sizes must not be summed.
+	packs := `SELECT h.product_id||':'||h.package_id id,h.product_id,h.package_id,max(p.name||' · '||h.package_label) name,count(*) FILTER(WHERE h.created_at>=$1 AND NOT h.baseline AND (h.old_rials IS DISTINCT FROM h.new_rials OR h.old_discount IS DISTINCT FROM h.new_discount))::float8 changes FROM price_history h JOIN products p ON p.id=h.product_id WHERE h.created_at<$2 AND ($3='' OR p.name ILIKE '%'||$3||'%') GROUP BY h.product_id,h.package_id`
+	summary, e := queryMaps(r.Context(), a.Pool, `SELECT count(*)::float8 AS "entityCount",count(*) FILTER(WHERE changes>0)::float8 AS "activeCount",coalesce(sum(changes),0)::float8 changes FROM (`+packs+`) t`, from, to, q)
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+	totals, e := queryMaps(r.Context(), a.Pool, `SELECT * FROM (`+packs+`) t ORDER BY changes DESC,id LIMIT 8`, from, to, q)
 	if e != nil {
 		a.dbError(w, e)
 		return
 	}
 	if len(ids) == 0 {
 		for i, t := range totals {
-			if i == 3 {
+			if i == 5 {
 				break
 			}
 			ids = append(ids, t["id"].(string))
 		}
 	}
+	// Limit before generating dates. Support legacy product IDs, with a hard series cap.
+	base := `WITH packs AS (SELECT * FROM (` + packs + `) t WHERE id=ANY($4::text[]) OR product_id=ANY($4::text[]) ORDER BY changes DESC,id LIMIT 12) SELECT p.id,p.product_id AS "productId",p.name,to_char(d,'YYYY-MM-DD') AS "day",h.price::float8 price FROM packs p CROSS JOIN generate_series(($1::timestamptz AT TIME ZONE 'Asia/Tehran')::date,($2::timestamptz AT TIME ZONE 'Asia/Tehran')::date-1,interval '1 day') d LEFT JOIN LATERAL (SELECT CASE WHEN new_discount>0 THEN least(new_rials,ceil(new_rials::numeric*(100-new_discount)/1000000)*10000) ELSE new_rials END price FROM price_history WHERE product_id=p.product_id AND package_id=p.package_id AND created_at < ((d+interval '1 day') AT TIME ZONE 'Asia/Tehran') ORDER BY created_at DESC,id DESC LIMIT 1) h ON true ORDER BY p.id,d`
 	rows, e := queryMaps(r.Context(), a.Pool, base, from, to, q, ids)
 	if e != nil {
 		a.dbError(w, e)
 		return
 	}
-	write(w, 200, map[string]any{"days": days, "points": rows, "totals": totals, "packages": []any{}})
+	write(w, 200, map[string]any{"days": days, "points": rows, "totals": totals, "summary": summary[0], "packages": []any{}})
 }

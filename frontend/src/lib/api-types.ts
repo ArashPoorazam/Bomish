@@ -8085,6 +8085,10 @@ export interface operations {
                 ids?: string;
                 /** @description Name filter */
                 q?: string;
+                /** @description Ranks the top eight and selects the default top five series. Prices rank packages by change count. */
+                metric?: "revenue" | "quantity" | "orders" | "clicks" | "views" | "price";
+                /** @description Repeated comparison IDs; safe for search terms containing commas. Price IDs are productId:packageId. */
+                id?: string[];
             };
             header?: never;
             path?: never;
@@ -8092,7 +8096,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Calendar days, daily points, complete share totals, and package sales */
+            /** @description Calendar days, selected daily points (default top five), top-eight totals ranked by metric, full-period summary (entityCount, activeCount and metric sums), and up to 100 package rows. Comparison selection does not filter summary or rankings. Price history compares packages; unknown prices remain null. */
             200: {
                 headers: {
                     [name: string]: unknown;

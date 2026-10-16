@@ -1,496 +1,383 @@
 "use client";
-import { reportSections } from "./workspace-navigation";
-import { useEffect, useState } from "react";
-import { Download } from "lucide-react";
-import { api } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Info, SlidersHorizontal, X } from "lucide-react";
 import { fa } from "@/lib/format";
+import { Workspace, useLoad, type PageData } from "./shared";
+import { LineChart, dayLabel, type ChartData } from "./charts";
 import {
-  Workspace,
-  Panel,
-  Feedback,
-  Pager,
-  DataTable,
-  useLoad,
-  type PageData,
-} from "./shared";
-import { LineChart, PieChart, type ChartData } from "./charts";
-function isoDay(date: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tehran",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  reports,
+  initialFilters,
+  filtersQuery,
+  type Filters,
+  type ReportSection,
+  type Selection,
+} from "./analytics-model";
+import { AnalyticsSummary, Ranking } from "./analytics-insights";
+import { DateControls, ExportReport } from "./analytics-controls";
+import { ReportTable, ChartTable } from "./analytics-table";
+function readLocation() {
+  const p = new URLSearchParams(window.location.search);
+  return { ...Object.fromEntries(p), id: p.getAll("id") };
 }
-const metrics: Record<string, [string, string][]> = {
-  overview: [
-    ["revenue", "فروش خالص (تومان)"],
-    ["orders", "تعداد سفارش"],
-  ],
-  products: [
-    ["quantity", "تعداد بسته فروخته‌شده"],
-    ["clicks", "کلیک"],
-    ["views", "بازدید"],
-    ["revenue", "فروش خالص (تومان)"],
-  ],
-  packages: [
-    ["quantity", "تعداد بسته فروخته‌شده"],
-    ["revenue", "فروش خالص (تومان)"],
-  ],
-  prices: [["price", "قیمت بسته پس از تخفیف (تومان)"]],
-  customers: [
-    ["revenue", "خرید (تومان)"],
-    ["orders", "تعداد سفارش"],
-  ],
-  categories: [
-    ["quantity", "تعداد بسته فروخته‌شده"],
-    ["clicks", "کلیک"],
-    ["revenue", "فروش خالص (تومان)"],
-  ],
-  searches: [["orders", "تعداد جستجو"]],
-};
-type ExportJob = {
-  id: string;
-  status: string;
-  progress: number;
-  error?: string;
-};
 export function AnalyticsPage({
-  initialSection = "overview",
+  initialParams = {},
 }: {
-  initialSection?: string;
+  initialParams?: Record<string, string | string[] | undefined>;
 }) {
-  const [section, setSection] = useState(
-    reportSections.some(([key]) => key === initialSection)
-      ? initialSection
-      : "overview",
-  );
-  const [from, setFrom] = useState(() =>
-      isoDay(new Date(Date.now() - 6 * 86400000)),
-    ),
-    [to, setTo] = useState(() => isoDay(new Date()));
-  const [q, setQ] = useState(""),
-    [sort, setSort] = useState(""),
-    [direction, setDirection] = useState("desc"),
-    [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<string[]>([]),
-    [metric, setMetric] = useState(""),
-    [customer, setCustomer] = useState("");
-  const [exportJob, setExportJob] = useState<ExportJob | null>(null),
-    [error, setError] = useState(""),
-    [exportBusy, setExportBusy] = useState(false);
-  const chartSection = section === "customer-orders" ? "customers" : section;
-  const choices = metrics[chartSection];
-  const activeMetric = choices.some(([key]) => key === metric)
-    ? metric
-    : choices[0][0];
-  const params = new URLSearchParams({
-    section,
-    from,
-    to,
-    q,
-    sort,
-    direction,
-    page: String(page),
-    customer,
-  });
-  const result = useLoad<PageData>("/omnisire/analytics?" + params);
-  const chartParams = new URLSearchParams({
-    section: chartSection,
-    from,
-    to,
-    q,
-    ids: customer || selected.join(","),
-  });
-  const chart = useLoad<ChartData>("/omnisire/analytics/charts?" + chartParams);
+  const [filters, setFilters] = useState(() => initialFilters(initialParams));
+  const [revision, setRevision] = useState(0);
+  const [debouncedQuery, setDebouncedQuery] = useState(filters.q);
+  const [selectionNotice, setSelectionNotice] = useState("");
   useEffect(() => {
-    if (!exportJob || ["ready", "failed"].includes(exportJob.status)) return;
-    let live = true;
-    const timer = setInterval(() => {
-      api<ExportJob>(`/omnisire/exports/${exportJob.id}`)
-        .then((v) => {
-          if (live) setExportJob(v);
-        })
-        .catch((e) => {
-          if (live) setError(e.message);
-        });
-    }, 2000);
-    return () => {
-      live = false;
-      clearInterval(timer);
-    };
-  }, [exportJob?.id, exportJob?.status]);
-  function changeSection(key: string) {
-    setSection(key);
-    setPage(1);
-    setSelected([]);
-    setSort("");
-    setQ("");
-    setCustomer("");
-    setMetric("");
-    setError("");
-    window.history.replaceState(null, "", `/omnisire/analytics?section=${key}`);
+    const timer = setTimeout(() => setDebouncedQuery(filters.q), 350);
+    return () => clearTimeout(timer);
+  }, [filters.q]);
+  const report = reports[filters.section];
+  const metric = report.metrics.some(([key]) => key === filters.metric)
+    ? filters.metric
+    : report.metrics[0][0];
+  const metricLabel = report.metrics.find(([key]) => key === metric)![1];
+  const urlQuery = filtersQuery(filters).toString();
+  const previousQuery = useRef(urlQuery);
+  useEffect(() => {
+    // Initial URL already came from the server; only persist user changes.
+    if (previousQuery.current === urlQuery) return;
+    previousQuery.current = urlQuery;
+    window.history.replaceState(null, "", `/omnisire/analytics?${urlQuery}`);
+  }, [urlQuery]);
+  useEffect(() => {
+    const restore = () => setFilters(initialFilters(readLocation()));
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+  const tableParams = new URLSearchParams({
+    section: filters.customer ? "customer-orders" : filters.section,
+    from: filters.from,
+    to: filters.to,
+    q: debouncedQuery,
+    sort: filters.sort,
+    direction: filters.direction,
+    page: String(filters.page),
+    pageSize: String(filters.pageSize),
+    customer: filters.customer,
+  });
+  const chartParams = new URLSearchParams({
+    section: filters.section,
+    from: filters.from,
+    to: filters.to,
+    metric,
+  });
+  (filters.customer
+    ? [filters.customer]
+    : filters.selected.map((s) => s.id)
+  ).forEach((id) => chartParams.append("id", id));
+  const result = useLoad<PageData>(
+    "/omnisire/analytics?" + tableParams,
+    revision,
+  );
+  const chart = useLoad<ChartData>(
+    "/omnisire/analytics/charts?" + chartParams,
+    revision,
+  );
+  function update(patch: Partial<Filters>) {
+    setFilters((f) => ({ ...f, ...patch }));
   }
-  function toggle(id: string) {
-    setSelected((prev) =>
-      prev.includes(id)
-        ? prev.filter((x) => x !== id)
-        : prev.length < 12
-          ? [...prev, id]
-          : prev,
-    );
+  function changeSection(section: string) {
+    if (!Object.hasOwn(reports, section)) return;
+    setFilters((f) => ({
+      ...f,
+      section: section as ReportSection,
+      q: "",
+      sort: "",
+      page: 1,
+      metric: "",
+      customer: "",
+      customerName: "",
+      selected: [],
+    }));
+    setDebouncedQuery("");
+    setSelectionNotice("");
   }
-  async function download() {
-    setError("");
-    setExportBusy(true);
-    try {
-      const filters = Object.fromEntries(params);
-      delete filters.page;
-      const job = await api<{ id: string }>(
-        "/omnisire/exports",
-        "POST",
-        filters,
+  function toggle(row: Selection) {
+    setSelectionNotice("");
+    setFilters((f) => ({
+      ...f,
+      selected: f.selected.some((s) => s.id === row.id)
+        ? f.selected.filter((s) => s.id !== row.id)
+        : f.selected.length < 5
+          ? [...f.selected, row]
+          : f.selected,
+    }));
+    if (
+      filters.selected.length >= 5 &&
+      !filters.selected.some((s) => s.id === row.id)
+    )
+      setSelectionNotice(
+        "برای خوانایی نمودار، حداکثر ۵ مورد را مقایسه کنید. ابتدا یکی از انتخاب‌ها را حذف کنید.",
       );
-      setExportJob({ ...job, status: "pending", progress: 0 });
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setExportBusy(false);
-    }
   }
-  const label =
-    reportSections.find(([key]) => key === section)?.[1] || "خریدهای مشتری";
   const data = chart.data;
+  const isOverview = filters.section === "overview";
   return (
     <Workspace
       owner
-      title={label}
-      activeSection={chartSection}
+      title={
+        filters.customer
+          ? `خریدهای ${filters.customerName || "مشتری"}`
+          : report.title
+      }
+      description={
+        filters.customer
+          ? "سفارش‌های پرداخت‌شده این مشتری در بازه انتخاب‌شده"
+          : report.description
+      }
+      activeSection={filters.section}
       onSectionChange={changeSection}
+      titleDetail={<span className="analytics-heading-tag">تحلیل داده‌ها</span>}
     >
-      <Panel
-        title="بازه گزارش"
-        action={
+      <div className="analytics-workspace">
+        {filters.customer && (
           <button
-            className="button secondary"
-            disabled={exportBusy || !from || !to || from > to}
-            onClick={() => void download()}
-          >
-            <Download size={17} />
-            دریافت اکسل
-          </button>
-        }
-      >
-        <div className="omni-filters">
-          <label>
-            از تاریخ
-            <input
-              type="date"
-              value={from}
-              max={to}
-              onChange={(e) => {
-                setFrom(e.target.value);
-                setPage(1);
-              }}
-            />
-          </label>
-          <label>
-            تا تاریخ
-            <input
-              type="date"
-              value={to}
-              min={from}
-              onChange={(e) => {
-                setTo(e.target.value);
-                setPage(1);
-              }}
-            />
-          </label>
-          <label>
-            جستجو در گزارش
-            <input
-              type="search"
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setPage(1);
-              }}
-              placeholder="نام یا مشخصات"
-            />
-          </label>
-          <button
-            className="button secondary"
-            onClick={() => {
-              setFrom(isoDay(new Date(Date.now() - 6 * 86400000)));
-              setTo(isoDay(new Date()));
-              setPage(1);
-            }}
-          >
-            هفته اخیر
-          </button>
-        </div>
-        <p className="omni-help">
-          روزها بر اساس زمان تهران محاسبه می‌شوند. فروش خالص پس از تخفیف‌ها و
-          بدون هزینه ارسال است.
-        </p>
-        <Feedback error={error} />
-        {exportJob && (
-          <div className="notice" role="status">
-            {exportJob.status === "ready" ? (
-              <a
-                className="text-link"
-                href={`/api/v1/omnisire/exports/${exportJob.id}/download`}
-              >
-                دانلود فایل اکسل
-              </a>
-            ) : exportJob.status === "failed" ? (
-              <span>
-                {exportJob.error || "خروجی آماده نشد؛ دوباره تلاش کنید."}
-              </span>
-            ) : (
-              <>
-                در حال آماده‌سازی اکسل · {fa(exportJob.progress)}٪{" "}
-                <progress max={100} value={exportJob.progress} />
-              </>
-            )}
-          </div>
-        )}
-      </Panel>
-      <Panel
-        title={section === "prices" ? "روند قیمت بسته‌ها" : "روند روزانه"}
-        action={
-          <label className="omni-metric">
-            شاخص نمودار
-            <select
-              value={activeMetric}
-              onChange={(e) => setMetric(e.target.value)}
-            >
-              {choices.map(([key, text]) => (
-                <option key={key} value={key}>
-                  {text}
-                </option>
-              ))}
-            </select>
-          </label>
-        }
-      >
-        <Feedback error={chart.error} loading={chart.loading} />
-        {!chart.loading && !chart.error && data && (
-          <>
-            {chartSection !== "overview" && section !== "customer-orders" && (
-              <details
-                className="chart-selection"
-                open={selected.length > 0 || undefined}
-              >
-                <summary>
-                  انتخاب برای مقایسه{" "}
-                  {selected.length ? `(${fa(selected.length)})` : ""}
-                </summary>
-                <p className="omni-help">
-                  حداکثر ۱۲ مورد. بدون انتخاب،{" "}
-                  {section === "prices"
-                    ? "قیمت بسته‌های سه محصول اول"
-                    : "پنج مورد اول"}{" "}
-                  نمایش داده می‌شود. نمودارهای سهم، کل نتایج این بازه را نشان
-                  می‌دهند.
-                </p>
-                <div className="chart-options">
-                  {data.totals.map((row) => (
-                    <label key={row.id} className="check-label">
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(row.id)}
-                        disabled={
-                          selected.length >= 12 && !selected.includes(row.id)
-                        }
-                        onChange={() => toggle(row.id)}
-                      />
-                      {row.name}
-                    </label>
-                  ))}
-                </div>
-                {selected.length > 0 && (
-                  <button className="text-link" onClick={() => setSelected([])}>
-                    پاک کردن انتخاب‌ها
-                  </button>
-                )}
-              </details>
-            )}
-            {section === "prices" && (
-              <p className="omni-help">
-                قیمت پایان هر روز پس از تخفیف. آخرین قیمت ثبت‌شده ادامه می‌یابد؛
-                روزهای پیش از اولین ثبت، داده ندارند.
-              </p>
-            )}
-            <LineChart
-              key={section + activeMetric + from + to + selected.join(",")}
-              data={data}
-              metric={activeMetric}
-              label={choices.find(([key]) => key === activeMetric)![1]}
-              monetary={["revenue", "price"].includes(activeMetric)}
-            />
-            <details className="chart-data-table">
-              <summary>جدول داده‌های نمودار</summary>
-              <DataTable
-                data={data.points}
-                columns={[
-                  { key: "name", label: "مورد", kind: "text" },
-                  { key: "day", label: "روز", kind: "text" },
-                  {
-                    key: activeMetric,
-                    label: choices.find(([key]) => key === activeMetric)![1],
-                    kind: ["price", "revenue"].includes(activeMetric)
-                      ? "money"
-                      : "number",
-                  },
-                ]}
-              />
-            </details>
-          </>
-        )}
-      </Panel>
-      {!chart.loading &&
-        !chart.error &&
-        data &&
-        chartSection !== "overview" && (
-          <div className="chart-pies">
-            {section === "prices" ? (
-              <PieChart
-                rows={data.totals}
-                metric="changes"
-                title="سهم محصولات از تغییرات قیمت"
-              />
-            ) : (
-              <>
-                <PieChart
-                  rows={data.totals}
-                  metric={
-                    chartSection === "customers" || chartSection === "searches"
-                      ? "orders"
-                      : "quantity"
-                  }
-                  title={
-                    chartSection === "customers"
-                      ? "سهم مشتریان از سفارش‌ها"
-                      : chartSection === "searches"
-                        ? "سهم عبارت‌های جستجو"
-                        : "سهم فروش بسته‌ها"
-                  }
-                />
-                {chartSection !== "searches" && (
-                  <PieChart
-                    rows={data.totals}
-                    metric={
-                      ["products", "categories"].includes(chartSection)
-                        ? "clicks"
-                        : "revenue"
-                    }
-                    title={
-                      ["products", "categories"].includes(chartSection)
-                        ? "سهم کلیک‌ها"
-                        : "سهم مبلغ خرید"
-                    }
-                    monetary={
-                      !["products", "categories"].includes(chartSection)
-                    }
-                  />
-                )}
-              </>
-            )}
-          </div>
-        )}
-      {!chart.loading &&
-        !chart.error &&
-        data &&
-        ["products", "packages"].includes(section) && (
-          <Panel title="فروش هر بسته در محصولات">
-            <DataTable
-              data={data.packages}
-              columns={[
-                { key: "name", label: "محصول", kind: "text" },
-                { key: "package", label: "بسته", kind: "text" },
-                { key: "quantity", label: "تعداد فروخته‌شده", kind: "number" },
-                { key: "revenue", label: "فروش خالص (تومان)", kind: "money" },
-              ]}
-            />
-          </Panel>
-        )}
-      <Panel
-        title="داده‌های گزارش"
-        action={
-          section === "customer-orders" ? (
-            <button
-              className="text-link"
-              onClick={() => changeSection("customers")}
-            >
-              بازگشت به مشتریان
-            </button>
-          ) : undefined
-        }
-      >
-        <div className="omni-filters">
-          <label>
-            مرتب‌سازی
-            <select
-              value={sort}
-              onChange={(e) => {
-                setSort(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">پیشنهادی</option>
-              {result.data?.columns?.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            ترتیب
-            <select
-              value={direction}
-              onChange={(e) => {
-                setDirection(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="desc">نزولی</option>
-              <option value="asc">صعودی</option>
-            </select>
-          </label>
-        </div>
-        <Feedback error={result.error} loading={result.loading} />
-        {!result.loading && !result.error && (
-          <DataTable
-            data={result.data?.items || []}
-            columns={result.data?.columns || []}
-            selected={new Set(selected)}
-            onSelect={
-              [
-                "products",
-                "packages",
-                "customers",
-                "categories",
-                "searches",
-              ].includes(section)
-                ? toggle
-                : undefined
+            className="text-link analytics-back"
+            onClick={() =>
+              update({
+                customer: "",
+                customerName: "",
+                q: "",
+                sort: "",
+                page: 1,
+              })
             }
-            onRow={
-              section === "customers"
-                ? (row) => {
-                    setCustomer(String(row.id));
-                    setSection("customer-orders");
-                    setPage(1);
-                    setSort("");
-                  }
-                : undefined
+          >
+            <ArrowRight size={16} />
+            بازگشت به مشتریان
+          </button>
+        )}
+        <DateControls
+          key={filters.from + filters.to}
+          from={filters.from}
+          to={filters.to}
+          onApply={(from, to) => update({ from, to, page: 1 })}
+          onRefresh={() => setRevision((n) => n + 1)}
+        />
+        <div className="analytics-scope">
+          <span>
+            <i /> {dayLabel(filters.from)} تا {dayLabel(filters.to)} ·{" "}
+            {fa(
+              Math.round(
+                (Date.parse(filters.to) - Date.parse(filters.from)) / 86400000,
+              ) + 1,
+            )}{" "}
+            روز
+          </span>
+          <span>
+            {filters.customer
+              ? "خلاصه خرید همین مشتری"
+              : "خلاصه کل بازه · مستقل از جستجوی جدول"}
+          </span>
+        </div>
+        {chart.error ? (
+          <div className="analytics-no-data" role="alert">
+            <p>{chart.error}</p>
+            <button
+              className="button secondary"
+              onClick={() => setRevision((n) => n + 1)}
+            >
+              تلاش دوباره نمودار
+            </button>
+          </div>
+        ) : chart.loading ? (
+          <div className="analytics-summary-skeleton" role="status">
+            <span>در حال محاسبه گزارش…</span>
+            <i />
+            <i />
+            <i />
+          </div>
+        ) : (
+          data && (
+            <AnalyticsSummary
+              data={data}
+              section={filters.section}
+              customer={filters.customer}
+            />
+          )
+        )}
+        <div className="analytics-analysis-heading">
+          <div>
+            <span className="analytics-eyebrow">از عدد به تصمیم</span>
+            <h2>
+              {isOverview
+                ? "مسیر فروش در طول زمان"
+                : filters.section === "prices"
+                  ? "چه زمانی قیمت تغییر کرد؟"
+                  : "روند و سهم در یک نگاه"}
+            </h2>
+          </div>
+          <label className="analytics-metric">
+            <SlidersHorizontal size={16} />
+            <span>شاخص نمودار</span>
+            <select
+              aria-label="شاخص نمودار"
+              value={metric}
+              onChange={(e) => update({ metric: e.target.value })}
+            >
+              {report.metrics.map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div
+          className={`analytics-analysis-grid ${isOverview || filters.customer ? "single" : ""}`}
+        >
+          <section className="analytics-trend">
+            <div className="analytics-card-heading">
+              <div>
+                <h2>
+                  {filters.section === "prices"
+                    ? "روند قیمت پایان روز"
+                    : "روند روزانه"}
+                </h2>
+                <p className="omni-help">
+                  {isOverview
+                    ? "مجموع فروشگاه در هر روز"
+                    : filters.customer
+                      ? "سفارش‌ها و خریدهای این مشتری"
+                      : filters.selected.length
+                        ? `${fa(filters.selected.length)} مورد انتخاب‌شده · مستقل از جستجوی جدول`
+                        : `۵ مورد اول بر اساس ${filters.section === "prices" ? "تعداد تغییر قیمت" : metricLabel}`}
+                </p>
+              </div>
+              <span className="analytics-count">
+                {filters.section === "prices" ? "تومان / بسته" : "روزانه"}
+              </span>
+            </div>
+            {!isOverview && !filters.customer && (
+              <div className="analytics-comparison">
+                <div>
+                  <span>مقایسه {fa(filters.selected.length)} از ۵</span>
+                  {filters.selected.length > 0 && (
+                    <button
+                      className="text-link"
+                      onClick={() => update({ selected: [] })}
+                    >
+                      بازگشت به موارد برتر
+                    </button>
+                  )}
+                </div>
+                {filters.selected.length > 0 ? (
+                  <div className="analytics-chips">
+                    {filters.selected.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => toggle(s)}
+                        aria-label={`حذف ${s.name}`}
+                      >
+                        <span>
+                          {data?.points.find((p) => p.id === s.id)?.name ||
+                            s.name}
+                        </span>
+                        <X size={13} />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p>
+                    برای ساخت مقایسه، موارد دلخواه را از رتبه‌بندی یا جدول پایین
+                    انتخاب کنید.
+                  </p>
+                )}
+                {filters.selected.length === 5 && (
+                  <p role="status">
+                    ظرفیت مقایسه تکمیل است؛ برای افزودن مورد جدید، یکی را حذف
+                    کنید.
+                  </p>
+                )}
+              </div>
+            )}
+            {selectionNotice && <p role="status">{selectionNotice}</p>}
+            {chart.loading ? (
+              <div className="analytics-chart-loading" role="status">
+                در حال آماده‌سازی نمودار…
+              </div>
+            ) : (
+              data && (
+                <>
+                  <LineChart
+                    key={filters.section + metric + chartParams}
+                    data={data}
+                    metric={metric}
+                    label={metricLabel}
+                    monetary={["revenue", "price"].includes(metric)}
+                  />
+                  <ChartTable
+                    key={chartParams.toString()}
+                    data={data}
+                    metric={metric}
+                    label={metricLabel}
+                  />
+                </>
+              )
+            )}
+          </section>
+          {!isOverview && !filters.customer && !chart.loading && data && (
+            <Ranking
+              data={data}
+              metric={metric}
+              label={metricLabel}
+              selected={filters.selected}
+              onSelect={toggle}
+            />
+          )}
+        </div>
+        <details className="analytics-definition">
+          <summary>
+            <Info size={16} />
+            تعریف شاخص‌ها و روش خواندن این گزارش
+          </summary>
+          <p>{report.note}</p>
+          {filters.section !== "overview" && (
+            <p>
+              انتخاب‌های مقایسه فقط نمودار روند را تغییر می‌دهند. خلاصه و سهم
+              رتبه‌بندی همیشه از تمام داده‌های بازه محاسبه می‌شوند؛ «سایر موارد»
+              سهم خارج از هشت رتبه اول است.
+            </p>
+          )}
+        </details>
+        <div className="analytics-export-row">
+          <p>جزئیات قابل جستجو و دریافت</p>
+          <ExportReport
+            filters={tableParams.toString()}
+            disabled={
+              result.loading ||
+              !!result.error ||
+              !result.data?.total ||
+              debouncedQuery !== filters.q
             }
           />
-        )}
-        <Pager data={result.data} page={page} onPage={setPage} />
-      </Panel>
+        </div>
+        <ReportTable
+          data={result.data}
+          filters={filters}
+          pending={result.loading || debouncedQuery !== filters.q}
+          error={result.error}
+          onChange={update}
+          onSelect={toggle}
+          onCustomer={(row) => {
+            setDebouncedQuery("");
+            update({
+              customer: String(row.id),
+              customerName: String(row.name),
+              q: "",
+              sort: "",
+              page: 1,
+            });
+          }}
+          onRetry={() => setRevision((n) => n + 1)}
+        />
+      </div>
     </Workspace>
   );
 }

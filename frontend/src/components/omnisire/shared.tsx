@@ -36,36 +36,35 @@ export const stamp = (v: unknown) =>
         timeZone: "Asia/Tehran",
       }).format(new Date(String(v)))
     : "—";
-export function useLoad<T>(url: string, revision = 0) {
+export function useLoad<T>(url: string | null, revision = 0) {
   const { user } = useStore();
   const identity = user?.staffId + ":" + user?.role;
-  const [data, setData] = useState<T | null>(null),
-    [error, setError] = useState(""),
-    [loading, setLoading] = useState(true);
+  const key = `${identity}:${revision}:${url}`;
+  const [state, setState] = useState<{
+    key: string;
+    data: T | null;
+    error: string;
+    loading: boolean;
+  }>({ key: "", data: null, error: "", loading: true });
   useEffect(() => {
-    let live = true;
-    if (!user?.role) {
-      setData(null);
-      setLoading(!user);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    api<T>(url)
-      .then((v) => {
-        if (live) setData(v);
+    const controller = new AbortController();
+    if (!user?.role || !url) return;
+    setState({ key, data: null, error: "", loading: true });
+    api<T>(url, "GET", undefined, controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted)
+          setState({ key, data, error: "", loading: false });
       })
       .catch((e) => {
-        if (live) setError(e.message);
-      })
-      .finally(() => {
-        if (live) setLoading(false);
+        if (!controller.signal.aborted)
+          setState({ key, data: null, error: e.message, loading: false });
       });
-    return () => {
-      live = false;
-    };
-  }, [url, revision, identity]);
-  return { data, error, loading };
+    return () => controller.abort();
+  }, [url, revision, identity, key, user?.role]);
+  if (!url) return { data: null, error: "", loading: false };
+  if (state.key !== key || !user?.role)
+    return { data: null, error: "", loading: !user || !!user.role };
+  return state;
 }
 export function Workspace({
   children,

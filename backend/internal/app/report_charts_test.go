@@ -110,3 +110,63 @@ func TestDailyChartsAndManualAvailability(t *testing.T) {
 		t.Fatal("missing product accepted")
 	}
 }
+
+func TestAnalyticsBoundedRankingAndSearch(t *testing.T) {
+	a := setup(t)
+	owner := couponOwner(t, a)
+	ctx := context.Background()
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := a.Pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// More entities than any page or chart: all must contribute to the denominator.
+	exec(`INSERT INTO products(id,slug,name,category_id) SELECT 'scale-'||n,'scale-'||n,'محصول '||n,(SELECT id FROM categories LIMIT 1) FROM generate_series(1,2000) n`)
+	exec(`INSERT INTO analytics_events(kind,product_id,session_hash,created_at) SELECT 'click','scale-'||n,'scale','2026-09-22'::timestamptz FROM generate_series(1,2000) n`)
+	var ranked struct {
+		chartResponse
+		Summary map[string]float64 `json:"summary"`
+	}
+	path := "/omnisire/analytics/charts?section=products&from=2026-09-21&to=2026-09-27&metric=clicks"
+	owner.ok(t, "GET", path, nil, &ranked)
+	if len(ranked.Totals) != 8 || len(ranked.Points) > 35 || ranked.Summary["clicks"] != 2000 || ranked.Summary["entityCount"] < 2000 {
+		t.Fatalf("unbounded or truncated summary: totals=%d points=%d summary=%+v", len(ranked.Totals), len(ranked.Points), ranked.Summary)
+	}
+	owner.ok(t, "GET", path+"&id=scale-2000", nil, &ranked)
+	if len(ranked.Points) == 0 || ranked.Points[0]["id"] != "scale-2000" || ranked.Summary["clicks"] != 2000 {
+		t.Fatal("selection changed scope", ranked)
+	}
+	exec(`INSERT INTO analytics_events(kind,query,session_hash,created_at) VALUES('search','چای, سبز','term','2026-09-22'),('search','چای, سبز','term2','2026-09-22'),('search','ادویه','term3','2026-09-22')`)
+	owner.ok(t, "GET", "/omnisire/analytics/charts?section=searches&from=2026-09-21&to=2026-09-27&id=%DA%86%D8%A7%DB%8C%2C%20%D8%B3%D8%A8%D8%B2", nil, &ranked)
+	if len(ranked.Points) != 1 || ranked.Points[0]["orders"].(float64) != 2 || ranked.Totals[0]["name"] != "چای, سبز" {
+		t.Fatal("comma term or search ranking", ranked)
+	}
+	var report struct {
+		Total int              `json:"total"`
+		Items []map[string]any `json:"items"`
+	}
+	owner.ok(t, "GET", "/omnisire/analytics?section=products&q=quantity", nil, &report)
+	if report.Total != 0 {
+		t.Fatal("search matched a JSON field instead of a label")
+	}
+	owner.ok(t, "GET", "/omnisire/analytics?section=products&q=%DB%B2%DB%B0%DB%B0%DB%B0", nil, &report)
+	if report.Total != 1 {
+		t.Fatal("Persian digits not normalized", report)
+	}
+	owner.ok(t, "GET", "/omnisire/analytics?section=products&q=%25", nil, &report)
+	if report.Total != 0 {
+		t.Fatal("wildcard search wasn't escaped")
+	}
+	for _, url := range []string{"/omnisire/analytics?from=invalid", "/omnisire/analytics?from=2020-01-01&to=2026-01-01", "/omnisire/analytics/charts?section=products&metric=unknown"} {
+		if code, _ := owner.call("GET", url, nil); code != 400 {
+			t.Fatal("invalid input accepted", url, code)
+		}
+	}
+	// Match storefront ceiling-to-1000-toman behavior and retain unknown history.
+	exec(`INSERT INTO price_history(product_id,package_id,package_label,new_rials,new_discount,created_at) VALUES('turmeric','rounding','بسته تست',105000,10,'2026-09-23')`)
+	owner.ok(t, "GET", "/omnisire/analytics/charts?section=prices&from=2026-09-21&to=2026-09-24&id=turmeric:rounding", nil, &ranked)
+	if len(ranked.Points) != 4 || ranked.Points[0]["price"] != nil || ranked.Points[3]["price"].(float64) != 100000 {
+		t.Fatal("price rounding or unknown history", ranked.Points)
+	}
+}

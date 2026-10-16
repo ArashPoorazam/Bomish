@@ -21,7 +21,7 @@ const products = Array.from({ length: 30 }, (_, i) => ({
   clicks: i + 2,
   revenue: (i + 1) * 10000,
 }));
-test("weekly charts compare products across pages and keep whole-period shares", async ({
+test("analytics compares across pages, preserves scope, and bounds the interface", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -33,7 +33,9 @@ test("weekly charts compare products across pages and keep whole-period shares",
       return route.fulfill({ json: session });
     if (url.pathname.endsWith("/charts")) {
       requests.push(url);
-      const ids = (url.searchParams.get("ids") || "1,2,3,4,5").split(",");
+      const ids = url.searchParams.getAll("id").length
+        ? url.searchParams.getAll("id")
+        : ["1", "2", "3", "4", "5"];
       const days = [
         "2026-09-22",
         "2026-09-23",
@@ -46,7 +48,16 @@ test("weekly charts compare products across pages and keep whole-period shares",
       return route.fulfill({
         json: {
           days,
-          totals: products,
+          totals: products.slice().reverse().slice(0, 8),
+          summary: {
+            entityCount: 30,
+            activeCount: 30,
+            revenue: 4650000,
+            quantity: 465,
+            clicks: 495,
+            views: 0,
+            orders: 0,
+          },
           packages: [
             {
               name: "محصول 1",
@@ -90,7 +101,7 @@ test("weekly charts compare products across pages and keep whole-period shares",
   await expect(page.locator(".omni-line-chart svg path")).toHaveCount(5);
   const from = await page.getByLabel("از تاریخ", { exact: true }).inputValue(),
     to = await page.getByLabel("تا تاریخ", { exact: true }).inputValue();
-  expect((Date.parse(to) - Date.parse(from)) / 86400000).toBe(6);
+  expect((Date.parse(to) - Date.parse(from)) / 86400000).toBe(29);
   const report = page
     .locator(".omni-panel")
     .filter({ has: page.getByRole("heading", { name: "داده‌های گزارش" }) });
@@ -112,15 +123,38 @@ test("weekly charts compare products across pages and keep whole-period shares",
     .selectOption("clicks");
   await page.getByRole("slider", { name: "روز نمودار" }).fill("2");
   await expect(page.locator(".chart-tooltip")).toContainText("محصول 26");
-  await expect(page.locator(".chart-pie")).toHaveCount(2);
-  await expect(
-    page.getByRole("heading", { name: "فروش هر بسته در محصولات" }),
-  ).toBeVisible();
+  await expect(page.locator(".analytics-ranks li")).toHaveCount(8);
+  await expect(page.locator(".analytics-other")).toBeVisible();
+  const count = requests.length;
+  await page.getByRole("searchbox").fill("محصول");
+  await expect(page).toHaveURL(/q=/);
+  await expect(page.locator(".analytics-chips button")).toHaveCount(2);
+  expect(requests.length).toBe(count);
+  await page
+    .getByRole("button", { name: "پاک کردن جستجو", exact: true })
+    .click();
   await page.getByLabel("از تاریخ", { exact: true }).fill("2026-09-01");
+  await page.getByRole("button", { name: "اعمال بازه", exact: true }).click();
   await expect
     .poll(() => requests.at(-1)?.searchParams.get("from"))
     .toBe("2026-09-01");
-  expect(requests.at(-1)?.searchParams.get("ids")).toBe("1,26");
+  expect(requests.at(-1)?.searchParams.getAll("id")).toEqual(["1", "26"]);
+  await page.reload();
+  await expect(page.locator(".analytics-chips button")).toHaveCount(2);
+  await expect(page.getByLabel("از تاریخ", { exact: true })).toHaveValue(
+    "2026-09-01",
+  );
+  for (const n of [2, 3, 4])
+    await report
+      .getByRole("checkbox", { name: `انتخاب محصول ${n}`, exact: true })
+      .check();
+  await expect(
+    report.getByRole("checkbox", { name: "انتخاب محصول 5", exact: true }),
+  ).toBeDisabled();
+  await page.locator(".analytics-chips button").first().click();
+  await expect(
+    report.getByRole("checkbox", { name: "انتخاب محصول 5", exact: true }),
+  ).toBeEnabled();
   await page.screenshot({
     path: "test-results/charts-desktop.png",
     fullPage: true,
@@ -191,4 +225,75 @@ test("staff navigation, category editing page, and member cancellation", async (
   await expect(
     page.getByLabel("نام و نام خانوادگی", { exact: true }),
   ).toHaveCount(0);
+});
+
+test("analytics recovers failed requests and applies only valid date ranges", async ({
+  page,
+}) => {
+  let failChart = true;
+  const chartRequests: URL[] = [];
+  await page.route("**/api/v1/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/session"))
+      return route.fulfill({ json: session });
+    if (url.pathname.endsWith("/charts")) {
+      chartRequests.push(url);
+      if (failChart)
+        return route.fulfill({
+          status: 503,
+          json: { error: "خطای آزمایشی گزارش" },
+        });
+      return route.fulfill({
+        json: {
+          days: ["2026-09-22"],
+          points: [],
+          totals: [],
+          packages: [],
+          summary: { entityCount: 0, activeCount: 0, revenue: 0, orders: 0 },
+        },
+      });
+    }
+    if (url.pathname.endsWith("/analytics"))
+      return route.fulfill({
+        json: { items: [], total: 0, page: 1, pageSize: 25, columns: [] },
+      });
+    return route.fulfill({ json: { items: [] } });
+  });
+  await page.goto("/omnisire/analytics");
+  await expect(
+    page.locator(".analytics-workspace").getByRole("alert"),
+  ).toContainText("خطای آزمایشی گزارش");
+  failChart = false;
+  await page
+    .getByRole("button", { name: "تلاش دوباره نمودار", exact: true })
+    .click();
+  await expect(page.locator(".analytics-summary article")).toHaveCount(3);
+  await expect(
+    page.locator(".analytics-workspace").getByRole("alert"),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "دریافت اکسل", exact: true }),
+  ).toBeDisabled();
+  const before = chartRequests.length;
+  await page.getByLabel("از تاریخ", { exact: true }).fill("2020-01-01");
+  await expect(
+    page.getByRole("button", { name: "اعمال بازه", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.locator(".analytics-workspace").getByRole("alert"),
+  ).toContainText("۳۶۶");
+  expect(chartRequests).toHaveLength(before);
+  await page.getByRole("button", { name: "۷ روز اخیر", exact: true }).click();
+  await expect.poll(() => chartRequests.length).toBe(before + 1);
+  const params = chartRequests.at(-1)!.searchParams;
+  expect(
+    (Date.parse(params.get("to")!) - Date.parse(params.get("from")!)) /
+      86400000,
+  ).toBe(6);
+  await expect(
+    page.locator(".analytics-workspace").getByRole("alert"),
+  ).toHaveCount(0);
+  await expect(page.locator(".analytics-table-panel")).toContainText(
+    "داده‌ای در این بازه ثبت نشده است",
+  );
 });

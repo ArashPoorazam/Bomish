@@ -12,6 +12,7 @@ export type ChartData = {
   points: ChartRow[];
   totals: ChartRow[];
   packages: ChartRow[];
+  summary: Record<string, number>;
 };
 const colors = [
   "#2d7055",
@@ -27,7 +28,7 @@ const colors = [
   "#365674",
   "#866349",
 ];
-const dayLabel = (day: string) =>
+export const dayLabel = (day: string) =>
   new Intl.DateTimeFormat("fa-IR", {
     month: "short",
     day: "numeric",
@@ -73,11 +74,12 @@ export function LineChart({
     ),
   }));
   const visible = series.filter((s) => !hidden.has(s.id));
-  const max = visible.reduce((max, series) => {
+  const rawMax = visible.reduce((max, series) => {
     for (const value of series.values.values())
       if (value !== null) max = Math.max(max, value);
     return max;
   }, 1);
+  const max = monetary ? rawMax : Math.max(4, Math.ceil(rawMax / 4) * 4);
   const W = width,
     H = width < 500 ? 240 : 310,
     left = monetary ? 85 : 45,
@@ -91,6 +93,10 @@ export function LineChart({
   const active = hover === null ? null : Math.min(hover, data.days.length - 1);
   return (
     <div ref={container} className="omni-line-chart" dir="ltr">
+      <p className="chart-unit" dir="rtl">
+        {label}
+        {monetary ? " · تومان" : ""}
+      </p>
       <div className="chart-legend" dir="rtl">
         {series.map((s) => (
           <button
@@ -111,12 +117,17 @@ export function LineChart({
           </button>
         ))}
       </div>
-      {!series.length ? (
+      {!series.length || !data.days.length ? (
         <p className="omni-empty" dir="rtl">
           در این بازه داده‌ای ثبت نشده است.
         </p>
       ) : (
         <>
+          {!visible.length && (
+            <p className="omni-help" dir="rtl">
+              برای نمایش روند، یک مورد را از راهنمای نمودار فعال کنید.
+            </p>
+          )}
           <svg
             viewBox={`0 0 ${W} ${H}`}
             role="img"
@@ -139,7 +150,10 @@ export function LineChart({
                   fontSize="12"
                   fill="#687368"
                 >
-                  {format(max * t)}
+                  {new Intl.NumberFormat("fa-IR", {
+                    notation: "compact",
+                    maximumFractionDigits: 1,
+                  }).format((max * t) / (monetary ? 10 : 1))}
                 </text>
               </g>
             ))}
@@ -152,7 +166,10 @@ export function LineChart({
                     open = false;
                     return "";
                   }
-                  const segment = `${open ? "L" : "M"}${x(i)},${y(v)}`;
+                  const segment =
+                    open && metric === "price"
+                      ? `H${x(i)} V${y(v)}`
+                      : `${open ? "L" : "M"}${x(i)},${y(v)}`;
                   open = true;
                   return segment;
                 })
@@ -220,7 +237,7 @@ export function LineChart({
               width={W - left - right}
               height={H - top - bottom}
               fill="transparent"
-              onMouseMove={(e) => {
+              onPointerMove={(e) => {
                 const box = e.currentTarget.getBoundingClientRect();
                 setHover(
                   Math.round(
@@ -229,13 +246,18 @@ export function LineChart({
                   ),
                 );
               }}
-              onMouseLeave={() => setHover(null)}
+              onPointerLeave={() => setHover(null)}
             />
           </svg>
           <label className="chart-date-control" dir="rtl">
-            بررسی روز{" "}
+            بررسی روز با لمس یا کلیدهای جهت‌نما{" "}
             <input
               aria-label="روز نمودار"
+              aria-valuetext={
+                data.days.length
+                  ? dayLabel(data.days[active ?? data.days.length - 1])
+                  : ""
+              }
               type="range"
               min={0}
               max={Math.max(0, data.days.length - 1)}
@@ -266,111 +288,5 @@ export function LineChart({
         </>
       )}
     </div>
-  );
-}
-export function PieChart({
-  rows,
-  metric,
-  title,
-  monetary = false,
-}: {
-  rows: ChartRow[];
-  metric: string;
-  title: string;
-  monetary?: boolean;
-}) {
-  const [active, setActive] = useState<string | null>(null);
-  const all = rows
-    .map((r) => ({ id: r.id, name: r.name, value: Number(r[metric] || 0) }))
-    .filter((r) => r.value > 0)
-    .sort((a, b) => b.value - a.value);
-  const slices = all.slice(0, 7);
-  if (all.length > 7)
-    slices.push({
-      id: "other",
-      name: "سایر",
-      value: all.slice(7).reduce((n, r) => n + r.value, 0),
-    });
-  const total = slices.reduce((n, r) => n + r.value, 0);
-  let offset = 0;
-  const radius = 70,
-    circumference = 2 * Math.PI * radius;
-  const current = slices.find((s) => s.id === active);
-  return (
-    <section className="chart-pie">
-      <h3>{title}</h3>
-      {!total ? (
-        <p className="omni-empty">داده‌ای در این بازه ثبت نشده است.</p>
-      ) : (
-        <>
-          <div className="pie-layout">
-            <svg viewBox="0 0 200 200" role="img" aria-label={title}>
-              {slices.map((s, i) => {
-                const length = (s.value / total) * circumference;
-                const start = offset;
-                offset += length;
-                return (
-                  <circle
-                    key={s.id}
-                    cx={100}
-                    cy={100}
-                    r={radius}
-                    fill="none"
-                    stroke={colors[i]}
-                    strokeWidth={active === s.id ? 33 : 27}
-                    strokeDasharray={`${length} ${circumference - length}`}
-                    strokeDashoffset={-start}
-                    transform="rotate(-90 100 100)"
-                    onMouseEnter={() => setActive(s.id)}
-                    onMouseLeave={() => setActive(null)}
-                  >
-                    <title>
-                      {s.name}: {fa((s.value / total) * 100)}٪
-                    </title>
-                  </circle>
-                );
-              })}
-              <text
-                x="100"
-                y="98"
-                textAnchor="middle"
-                fontSize="19"
-                fill="#203b32"
-              >
-                {fa(Math.round(((current?.value || total) / total) * 100))}٪
-              </text>
-              <text
-                x="100"
-                y="122"
-                textAnchor="middle"
-                fontSize="11"
-                fill="#687368"
-              >
-                {current ? "سهم انتخاب‌شده" : "کل بازه"}
-              </text>
-            </svg>
-            <div className="pie-legend">
-              {slices.map((s, i) => (
-                <button
-                  key={s.id}
-                  onMouseEnter={() => setActive(s.id)}
-                  onMouseLeave={() => setActive(null)}
-                  onFocus={() => setActive(s.id)}
-                  onBlur={() => setActive(null)}
-                  onClick={() => setActive(active === s.id ? null : s.id)}
-                >
-                  <i style={{ background: colors[i] }} />
-                  <span>{s.name}</span>
-                  <b>{fa(Math.round((s.value / total) * 1000) / 10)}٪</b>
-                  <small>
-                    {monetary ? money(s.value) + " تومان" : fa(s.value)}
-                  </small>
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </section>
   );
 }

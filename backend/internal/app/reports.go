@@ -1,10 +1,12 @@
 package app
 
 import (
+	"bomish/internal/domain"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type reportColumn struct {
@@ -29,7 +31,7 @@ var reportSpecs = map[string]reportSpec{
 	"packages":        {`SELECT product_id||':'||package_id AS id,max(name)||' · '||max(package_label) AS name,sum(quantity)::bigint AS quantity,sum(net_rials)::bigint AS revenue FROM analytics_order_lines WHERE paid_at>=$1 AND paid_at<$2 GROUP BY product_id,package_id`, []reportColumn{col("name", "محصول / بسته"), num("quantity", "تعداد"), moneyCol("revenue", "فروش خالص")}, "revenue DESC,id"},
 	"customers":       {`SELECT u.id,coalesce(nullif(c.name,''),u.phone) AS name,u.phone,u.created_at AS "createdAt",coalesce(c.orders,0)::bigint AS orders,coalesce(c.revenue,0)::bigint AS revenue FROM users u LEFT JOIN (SELECT user_id,max(address->>'recipient') name,count(*) orders,sum(subtotal_rials-discount_rials) revenue FROM orders WHERE paid_at>=$1 AND paid_at<$2 AND status IN ('paid','packing','shipped','received') GROUP BY user_id) c ON c.user_id=u.id`, []reportColumn{col("name", "مشتری"), col("phone", "همراه"), dateCol("createdAt", "عضویت"), num("orders", "سفارش"), moneyCol("revenue", "خرید")}, "revenue DESC,id"},
 	"customer-orders": {`SELECT o.id,o.user_id AS "customerId",coalesce(o.address->>'recipient','') AS name,o.paid_at AS "createdAt",o.status,o.subtotal_rials-o.discount_rials AS revenue,(SELECT string_agg(i.name||' × '||i.quantity::text,'، ') FROM order_items i WHERE i.order_id=o.id) AS items FROM orders o WHERE o.paid_at>=$1 AND o.paid_at<$2 AND o.status IN ('paid','packing','shipped','received')`, []reportColumn{col("id", "سفارش"), col("name", "مشتری"), dateCol("createdAt", "پرداخت"), col("items", "محصولات"), moneyCol("revenue", "خرید")}, `"createdAt" DESC,id`},
-	"prices":          {`SELECT h.id::text AS id,p.name||' · '||h.package_label AS name,h.product_id AS "productId",h.old_rials AS "oldRials",h.new_rials AS "newRials",h.new_rials-h.old_rials AS change,CASE WHEN h.old_rials>0 THEN round((h.new_rials-h.old_rials)*100.0/h.old_rials,2)::float8 END AS percent,h.old_discount AS "oldDiscount",h.new_discount AS "newDiscount",h.created_at AS "createdAt",h.baseline,coalesce(nullif(s.full_name,''),s.username,'سیستم') AS actor FROM price_history h JOIN products p ON p.id=h.product_id LEFT JOIN staff s ON s.id=h.actor_id WHERE h.created_at>=$1 AND h.created_at<$2`, []reportColumn{col("name", "محصول / بسته"), moneyCol("oldRials", "قیمت قبل"), moneyCol("newRials", "قیمت جدید"), moneyCol("change", "تغییر"), num("percent", "درصد تغییر"), num("oldDiscount", "تخفیف قبل ٪"), num("newDiscount", "تخفیف جدید ٪"), col("actor", "همکار"), dateCol("createdAt", "زمان"), col("baseline", "ثبت مبنا")}, `"createdAt" DESC,id`},
+	"prices":          {`SELECT h.id::text AS id,p.name||' · '||h.package_label AS name,h.product_id AS "productId",h.product_id||':'||h.package_id AS "comparisonId",h.old_rials AS "oldRials",h.new_rials AS "newRials",h.new_rials-h.old_rials AS change,CASE WHEN h.old_rials>0 THEN round((h.new_rials-h.old_rials)*100.0/h.old_rials,2)::float8 END AS percent,h.old_discount AS "oldDiscount",h.new_discount AS "newDiscount",h.created_at AS "createdAt",h.baseline,coalesce(nullif(s.full_name,''),s.username,'سیستم') AS actor FROM price_history h JOIN products p ON p.id=h.product_id LEFT JOIN staff s ON s.id=h.actor_id WHERE h.created_at>=$1 AND h.created_at<$2`, []reportColumn{col("name", "محصول / بسته"), moneyCol("oldRials", "قیمت قبل"), moneyCol("newRials", "قیمت جدید"), moneyCol("change", "تغییر"), num("percent", "درصد تغییر"), num("oldDiscount", "تخفیف قبل ٪"), num("newDiscount", "تخفیف جدید ٪"), col("actor", "همکار"), dateCol("createdAt", "زمان"), col("baseline", "ثبت مبنا")}, `"createdAt" DESC,id`},
 	"categories":      {`SELECT c.id,c.name,coalesce(sum(l.net_rials),0)::bigint AS revenue,coalesce(sum(l.quantity),0)::bigint AS quantity FROM categories c LEFT JOIN products p ON p.category_id=c.id LEFT JOIN analytics_order_lines l ON l.product_id=p.id AND l.paid_at>=$1 AND l.paid_at<$2 GROUP BY c.id`, []reportColumn{col("name", "دسته‌بندی"), num("quantity", "تعداد بسته"), moneyCol("revenue", "فروش خالص")}, "revenue DESC,id"},
 	"searches":        {`SELECT query AS id,query AS name,count(*) AS searches FROM analytics_events WHERE kind='search' AND created_at>=$1 AND created_at<$2 GROUP BY query`, []reportColumn{col("name", "عبارت جستجو"), num("searches", "جستجو")}, "searches DESC,id"},
 	"discounts":       {`SELECT coalesce(discount_code,'بدون کد') AS id,coalesce(discount_code,'بدون کد') AS name,count(*) AS orders,sum(discount_rials)::bigint AS discount,sum(subtotal_rials-discount_rials)::bigint AS revenue FROM orders WHERE paid_at>=$1 AND paid_at<$2 AND status IN ('paid','packing','shipped','received') GROUP BY discount_code`, []reportColumn{col("name", "کد تخفیف"), num("orders", "سفارش"), moneyCol("discount", "تخفیف کد"), moneyCol("revenue", "فروش خالص")}, "revenue DESC,id"},
@@ -48,11 +50,33 @@ func reportQuery(r *http.Request) (reportSpec, string, []any, string, bool) {
 		return spec, "", nil, "", false
 	}
 	from, to := reportDates(r)
-	if !from.Before(to) {
+	for _, key := range []string{"from", "to"} {
+		if value := r.URL.Query().Get(key); value != "" {
+			if _, e := time.Parse("2006-01-02", value); e != nil {
+				return spec, "", nil, "", false
+			}
+		}
+	}
+	if !from.Before(to) || to.Sub(from) > 366*24*time.Hour {
 		return spec, "", nil, "", false
 	}
-	args := []any{from, to, strings.TrimSpace(r.URL.Query().Get("q"))}
-	sql := `SELECT * FROM (` + spec.SQL + `) x WHERE ($3='' OR row_to_json(x)::text ILIKE '%'||$3||'%')`
+	query := domain.Normalize(r.URL.Query().Get("q"))
+	if len(query) > 500 {
+		return spec, "", nil, "", false
+	}
+	// Search meaningful labels, not JSON keys or incidental numeric metrics.
+	fields := []string{"coalesce(name,'')", "id"}
+	switch section {
+	case "customers":
+		fields = append(fields, "phone")
+	case "prices":
+		fields = append(fields, "actor")
+	case "customer-orders":
+		fields = append(fields, "coalesce(items,'')")
+	}
+	query = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query)
+	args := []any{from, to, query}
+	sql := `SELECT * FROM (` + spec.SQL + `) x WHERE ($3='' OR lower(translate(` + strings.Join(fields, `||' '||`) + `, 'يك۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', 'یک01234567890123456789')) LIKE '%'||$3||'%')`
 	if ids := r.URL.Query().Get("ids"); ids != "" {
 		args = append(args, strings.Split(ids, ","))
 		sql += ` AND id=ANY($4::text[])`
@@ -69,6 +93,7 @@ func reportQuery(r *http.Request) (reportSpec, string, []any, string, bool) {
 			if r.URL.Query().Get("direction") == "desc" {
 				sort += " DESC"
 			}
+			sort += " NULLS LAST"
 			if field != "id" {
 				sort += ",id"
 			}
