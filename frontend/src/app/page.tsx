@@ -14,6 +14,8 @@ import { serverApi } from "@/lib/api";
 import type { Product, Article, HomeSlide } from "@/lib/types";
 import { ProductRail } from "@/components/product-rail";
 import { HomeSlideshow } from "@/components/home-slideshow";
+import { HomeMotion } from "@/components/home-motion";
+import { HomeShoppingGuide } from "@/components/home-shopping-guide";
 export const dynamic = "force-dynamic";
 export default async function Home() {
   const [selected, newest, offers, articles, slides] = await Promise.all([
@@ -30,7 +32,7 @@ export default async function Home() {
     serverApi<HomeSlide[]>("/home/slides").catch(() => []),
   ]);
   return (
-    <div className="shop-home">
+    <HomeMotion>
       <section className="hero container">
         <div className="hero-copy">
           <span className="eyebrow">بومیش، همراه آشپزی هر روز</span>
@@ -52,16 +54,17 @@ export default async function Home() {
               سفارش اختصاصی
             </Link>
           </div>
-          <div className="hero-caption">
+          <Link className="hero-caption" href="#home-shopping-guide">
             <Leaf size={18} />
-            <span>به‌اندازه نیازتان، به‌سلیقه خودتان</span>
-          </div>
+            <span>راهنمای انتخاب بسته و ارسال سفارش</span>
+          </Link>
         </div>
         <HomeSlideshow key={JSON.stringify(slides)} slides={slides} />
       </section>
       <section
         className="container home-categories"
         aria-label="دسته‌های محصولات"
+        data-home-reveal
       >
         <div className="category-grid">
           {[
@@ -110,6 +113,7 @@ export default async function Home() {
       <section
         className="principles container"
         aria-labelledby="principles-title"
+        data-home-reveal
       >
         <div className="section-heading">
           <div>
@@ -165,9 +169,11 @@ export default async function Home() {
           products={offers}
         />
       </div>
+      <HomeShoppingGuide />
       <section
         className="home-editorial container"
         aria-label="داستان و مجله بومیش"
+        data-home-reveal
       >
         <article className="brand-story">
           <Sprout size={42} strokeWidth={1.1} />
@@ -224,6 +230,6 @@ export default async function Home() {
           )}
         </div>
       </section>
-    </div>
+    </HomeMotion>
   );
 }

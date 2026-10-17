@@ -6,6 +6,7 @@ import { WorkspaceFrame } from "@/components/workspace-frame";
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
 import "./storefront.css";
+import "./home-enhancements.css";
 import "./auth.css";
 import "./requests.css";
 import "./home-management.css";

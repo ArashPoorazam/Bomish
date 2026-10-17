@@ -7828,6 +7828,10 @@ export interface components {
         HomeSlide: {
             image: string;
             alt: string;
+            title?: string;
+            caption?: string;
+            /** @enum {string} */
+            collection?: "products" | "spices" | "herbs" | "seeds" | "arrivals" | "bestsellers" | "suggestions";
         };
         ShippingSize: {
             /** Format: int64 */

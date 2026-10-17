@@ -1,8 +1,11 @@
 "use client";
 import Image from "next/image";
+import Link from "next/link";
+import { ArrowLeft, Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { HomeSlide } from "@/lib/types";
 import { fa } from "@/lib/format";
+import { homeCollections } from "@/lib/home-collections";
 
 const fallback: HomeSlide = {
   image: "/images/spices.png",
@@ -59,7 +62,7 @@ export function HomeSlideshow({ slides }: { slides: HomeSlide[] }) {
     !reduced;
   useEffect(() => {
     if (!running) return;
-    const timer = window.setTimeout(() => advance(), 5000);
+    const timer = window.setTimeout(() => advance(), 8000);
     return () => clearTimeout(timer);
   }, [running, advance, frame.tick]);
   const picture = (index: number, outgoing = false) => {
@@ -83,24 +86,13 @@ export function HomeSlideshow({ slides }: { slides: HomeSlide[] }) {
       </div>
     );
   };
+  const current = pictures[frame.index];
+  const collection =
+    homeCollections[current.collection || "products"] ||
+    homeCollections.products;
   return (
     <div
-      className={`hero-art hero-slideshow${pictures.length > 1 ? " is-draggable" : ""}${dragging ? " is-dragging" : ""}`}
-      data-direction={frame.direction}
-      role="region"
-      aria-label="تصاویر بومیش"
-      aria-roledescription="نمایش اسلاید"
-      onKeyDown={(e) => {
-        if (pictures.length < 2 || !["ArrowLeft", "ArrowRight"].includes(e.key))
-          return;
-        e.preventDefault();
-        const direction = e.key === "ArrowRight" ? 1 : -1;
-        setPaused(true);
-        advance(
-          (frame.index + direction + pictures.length) % pictures.length,
-          direction,
-        );
-      }}
+      className="home-hero-feature"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocusCapture={() => setFocused(true)}
@@ -109,71 +101,121 @@ export function HomeSlideshow({ slides }: { slides: HomeSlide[] }) {
       }}
     >
       <div
-        className="hero-slide-viewport"
-        aria-live={running ? "off" : "polite"}
-        onPointerDown={(e) => {
-          if (pictures.length < 2 || !e.isPrimary || e.button !== 0) return;
-          gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
-          e.currentTarget.setPointerCapture(e.pointerId);
-          setDragging(true);
-        }}
-        onPointerUp={(e) => {
-          const start = gesture.current;
-          if (!start || start.id !== e.pointerId) return;
-          gesture.current = null;
-          setDragging(false);
-          e.currentTarget.releasePointerCapture(e.pointerId);
-          const dx = e.clientX - start.x;
-          const dy = e.clientY - start.y;
-          if (Math.abs(dx) < 40 || Math.abs(dx) <= Math.abs(dy)) return;
-          const direction = dx > 0 ? 1 : -1;
+        className={`hero-art hero-slideshow${pictures.length > 1 ? " is-draggable" : ""}${dragging ? " is-dragging" : ""}`}
+        data-direction={frame.direction}
+        role="region"
+        aria-label="تصاویر بومیش"
+        aria-roledescription="نمایش اسلاید"
+        onKeyDown={(e) => {
+          if (
+            pictures.length < 2 ||
+            !["ArrowLeft", "ArrowRight"].includes(e.key)
+          )
+            return;
+          e.preventDefault();
+          const direction = e.key === "ArrowRight" ? 1 : -1;
           setPaused(true);
           advance(
             (frame.index + direction + pictures.length) % pictures.length,
             direction,
           );
         }}
-        onLostPointerCapture={() => {
-          gesture.current = null;
-          setDragging(false);
-        }}
-        onPointerCancel={() => {
-          gesture.current = null;
-          setDragging(false);
-        }}
       >
-        {frame.previous >= 0 && picture(frame.previous, true)}
-        {picture(frame.index)}
-      </div>
-      {pictures.length > 1 && (
-        <div className="hero-slide-preload" aria-hidden="true">
-          <Image
-            src={pictures[(frame.index + 1) % pictures.length].image}
-            alt=""
-            fill
-            loading="eager"
-            sizes="(max-width: 760px) 100vw, 50vw"
-          />
+        <div
+          className="hero-slide-viewport"
+          aria-live={running ? "off" : "polite"}
+          onPointerDown={(e) => {
+            if (pictures.length < 2 || !e.isPrimary || e.button !== 0) return;
+            gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setDragging(true);
+          }}
+          onPointerUp={(e) => {
+            const start = gesture.current;
+            if (!start || start.id !== e.pointerId) return;
+            gesture.current = null;
+            setDragging(false);
+            e.currentTarget.releasePointerCapture(e.pointerId);
+            const dx = e.clientX - start.x;
+            const dy = e.clientY - start.y;
+            if (Math.abs(dx) < 40 || Math.abs(dx) <= Math.abs(dy)) return;
+            const direction = dx > 0 ? 1 : -1;
+            setPaused(true);
+            advance(
+              (frame.index + direction + pictures.length) % pictures.length,
+              direction,
+            );
+          }}
+          onLostPointerCapture={() => {
+            gesture.current = null;
+            setDragging(false);
+          }}
+          onPointerCancel={() => {
+            gesture.current = null;
+            setDragging(false);
+          }}
+        >
+          {frame.previous >= 0 && picture(frame.previous, true)}
+          {picture(frame.index)}
         </div>
-      )}
-      {pictures.length > 1 && (
-        <div className="hero-slide-controls">
-          <div className="hero-slide-dots">
-            {pictures.map((_, i) => (
-              <button
-                type="button"
-                key={i}
-                aria-label={`نمایش تصویر ${fa(i + 1)}`}
-                aria-pressed={frame.index === i}
-                onClick={() => {
-                  setPaused(true);
-                  advance(i, i > frame.index ? 1 : -1);
-                }}
-              />
-            ))}
+        {pictures.length > 1 && (
+          <div className="hero-slide-preload" aria-hidden="true">
+            <Image
+              src={pictures[(frame.index + 1) % pictures.length].image}
+              alt=""
+              fill
+              loading="eager"
+              sizes="(max-width: 760px) 100vw, 50vw"
+            />
           </div>
+        )}
+        {pictures.length > 1 && (
+          <div className="hero-slide-controls">
+            <button
+              className="hero-slide-playback"
+              type="button"
+              aria-label={
+                paused || reduced ? "پخش خودکار تصاویر" : "توقف پخش خودکار"
+              }
+              disabled={reduced}
+              onClick={() => setPaused((old) => !old)}
+            >
+              {paused || reduced ? <Play size={15} /> : <Pause size={15} />}
+            </button>
+            <div className="hero-slide-dots">
+              {pictures.map((_, i) => (
+                <button
+                  type="button"
+                  key={i}
+                  aria-label={`نمایش تصویر ${fa(i + 1)}`}
+                  aria-pressed={frame.index === i}
+                  onClick={() => {
+                    setPaused(true);
+                    advance(i, i > frame.index ? 1 : -1);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <div
+        className="hero-slide-caption"
+        aria-live={running ? "off" : "polite"}
+        aria-atomic="true"
+      >
+        <div>
+          <h2>{current.title || collection.title}</h2>
+          <p>{current.caption || collection.caption}</p>
         </div>
-      )}
+        <Link
+          className="text-link"
+          href={collection.href}
+          onFocus={() => setPaused(true)}
+        >
+          {collection.label} <ArrowLeft size={16} />
+        </Link>
+      </div>
     </div>
   );
 }

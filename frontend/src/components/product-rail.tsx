@@ -52,7 +52,12 @@ export function ProductRail({
     });
   }
   return (
-    <section className="product-rail" aria-labelledby={id + "-heading"}>
+    <section
+      className="product-rail"
+      data-count={products.length}
+      data-home-reveal
+      aria-labelledby={id + "-heading"}
+    >
       <div className="section-heading">
         <div>
           <span className="eyebrow">{eyebrow}</span>
@@ -62,33 +67,35 @@ export function ProductRail({
           <Link className="text-link" href={href}>
             همه محصولات
           </Link>
-          <div className="rail-controls">
-            <button
-              type="button"
-              aria-label={`قبلی در ${title}`}
-              aria-controls={id}
-              disabled={edges.start}
-              onClick={() => move(false)}
-            >
-              <ArrowRight size={19} />
-            </button>
-            <button
-              type="button"
-              aria-label={`بعدی در ${title}`}
-              aria-controls={id}
-              disabled={edges.end}
-              onClick={() => move(true)}
-            >
-              <ArrowLeft size={19} />
-            </button>
-          </div>
+          {!(edges.start && edges.end) && (
+            <div className="rail-controls">
+              <button
+                type="button"
+                aria-label={`قبلی در ${title}`}
+                aria-controls={id}
+                disabled={edges.start}
+                onClick={() => move(false)}
+              >
+                <ArrowRight size={19} />
+              </button>
+              <button
+                type="button"
+                aria-label={`بعدی در ${title}`}
+                aria-controls={id}
+                disabled={edges.end}
+                onClick={() => move(true)}
+              >
+                <ArrowLeft size={19} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <div
         ref={rail}
         id={id}
         className="rail-track"
-        tabIndex={0}
+        tabIndex={edges.start && edges.end ? undefined : 0}
         role="region"
         aria-label={title}
         onKeyDown={(e) => {

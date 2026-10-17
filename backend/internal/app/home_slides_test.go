@@ -25,7 +25,7 @@ func TestHomeSlidesPersistencePermissionsAndValidation(t *testing.T) {
 	editor, _ := testStaff(t, a, "editor", nil)
 	operator, _ := testStaff(t, a, "operator", nil)
 	restricted, _ := testStaff(t, a, "editor", []string{"products"})
-	slides := []homeSlide{{Image: "/images/spices.png", Alt: " ادویه‌ها "}, {Image: "/uploads/example.webp", Alt: "سبزی‌های خشک"}}
+	slides := []homeSlide{{Image: "/images/spices.png", Alt: " ادویه‌ها ", Title: "طعم تازه", Caption: "برای آشپزی هر روز", Collection: "spices"}, {Image: "/uploads/example.webp", Alt: "سبزی‌های خشک"}}
 	for _, client := range []*client{c, operator, restricted} {
 		for _, method := range []string{"GET", "PUT"} {
 			code, _ := client.call(method, "/staff/home/slides", slides)
@@ -42,6 +42,13 @@ func TestHomeSlidesPersistencePermissionsAndValidation(t *testing.T) {
 		t.Fatalf("persistence: %#v", got)
 	}
 	invalid := []any{nil, map[string]any{"slides": slides}, []homeSlide{{Image: "https://example.com/image.jpg", Alt: "عکس"}}, []homeSlide{{Image: "/uploads/../private.png", Alt: "عکس"}}, []homeSlide{{Image: "/images/spices.png", Alt: " "}}, []homeSlide{{Image: "/images/spices.png", Alt: strings.Repeat("ن", 301)}}, []homeSlide{{Image: "/images/spices.png", Alt: "a\x00b"}}}
+	invalid = append(invalid,
+		[]homeSlide{{Image: "/images/spices.png", Alt: "عکس", Title: strings.Repeat("ن", 81)}},
+		[]homeSlide{{Image: "/images/spices.png", Alt: "عکس", Caption: strings.Repeat("ن", 161)}},
+		[]homeSlide{{Image: "/images/spices.png", Alt: "عکس", Title: "a\x00b"}},
+		[]homeSlide{{Image: "/images/spices.png", Alt: "عکس", Collection: "https://example.com"}},
+		[]homeSlide{{Image: "/images/spices.png", Alt: "عکس", Collection: "unknown"}},
+	)
 	for _, value := range invalid {
 		if code, _ := editor.call("PUT", "/staff/home/slides", value); code != 400 {
 			t.Fatalf("invalid input accepted: %d %#v", code, value)
@@ -59,6 +66,7 @@ func TestHomeSlidesPersistencePermissionsAndValidation(t *testing.T) {
 	editor.csrf = csrf
 	slides[0], slides[1] = slides[1], slides[0]
 	editor.ok(t, "PUT", "/staff/home/slides", slides, nil)
+	got = nil // Decode optional fields into fresh values after reordering.
 	editor.ok(t, "GET", "/staff/home/slides", nil, &got)
 	if !reflect.DeepEqual(got, slides) {
 		t.Fatal("order not saved")

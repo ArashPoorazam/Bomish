@@ -11,6 +11,7 @@ import {
 import { api } from "@/lib/api";
 import { fa } from "@/lib/format";
 import type { HomeSlide } from "@/lib/types";
+import { homeCollections } from "@/lib/home-collections";
 import { useLiveQuery } from "@/hooks/use-live-query";
 import type { HomeEditorState } from "./home-management";
 
@@ -89,7 +90,10 @@ export function HomeSlidesEditor({
         <div>
           <span className="eyebrow">نمای اول فروشگاه</span>
           <h2 id="home-images-title">تصاویر صفحه اصلی</h2>
-          <p>تصاویر به ترتیب این فهرست، هر ۵ ثانیه نمایش داده می‌شوند.</p>
+          <p>
+            تصاویر به ترتیب این فهرست، هر ۸ ثانیه نمایش داده می‌شوند. برای هر
+            تصویر، مجموعه و متن دلخواه انتخاب کنید.
+          </p>
         </div>
         <span className="badge">{fa(slides.length)} تصویر</span>
       </div>
@@ -114,6 +118,8 @@ export function HomeSlidesEditor({
             const next = slides.map((slide) => ({
               ...slide,
               alt: slide.alt.trim(),
+              title: slide.title?.trim() || undefined,
+              caption: slide.caption?.trim() || undefined,
             }));
             await api("/staff/home/slides", "PUT", next);
             setSlides(next);
@@ -166,22 +172,90 @@ export function HomeSlidesEditor({
                   <Image src={slide.image} alt={slide.alt} fill sizes="240px" />
                   <span>{fa(i + 1)}</span>
                 </div>
-                <label>
-                  توضیح تصویر {fa(i + 1)}
-                  <input
-                    value={slide.alt}
-                    required
-                    maxLength={300}
-                    placeholder="توضیح کوتاه از محتوای تصویر"
-                    onChange={(e) =>
-                      update(
-                        slides.map((s, index) =>
-                          index === i ? { ...s, alt: e.target.value } : s,
+                <div className="home-slide-fields">
+                  <label>
+                    توضیح تصویر {fa(i + 1)}
+                    <input
+                      value={slide.alt}
+                      required
+                      maxLength={300}
+                      placeholder="توضیح کوتاه از محتوای تصویر"
+                      onChange={(e) =>
+                        update(
+                          slides.map((s, index) =>
+                            index === i ? { ...s, alt: e.target.value } : s,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                  <label>
+                    مجموعه تصویر {fa(i + 1)}
+                    <select
+                      value={slide.collection || "products"}
+                      onChange={(e) =>
+                        update(
+                          slides.map((s, index) =>
+                            index === i
+                              ? {
+                                  ...s,
+                                  collection: e.target
+                                    .value as HomeSlide["collection"],
+                                }
+                              : s,
+                          ),
+                        )
+                      }
+                    >
+                      {Object.entries(homeCollections).map(
+                        ([key, collection]) => (
+                          <option key={key} value={key}>
+                            {collection.label}
+                          </option>
                         ),
-                      )
-                    }
-                  />
-                </label>
+                      )}
+                    </select>
+                  </label>
+                  <label>
+                    عنوان تصویر {fa(i + 1)}
+                    <input
+                      value={slide.title || ""}
+                      maxLength={80}
+                      placeholder={
+                        homeCollections[slide.collection || "products"].title
+                      }
+                      onChange={(e) =>
+                        update(
+                          slides.map((s, index) =>
+                            index === i ? { ...s, title: e.target.value } : s,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                  <label>
+                    متن کوتاه تصویر {fa(i + 1)}
+                    <textarea
+                      value={slide.caption || ""}
+                      maxLength={160}
+                      rows={2}
+                      placeholder={
+                        homeCollections[slide.collection || "products"].caption
+                      }
+                      onChange={(e) =>
+                        update(
+                          slides.map((s, index) =>
+                            index === i ? { ...s, caption: e.target.value } : s,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                  <small>
+                    عنوان و متن کوتاه اختیاری‌اند؛ در صورت خالی بودن، متن مجموعه
+                    نمایش داده می‌شود.
+                  </small>
+                </div>
                 <div className="home-item-actions">
                   <button
                     type="button"

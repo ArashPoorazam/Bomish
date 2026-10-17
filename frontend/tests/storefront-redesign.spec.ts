@@ -263,13 +263,15 @@ test("homepage copy and conditional bestseller carousel navigation", async ({
   const previous = page.getByRole("button", {
     name: "قبلی در محبوب‌های بومیش",
   });
-  await expect(previous).toBeDisabled();
   if (await track.evaluate((el) => el.scrollWidth > el.clientWidth + 2)) {
+    await expect(previous).toBeDisabled();
     await track.focus();
     await page.keyboard.press("ArrowLeft");
     await expect(previous).toBeEnabled();
     await previous.click();
     await expect(previous).toBeDisabled();
+  } else {
+    await expect(previous).toHaveCount(0);
   }
 });
 

@@ -96,6 +96,15 @@
   overflow: hidden;
   background: #f4f2e9;
 }
+.home-slide-fields {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.home-slide-fields small {
+  color: var(--muted);
+  font-size: 11px;
+}
 .home-slide-preview img {
   object-fit: cover;
   object-position: center;
