@@ -245,13 +245,13 @@ test("homepage copy and conditional bestseller carousel navigation", async ({
   await page.goto("/");
   await expect(page.locator("main")).not.toContainText("انتخاب آزادانه وزن");
   await expect(page.locator(".principle-card").last()).toContainText(
-    "جنس درجه ۱، ۲ و ۳ را قاطی نمی‌کنیم",
+    "درجه‌های مختلف یک محصول را با هم ترکیب نمی‌کنیم",
   );
   await expect(
     page.getByRole("heading", { name: "انتخاب‌های بومیش", exact: true }),
   ).toHaveCount(0);
   const heading = page.getByRole("heading", {
-    name: "پرفروش ترین‌های بومیش",
+    name: "محبوب‌های بومیش",
     exact: true,
   });
   if (!products.length) {
@@ -259,9 +259,9 @@ test("homepage copy and conditional bestseller carousel navigation", async ({
     return;
   }
   await expect(heading).toBeVisible();
-  const track = page.locator('.rail-track[aria-label="پرفروش ترین‌های بومیش"]');
+  const track = page.locator('.rail-track[aria-label="محبوب‌های بومیش"]');
   const previous = page.getByRole("button", {
-    name: "قبلی در پرفروش ترین‌های بومیش",
+    name: "قبلی در محبوب‌های بومیش",
   });
   await expect(previous).toBeDisabled();
   if (await track.evaluate((el) => el.scrollWidth > el.clientWidth + 2)) {

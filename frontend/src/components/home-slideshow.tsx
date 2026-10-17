@@ -156,10 +156,6 @@ export function HomeSlideshow({ slides }: { slides: HomeSlide[] }) {
           />
         </div>
       )}
-      {(pictures[frame.index].image === fallback.image ||
-        failed[pictures[frame.index].image]) && (
-        <span className="image-note">تصویر نمایشی</span>
-      )}
       {pictures.length > 1 && (
         <div className="hero-slide-controls">
           <div className="hero-slide-dots">

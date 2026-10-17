@@ -33,20 +33,20 @@ export default async function Home() {
     <div className="shop-home">
       <section className="hero container">
         <div className="hero-copy">
-          <span className="eyebrow">از طبیعت، برای سفره شما</span>
+          <span className="eyebrow">بومیش، همراه آشپزی هر روز</span>
           <h1>
-            با <em>یک</em> بار خرید
+            کمی <em>عطر و طعم</em>
             <br />
-            مشتری دائمی می‌شوید
+            کلی حال خوب
           </h1>
           <p>
-            از ما ادویه‌های خوش‌طعم، سبزی‌های خوش‌عطر و دانه‌های خوراکی بخرید.
+            ادویه، سبزی خشک و دانه‌های خوراکی؛ برای غذاهایی که با عشق می‌پزید.
             <br />
-            به‌صورت اختصاصی یا عمده به ما سفارش بدید.
+            برای آشپزخانه‌تان خرید کنید یا سفارش اختصاصی و عمده بدهید.
           </p>
           <div className="hero-actions">
             <Link className="button" href="/products">
-              گشت‌وگذار در محصولات <ArrowLeft size={19} />
+              کشف طعم‌ها <ArrowLeft size={19} />
             </Link>
             <Link className="button secondary" href="/account/custom/new">
               سفارش اختصاصی
@@ -54,7 +54,7 @@ export default async function Home() {
           </div>
           <div className="hero-caption">
             <Leaf size={18} />
-            <span>بسته‌های متنوع، انتخابی ساده</span>
+            <span>به‌اندازه نیازتان، به‌سلیقه خودتان</span>
           </div>
         </div>
         <HomeSlideshow key={JSON.stringify(slides)} slides={slides} />
@@ -68,19 +68,19 @@ export default async function Home() {
             {
               href: "spices",
               title: "ادویه‌ها",
-              text: "روحِ هر غذا",
+              text: "یک چاشنی، هزار طعم",
               Icon: Flower2,
             },
             {
               href: "herbs",
               title: "سبزی‌های خشک",
-              text: "عطر باغ در آشپزخانه",
+              text: "عطر آشنای غذای خانه",
               Icon: Leaf,
             },
             {
               href: "seeds",
               title: "دانه‌های خوراکی",
-              text: "کوچک، اما پر از طعم",
+              text: "جزئیات کوچک، طعم‌های تازه",
               Icon: Wheat,
             },
           ].map(({ href, title, text, Icon }) => (
@@ -101,8 +101,8 @@ export default async function Home() {
       </section>
       <div className="container">
         <ProductRail
-          title="پرفروش ترین‌های بومیش"
-          eyebrow="محبوب‌ترین‌ها در ۳۰ روز گذشته"
+          title="محبوب‌های بومیش"
+          eyebrow="انتخاب مشتریان در ۳۰ روز گذشته"
           products={selected}
           href="/products?collection=bestsellers"
         />
@@ -113,29 +113,29 @@ export default async function Home() {
       >
         <div className="section-heading">
           <div>
-            <span className="eyebrow">قول ما به شما</span>
-            <h2 id="principles-title">سه اصل، یک خیال راحت</h2>
+            <span className="eyebrow">پشت هر بسته، یک تعهد</span>
+            <h2 id="principles-title">با خیال راحت انتخاب کنید</h2>
           </div>
-          <p>خرید خوب، از اعتماد شروع می‌شود.</p>
+          <p>کیفیت، پاسخ‌گویی و صداقت؛ پایه‌های کار ما.</p>
         </div>
         <div className="principle-grid">
           {[
             {
-              title: "کیفیت و ارزانی",
-              text: "ما انتخاب کردیم که بهترین محصولات ممکن را عرضه و بسته‌بندی کنیم و با کمترین سود ممکن در اختیار مردم قرار بدهیم.",
-              detail: "سلامت و کیفیت محصول اولویت همیشگی ماست.",
+              title: "کیفیت خوب، قیمت منصفانه",
+              text: "محصولات را با دقت انتخاب و بسته‌بندی می‌کنیم تا خرید باکیفیت، بخشی از زندگی روزمره باشد.",
+              detail: "سلامت محصول و قیمت منصفانه، معیار ما در هر انتخاب است.",
               Icon: BadgeCheck,
             },
             {
-              title: "پشتیبانی و پیگیری",
-              text: "تیم ما از ساعت ۱۲ ظهر تا ۱۲ شب پاسخ‌گوی سؤالات مشتریان است.",
+              title: "از انتخاب تا تحویل، کنار شما",
+              text: "از ۱۲ ظهر تا ۱۲ شب، پاسخ‌گوی پرسش‌های شما هستیم.",
               detail:
-                "از خرید و بسته‌بندی تا رسیدن کالا به درِ منزل، شما می‌توانید از مسیر حرکت سفارشتان باخبر بشید.",
+                "از ثبت سفارش تا رسیدن بسته، می‌توانید وضعیت خریدتان را پیگیری کنید.",
               Icon: Headset,
             },
             {
-              title: "تقلب نکردن",
-              text: "در بازار امروزی، تقلب به یک ترفند اقتصادی تبدیل شده است. ما هرگز از چنین ترفندهایی برای سود بیشتر پیروی نمی‌کنیم؛ ما هرگز محصولات درجه ۱، ۲ و ۳ را ترکیب نمی‌کنیم و به اصول خود پایبندیم.",
+              title: "صداقت در هر بسته",
+              text: "درجه‌های مختلف یک محصول را با هم ترکیب نمی‌کنیم. آنچه به دستتان می‌رسد، باید همان کیفیتی باشد که انتخاب کرده‌اید.",
               Icon: Handshake,
             },
           ].map(({ title, text, detail, Icon }, i) => (
@@ -154,13 +154,13 @@ export default async function Home() {
       <div className="container">
         <ProductRail
           title="تازه‌های بومیش"
-          eyebrow="تازه به قفسه‌ها رسیده"
+          eyebrow="طعم‌های تازه برای انتخاب بعدی شما"
           href="/products?sort=newest"
           products={newest}
         />
         <ProductRail
-          title="پیشنهادهای بومیش"
-          eyebrow="به انتخاب تیم بومیش"
+          title="پیشنهاد ما برای شما"
+          eyebrow="از میان قفسه‌های بومیش، با سلیقه تیم ما"
           href="/products?collection=suggestions"
           products={offers}
         />
@@ -171,14 +171,15 @@ export default async function Home() {
       >
         <article className="brand-story">
           <Sprout size={42} strokeWidth={1.1} />
-          <span className="eyebrow">آشنایی با ما</span>
-          <h2>داستان بومیش</h2>
+          <span className="eyebrow">از ما و دنیای طعم‌ها</span>
+          <h2>بومیش؛ به عشق غذای خوب</h2>
           <p>
-            از عطر یک ادویه تا طعم یک غذای خانگی؛ بومیش جایی برای شناخت طعم‌ها و
-            انتخاب با خیال راحت است.
+            گاهی عطر یک ادویه، تمام حال‌وهوای غذا را عوض می‌کند. در بومیش، کنار
+            شماییم تا طعم‌های تازه پیدا کنید و به غذاهای هر روزتان رنگ دیگری
+            بدهید.
           </p>
           <Link href="/about" className="text-link">
-            داستان ما را بخوانید <ArrowLeft size={18} />
+            با بومیش آشنا شوید <ArrowLeft size={18} />
           </Link>
           <span className="story-signature" aria-hidden="true">
             بومیش
@@ -187,11 +188,13 @@ export default async function Home() {
         <div className="magazine-preview">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">بخوانیم، بچشیم، یاد بگیریم</span>
+              <span className="eyebrow">
+                ایده‌های خواندنی، طعم‌های امتحان‌کردنی
+              </span>
               <h2>مجله بومیش</h2>
             </div>
             <Link className="text-link" href="/blog">
-              همه نوشته‌ها <ArrowLeft size={16} />
+              گشت‌وگذار در مجله <ArrowLeft size={16} />
             </Link>
           </div>
           {articles.slice(0, 2).map((a) => (
@@ -208,13 +211,16 @@ export default async function Home() {
                 <h3>{a.title}</h3>
                 <p>{a.excerpt}</p>
                 <span className="text-link">
-                  خواندن مقاله <ArrowLeft size={15} />
+                  ادامه مطلب <ArrowLeft size={15} />
                 </span>
               </div>
             </Link>
           ))}
           {!articles.length && (
-            <p>به‌زودی، نوشته‌هایی برای خوش‌طعم‌تر شدن روزها.</p>
+            <p>
+              به‌زودی با ایده‌ها و نکته‌های تازه برای آشپزی، اینجا همراهتان
+              هستیم.
+            </p>
           )}
         </div>
       </section>

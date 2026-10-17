@@ -235,10 +235,10 @@ test("customer session, five stages, refresh, support and custom requests work a
   );
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "پرفروش ترین‌های بومیش", exact: true }),
+    page.getByRole("heading", { name: "محبوب‌های بومیش", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "پیشنهادهای بومیش", exact: true }),
+    page.getByRole("heading", { name: "پیشنهاد ما برای شما", exact: true }),
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/account/orders/${order.orderId}`);

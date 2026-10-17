@@ -105,18 +105,18 @@
 .shipping-readiness {
   background: #eef4e9;
 }
-.section-heading {
+:is(.shipping-settings, .shipping-readiness) .section-heading {
   display: flex;
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
 }
-.section-heading h3,
-.section-heading p,
+:is(.shipping-settings, .shipping-readiness) .section-heading h3,
+:is(.shipping-settings, .shipping-readiness) .section-heading p,
 .box-stock-card h4 {
   margin: 0;
 }
-.section-heading > div {
+:is(.shipping-settings, .shipping-readiness) .section-heading > div {
   flex: 1;
   min-width: 160px;
 }

@@ -60,7 +60,7 @@ export function ProductRail({
         </div>
         <div className="rail-actions">
           <Link className="text-link" href={href}>
-            همه محصولات <ArrowLeft size={16} />
+            همه محصولات
           </Link>
           <div className="rail-controls">
             <button
