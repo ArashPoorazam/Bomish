@@ -115,7 +115,7 @@ func (a *App) publishProduct(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	cfg, err := readShippingConfig(r.Context(), tx, true)
+	_, err := readShippingConfig(r.Context(), tx, true)
 	if err != nil {
 		a.dbError(w, err)
 		return
@@ -129,14 +129,14 @@ func (a *App) publishProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	var p domain.Product
 	_ = json.Unmarshal(raw, &p)
-	if cfg.Mode == "calculated" {
-		for _, v := range p.Packages {
-			if err = v.ValidateMeasurements(true); err != nil {
-				shippingError(w, 422, "missing_measurements", err.Error())
-				return
-			}
+
+	for _, v := range p.Packages {
+		if err = v.ValidateMeasurements(true); err != nil {
+			shippingError(w, 422, "missing_measurements", err.Error())
+			return
 		}
 	}
+
 	if e = p.Validate(true); e != nil {
 		fail(w, 400, e.Error())
 		return
@@ -212,31 +212,31 @@ func (a *App) setAvailability(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	if !in.OutOfStock {
-		cfg, err := readShippingConfig(r.Context(), tx, true)
+		_, err := readShippingConfig(r.Context(), tx, true)
 		if err != nil {
 			a.dbError(w, err)
 			return
 		}
-		if cfg.Mode == "calculated" {
-			var raw []byte
-			err = tx.QueryRow(r.Context(), "SELECT content FROM products WHERE id=$1 FOR UPDATE", r.PathValue("id")).Scan(&raw)
-			if err != nil {
-				fail(w, 404, "محصول پیدا نشد")
+
+		var raw []byte
+		err = tx.QueryRow(r.Context(), "SELECT content FROM products WHERE id=$1 FOR UPDATE", r.PathValue("id")).Scan(&raw)
+		if err != nil {
+			fail(w, 404, "محصول پیدا نشد")
+			return
+		}
+		var p domain.Product
+		if err = json.Unmarshal(raw, &p); err != nil {
+			a.dbError(w, err)
+			return
+		}
+		p.EnsurePackages()
+		for _, pack := range p.Packages {
+			if err = pack.ValidateMeasurements(true); err != nil {
+				shippingError(w, 422, "missing_measurements", err.Error())
 				return
-			}
-			var p domain.Product
-			if err = json.Unmarshal(raw, &p); err != nil {
-				a.dbError(w, err)
-				return
-			}
-			p.EnsurePackages()
-			for _, pack := range p.Packages {
-				if err = pack.ValidateMeasurements(true); err != nil {
-					shippingError(w, 422, "missing_measurements", err.Error())
-					return
-				}
 			}
 		}
+
 	}
 	tag, e := tx.Exec(r.Context(), `UPDATE products SET content=jsonb_set(content,'{outOfStock}',to_jsonb($2::boolean)),updated_at=now() WHERE id=$1`, r.PathValue("id"), in.OutOfStock)
 	if e != nil {

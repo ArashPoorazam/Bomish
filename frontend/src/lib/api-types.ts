@@ -2342,7 +2342,7 @@ export interface paths {
                 };
             };
         };
-        /** @description Updates merchant settings (origin, boxes, freeShippingRials and supportUrl) using optimistic version checks. Technical fields returned by GET are ignored on PUT; manage mode, localities, providers, packagingGrams, rules and box postalSizeId mappings through SHIPPING_CONFIG_FILE. */
+        /** @description Updates merchant settings (origin, boxes, freeShippingRials and supportUrl) using optimistic version checks. Technical fields returned by GET are ignored on PUT; manage localities, providers and box postalSizeId mappings through SHIPPING_CONFIG_FILE. */
         put: {
             parameters: {
                 query?: never;
@@ -7386,15 +7386,10 @@ export interface components {
         };
         ShippingConfig: {
             /** Format: int64 */
-            packagingGrams: number;
-            rules: components["schemas"]["ShippingRule"][];
-            /** Format: int64 */
             freeShippingRials: number;
             supportUrl: string;
             /** Format: int64 */
             version: number;
-            /** @enum {string} */
-            mode: "legacy" | "calculated";
             /** Format: int64 */
             originRevision: number;
             origin: components["schemas"]["Address"];
@@ -7415,6 +7410,10 @@ export interface components {
             readiness?: components["schemas"]["ShippingReadinessIssue"][];
             boxCatalog?: components["schemas"]["BoxCatalogEntry"][];
             simulated?: boolean;
+            boxDefaults?: {
+                wallMm: number;
+                insetMm: number;
+            };
         };
         Member: {
             id: string;
@@ -7993,8 +7992,6 @@ export interface components {
         CalculatedShippingConfig: {
             /** Format: int64 */
             version: number;
-            /** @enum {string} */
-            mode: "legacy" | "calculated";
             /** Format: int64 */
             originRevision: number;
             origin: components["schemas"]["Address"];

@@ -54,7 +54,6 @@ export function ShippingEditor({
   return (
     <div className="form-card stack shipping-settings">
       <div className="between">
-        <h2>ارسال</h2>
         <span role="status">
           {busy
             ? "در حال ذخیره…"
@@ -96,6 +95,7 @@ export function ShippingEditor({
           />
         </section>
         <ShippingBoxes
+          defaults={v.boxDefaults ?? { wallMm: 6, insetMm: 10 }}
           boxes={v.boxes}
           catalog={v.boxCatalog ?? []}
           simulated={!!v.simulated}

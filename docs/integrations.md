@@ -105,7 +105,7 @@ For isolated acceptance testing, set `TEST_DATABASE_URL` to a disposable Postgre
 
 ## Shipping provider integration and simulation
 
-Shipping has two independent controls: store configuration (`legacy` or `calculated`) and the server-only development flag `SHIPPING_SIMULATED=true`. The default remains legacy, with both providers disabled. Simulation requires `APP_ENV=development`; production startup restrictions and simulated payment behavior are unchanged. Do not enable real SMS for acceptance tests.
+Shipping always uses calculated quotations. `SHIPPING_SIMULATED=true` enables the development simulator; it requires `APP_ENV=development`. Providers remain disabled until configured. There is no legacy mode or fixed province/weight tariff fallback.
 
 The simulator persists courier records in `simulated_shipments`; it survives restarts and never contacts a carrier. Authorized staff can advance simulated statuses through `POST /staff/orders/{id}/shipments/simulate` only when simulation is enabled. Quotations, invoice snapshots, readiness, booking leases and customer/staff screens otherwise use the same orchestration as a future verified provider. Simulation checks are labelled and never certify a live account.
 
@@ -123,9 +123,9 @@ For recovery: refresh an uncertain shipment first. Do not delete attempts or rec
 
 ## Simplified staff shipping workflow
 
-The product wizard has five steps. In **بسته‌ها**, each stable package card combines selling details and shipping measurements. Measurement help and copying are secondary controls. Saving complete measurements after visiting this step explicitly confirms them on the server; unrelated edits do not certify old estimates. Partial drafts remain allowed, calculated-mode publication requires complete confirmed measurements, and legacy mode retains preparation warnings. Changing contents does not rescale dimensions. Old `step=shipping` links open the merged package step.
+The product wizard has five steps. In **بسته‌ها**, each stable package card combines selling details and shipping measurements. Measurement help and copying are secondary controls. Saving complete measurements after visiting this step explicitly confirms them on the server; unrelated edits do not certify old estimates. Partial drafts remain allowed, publication requires complete confirmed measurements. Changing contents does not rescale dimensions. Old `step=shipping` links open the merged package step.
 
-In **ارسال**, complete the pickup address, select stocked cartons, then review delivery policy and the free-shipping threshold. Readiness separates merchant preparation from integration setup. Provider settings, city and postal carton mappings, calculation mode and legacy tariffs are managed in `config/shipping.json`; quotation testing remains a separate expandable section. The interface retains read-only integration readiness and directs staff to the technical operator when setup is incomplete. Saves are explicit and retain concurrent-edit protection. Existing stores remain in their saved mode; calculated activation in this release requires simulation.
+In **ارسال**, complete the pickup address, select stocked cartons, then review delivery policy and the free-shipping threshold. Readiness separates merchant preparation from integration setup. Provider settings, city and postal carton mappings, are managed in `config/shipping.json`; quotation testing remains a separate expandable section. The interface retains read-only integration readiness and directs staff to the technical operator when setup is incomplete. Saves are explicit and retain concurrent-edit protection. All stores use calculated shipping; carrier requests in this release require simulation.
 
 The routing rule is **Tehran city: Snapp; all other cities: post**, including other cities in Tehran province. Internal locality identity is independent of postal provider mappings. Missing postal mappings do not block an eligible Snapp quote. Postal orders select among boxes with eligible postal mappings and limits. When Snapp is unavailable or over capacity, checkout shows the postal reason and price. Acceptance refers to that exact unexpired quote ID, bound to the customer, cart, address, discount and configuration revision; it neither silently requotes nor enables future automatic fallback.
 
@@ -144,12 +144,9 @@ Keep API keys in the root `.env`: `SNAPP_API_KEY`, `TAPIN_API_KEY`, and the deve
 
 | Field | What to enter |
 | --- | --- |
-| `mode` | `legacy` for existing weight-band tariffs; `calculated` only after completing activation prerequisites. |
 | `localities` | Supported cities. Each entry has stable internal `id` and `provinceId`, Persian `province` and `city`, and provider-issued `tapinProvince` / `tapinCity`. Set `verified` only after confirming the postal mappings. The array replaces the full saved city list; keep IDs used by saved addresses. |
 | `snapp`, `tapin` | Provider account and service settings described below. Omitted properties retain their saved values. |
 | `postalBoxSizes` | Provider-issued postal size ID for each saved carton, keyed by its stable box `id`. Export the current configuration after adding cartons to get these keys. Omitted keys keep their mappings; an empty string clears a mapping. Unknown box IDs are rejected. |
-| `packagingGrams` | Packaging weight added by legacy pricing, in grams (0–10,000). |
-| `rules` | Full replacement list of legacy tariff bands: `province`, `maxGrams`, and `feeRials`. Amounts are **rials**, so 65,000 toman is `650000`. Do not repeat the same province/weight boundary. IDs are generated automatically. |
 
 Provider objects accept `enabled`, `service` (provider service ID), `shopId` (Tapin merchant/shop ID), `currency` (`rial` or `toman`, matching the provider response), and `verified` (confirmation of the configured provider contract). Snapp also needs `cityId` and an `area` polygon of `[latitude, longitude]` pairs. Capacity fields are `maxGrams`, `maxVolumeCm3`, `maxParcels`, and `maxSize` (`lengthMm`, `widthMm`, `heightMm` in **millimetres**). Obtain actual IDs, coverage and limits from your provider; the example deliberately does not invent them. These verification flags never enable the currently disabled live adapters.
 
@@ -172,7 +169,7 @@ To apply the file immediately without restarting an already-running API:
 SHIPPING_CONFIG_FILE="$PWD/../config/shipping.json" go run ./cmd/server apply-shipping-config
 ```
 
-Compose equivalent: `docker compose exec -T api /app/server apply-shipping-config`. For a new calculated setup, first import provider settings and city mappings with `mode: "legacy"`, complete pickup address/cartons/product measurements in the interface, then change the file to `mode: "calculated"` and apply it again. Activation retains all existing readiness checks and requires the development simulator in this release.
+Compose equivalent: `docker compose exec -T api /app/server apply-shipping-config`. Import provider settings and city mappings, then complete pickup address, cartons and product measurements in the interface. Partial setup can be saved; checkout reports incomplete configuration until it can obtain a calculated quote. No mode switch is required.
 
 The opt-in shipping browser acceptance suite also needs `DATABASE_URL` pointing to its disposable API database; it uses this CLI to set up integrations. It must never target a real store database.
 

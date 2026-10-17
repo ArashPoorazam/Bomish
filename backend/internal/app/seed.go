@@ -36,13 +36,6 @@ func (a *App) Seed(ctx context.Context) error {
 	if err = writeDemoStaff(ctx, tx); err != nil {
 		return err
 	}
-	for _, province := range []string{"تهران", "البرز", "اصفهان", "فارس", "خراسان رضوی", "گیلان", "مازندران", "آذربایجان شرقی"} {
-		for _, band := range [][2]int64{{2200, 650000}, {5200, 950000}, {25200, 1800000}} {
-			if _, err = tx.Exec(ctx, "INSERT INTO shipping_rules(id,province,max_grams,fee_rials) VALUES($1,$2,$3,$4) ON CONFLICT(province,max_grams) DO NOTHING", token(), province, band[0], band[1]); err != nil {
-				return err
-			}
-		}
-	}
 	return tx.Commit(ctx)
 }
 

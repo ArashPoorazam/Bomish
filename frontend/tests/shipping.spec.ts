@@ -138,7 +138,6 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
   ).json()) as ShippingConfig;
   config = {
     ...config,
-    mode: "calculated",
     origin: address,
     localities: [
       {
@@ -210,7 +209,6 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
     writeFileSync(
       file,
       JSON.stringify({
-        mode: config.mode,
         localities: config.localities,
         snapp: config.snapp,
         tapin: config.tapin,
@@ -408,7 +406,6 @@ test("missing pin explicitly accepts post, postal tracking and zero cost stay di
   const cfg = (await (
     await page.request.get("/api/v1/staff/shipping")
   ).json()) as ShippingConfig;
-  expect(cfg.mode).toBe("calculated");
   cfg.boxes[0].maxGrams = 350;
   await checked(page.request, "/staff/shipping", "PUT", cfg, headers);
   const context = await browser.newContext({

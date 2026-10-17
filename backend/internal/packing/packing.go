@@ -49,7 +49,7 @@ func (b Box) Usable() Size {
 	return Size{b.Inside.Length - 2*b.InsetMm, b.Inside.Width - 2*b.InsetMm, b.Inside.Height - 2*b.InsetMm}
 }
 func (b Box) Validate() error {
-	if b.ID == "" || b.Name == "" || !b.Inside.Valid() || !b.Outside.Valid() || !b.Usable().Valid() || b.Inside.Length > b.Outside.Length || b.Inside.Width > b.Outside.Width || b.Inside.Height > b.Outside.Height || b.InsetMm < 0 || b.EmptyGrams <= 0 || b.FillerGrams < 0 || b.MaxGrams <= b.EmptyGrams+b.FillerGrams || b.MaxGrams > 1000000 {
+	if b.ID == "" || b.Name == "" || !b.Inside.Valid() || !b.Outside.Valid() || !b.Usable().Valid() || b.Inside.Length > b.Outside.Length || b.Inside.Width > b.Outside.Width || b.Inside.Height > b.Outside.Height || b.InsetMm < 0 || b.EmptyGrams <= 0 || b.FillerGrams < 0 || b.MaxGrams < 0 || (b.MaxGrams > 0 && b.MaxGrams <= b.EmptyGrams+b.FillerGrams) || b.MaxGrams > 1000000 {
 		return errors.New("ابعاد، وزن خالی، حاشیه محافظ و ظرفیت کارتن را کامل کنید")
 	}
 	return nil
@@ -169,7 +169,7 @@ func coordinates(placed []Placement, size Size, item Size) ([]int64, []int64, []
 func fit(items []Item, b Box, attempts *int) (Parcel, error) {
 	p := Parcel{Box: b, Placements: []Placement{}, GrossGrams: b.EmptyGrams + b.FillerGrams}
 	for _, item := range items {
-		if p.GrossGrams+item.Grams > b.MaxGrams {
+		if b.MaxGrams > 0 && p.GrossGrams+item.Grams > b.MaxGrams {
 			continue
 		}
 		var best *Placement
@@ -338,7 +338,7 @@ func ValidateCorrections(parcels []Parcel, items []Item) error {
 				return errors.New("چیدمان همپوشان یا بدون تکیه‌گاه است")
 			}
 		}
-		if p.GrossGrams != weight || p.Weight() < weight || p.Weight() > p.Box.MaxGrams {
+		if p.GrossGrams != weight || p.Weight() < weight || (p.Box.MaxGrams > 0 && p.Weight() > p.Box.MaxGrams) {
 			return errors.New("وزن اندازه‌گیری‌شده یا ظرفیت کارتن معتبر نیست")
 		}
 	}

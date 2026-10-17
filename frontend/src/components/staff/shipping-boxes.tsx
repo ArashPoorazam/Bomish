@@ -41,11 +41,13 @@ export function ShippingBoxes({
   boxes,
   catalog,
   simulated,
+  defaults,
   onChange,
 }: {
   boxes: ShippingBox[];
   catalog: NonNullable<ShippingConfig["boxCatalog"]>;
   simulated: boolean;
+  defaults: NonNullable<ShippingConfig["boxDefaults"]>;
   onChange: (b: ShippingBox[]) => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
@@ -130,8 +132,10 @@ export function ShippingBoxes({
         })}
       </div>
       <p className="muted">
-        فقط بار اول ابعاد داخلی، وزن و ظرفیت کارتن خریداری‌شده را تکمیل کنید.
-        محافظ دور محصول در اندازه‌های محصول محاسبه شده است.
+        فقط ابعاد بیرونی و وزن کارتن خالی را اندازه بگیرید. فضای داخلی با ضخامت
+        دیواره {fa(defaults.wallMm)} میلی‌متر و حاشیه محافظ{" "}
+        {fa(defaults.insetMm / 10)}
+        سانتی‌متر از هر سمت، خودکار محاسبه می‌شود.
       </p>
       {boxes.map((b, i) => (
         <article className="box-stock-card stack" key={b.id}>
@@ -192,40 +196,40 @@ export function ShippingBoxes({
                 />
               </label>
               <SizeFields
-                value={b.inside}
-                label="ابعاد داخلی"
-                onChange={(inside) => update(i, { inside, verified: false })}
-              />
-              <SizeFields
                 value={b.outside}
                 label="ابعاد بیرونی"
                 onChange={(outside) => update(i, { outside, verified: false })}
               />
-              <div className="form-grid">
-                {(
-                  [
-                    ["emptyGrams", "وزن کارتن خالی (گرم)"],
-                    ["maxGrams", "ظرفیت وزن ناخالص (گرم)"],
-                    ["fillerGrams", "وزن پرکننده (گرم)"],
-                    ["insetMm", "حاشیه محافظ هر سمت (سانتی‌متر)"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <MeasurementNumber
-                    key={key}
-                    label={label}
-                    value={b[key]}
-                    scale={key === "insetMm" ? 10 : 1}
-                    onChange={(v) => update(i, { [key]: v, verified: false })}
-                  />
-                ))}
-              </div>
+              <MeasurementNumber
+                label="وزن کارتن خالی (گرم)"
+                value={b.emptyGrams}
+                onChange={(emptyGrams) =>
+                  update(i, { emptyGrams, verified: false })
+                }
+              />
+              <p className="box-usable-size" aria-live="polite">
+                فضای قابل استفاده برای محصولات:{" "}
+                <bdi>
+                  {[b.outside.lengthMm, b.outside.widthMm, b.outside.heightMm]
+                    .map((size) =>
+                      fa(
+                        Math.max(
+                          0,
+                          size - 2 * (defaults.wallMm + defaults.insetMm),
+                        ) / 10,
+                      ),
+                    )
+                    .join(" × ")}
+                </bdi>{" "}
+                سانتی‌متر
+              </p>
               <label className="check-label">
                 <input
                   type="checkbox"
                   checked={b.verified}
                   onChange={(e) => update(i, { verified: e.target.checked })}
                 />
-                اندازه‌های واقعی و ظرفیت این کارتن را بررسی کردم
+                ابعاد بیرونی و وزن کارتن خالی را بررسی کردم
               </label>
 
               <button

@@ -206,7 +206,9 @@ export function Workspace({
         </div>
       </aside>
       <div className="omni-main">
-        <div className="omni-content">
+        <div
+          className={`omni-content ${activeSection === "shipping" ? "omni-content-shipping" : ""}`}
+        >
           <div className="omni-heading">
             <button
               ref={menuButton}

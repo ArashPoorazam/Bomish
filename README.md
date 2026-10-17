@@ -141,6 +141,17 @@ Fill private service keys and support details in the root `.env`; see [integrati
 
 See [architecture and behavior](docs/architecture.md), [launch requirements](docs/launch.md), and [asset provenance](docs/assets.md). No public deployment has been made.
 
-Shipping measurements and calculated delivery workflows are now available behind the store's default `legacy` mode. Staff can prepare package measurements, the pickup address and verified boxes; technical operators configure locality mappings and carriers in `config/shipping.json`, then exercise calculated checkout and fulfillment using the durable development simulator (`SHIPPING_SIMULATED=true`). Live carrier activation remains blocked pending verified merchant contracts and operational setup; see [shipping integration and recovery](docs/integrations.md#shipping-provider-integration-and-simulation) and [activation prerequisites](docs/launch.md#shipping-activation-gate).
+Shipping always uses calculated delivery: Tehran city uses Snapp when serviceable and other destinations use post. There is no legacy tariff mode. Complete the pickup address, cartons, package measurements, locality mappings and provider setup before checkout can quote delivery. Technical settings live in `config/shipping.json`; development simulation uses `SHIPPING_SIMULATED=true`. Live carriers still require verified merchant contracts; see [shipping integration](docs/integrations.md#shipping-provider-integration-and-simulation).
 
 Technical shipping settings live in [`config/shipping.json`](config/shipping.json), with a [field template](config/shipping.example.json) and [editing/apply instructions](docs/integrations.md#shipping-configuration-file). API keys remain in `.env`.
+
+### Carton geometry defaults
+
+Set `SHIPPING_BOX_WALL_MM` (default `6`) and `SHIPPING_BOX_INSET_MM`
+(default `10`) on the API process, then restart the API. Docker Compose forwards
+both variables. Values are whole millimeters from 0 to 100. These defaults apply
+to existing and new cartons: internal dimensions subtract twice the wall
+thickness from external dimensions; usable dimensions additionally subtract twice
+the protective margin. Staff enter external dimensions and empty-carton weight.
+Filler weight is zero and cartons have no individual gross-weight limit
+(`maxGrams: 0`). Carrier weight limits and actual product/carton weight still apply.

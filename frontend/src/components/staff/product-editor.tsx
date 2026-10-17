@@ -105,12 +105,6 @@ export function ProductEditor({
         : pack,
     ),
   };
-  const [calculated, setCalculated] = useState(false);
-  useEffect(() => {
-    api<{ shippingMode: string }>("/settings")
-      .then((v) => setCalculated(v.shippingMode === "calculated"))
-      .catch(() => {});
-  }, []);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -126,7 +120,7 @@ export function ProductEditor({
   const dirty = JSON.stringify(p) !== saved;
   const locked = !!busy || uploading;
   const existing = products.find((x) => x.id === p.id);
-  const issues = productIssues(editorProduct, true, calculated);
+  const issues = productIssues(editorProduct, true);
   useEffect(() => {
     onStateChange({ dirty, busy: locked });
   }, [dirty, locked, onStateChange]);
@@ -157,7 +151,7 @@ export function ProductEditor({
   async function save(publish: boolean) {
     if (locked) return;
     feedbackTrigger.current = document.activeElement as HTMLElement;
-    const invalid = productIssues(editorProduct, publish, calculated);
+    const invalid = productIssues(editorProduct, publish);
     if (invalid.length) {
       setStep(invalid[0].step);
       setError(invalid[0].text);
@@ -380,12 +374,7 @@ export function ProductEditor({
                 packages={editorProduct.packages}
                 onFix={() => go("packages")}
               />
-              {!calculated && (
-                <p className="notice">
-                  تعرفه قبلی فعال است. اندازه‌های ناقص پیش از فعال‌سازی ارسال
-                  محاسبه‌شده باید تکمیل شوند.
-                </p>
-              )}
+
               <div className="product-review-summary">
                 {p.images[0] && (
                   <Image

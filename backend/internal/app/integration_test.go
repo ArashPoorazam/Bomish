@@ -382,14 +382,5 @@ func TestStoreIntegration(t *testing.T) {
 			t.Fatal(out)
 		}
 	})
-	t.Run("delivery weight boundaries", func(t *testing.T) {
-		for _, c := range []struct{ grams, fee int64 }{{2000, 650000}, {2001, 950000}, {5000, 950000}, {5001, 1800000}, {25000, 1800000}} {
-			cart := domain.Cart{Items: []domain.CartItem{{Product: domain.Product{Status: "published", MinGrams: 1, StepGrams: 1, MaxGrams: 100000, OutOfStock: false}, Grams: c.grams, Quantity: 1, Package: domain.Package{MaxQuantity: 5}}}, SubtotalRials: 1000}
-			q, e := calculateQuote(ctx, a.Pool, cart, "تهران")
-			if e != nil || q.ShippingRials != c.fee || q.WeightGrams != c.grams+200 {
-				t.Fatalf("%+v %+v %v", c, q, e)
-			}
-		}
-	})
 
 }

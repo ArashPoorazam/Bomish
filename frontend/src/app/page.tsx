@@ -194,9 +194,14 @@ export default async function Home() {
           <Link href="/about" className="text-link">
             با بومیش آشنا شوید <ArrowLeft size={18} />
           </Link>
-          <span className="story-signature" aria-hidden="true">
-            بومیش
-          </span>
+          <Image
+            className="story-signature"
+            src="/images/bomish-logo.png"
+            alt=""
+            width={280}
+            height={280}
+            sizes="280px"
+          />
         </article>
         <div className="magazine-preview">
           <div className="section-heading">

@@ -153,19 +153,12 @@
   min-height: 44px;
 }
 .checkout-page .checkout-summary {
-  position: sticky;
-  top: 24px;
-  max-height: calc(100dvh - 48px);
-  overflow-y: auto;
-  scrollbar-width: thin;
+  position: static;
+  max-height: none;
+  overflow: visible;
 }
 
 @media (max-width: 800px) {
-  .checkout-page .checkout-summary {
-    position: static;
-    max-height: none;
-    overflow-y: visible;
-  }
   .checkout-page .checkout-layout {
     grid-template-columns: 1fr;
   }

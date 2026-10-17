@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import {
@@ -226,14 +227,12 @@ export function Chat({
                 className={`chat-message ${m.fromStaff ? "from-staff" : "from-customer"} ${outgoing ? "is-outgoing" : "is-incoming"}`}
               >
                 {staff && !m.fromStaff && customerOrdersUrl ? (
-                  <a
+                  <Link
                     href={customerOrdersUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     aria-label="مشاهده همه سفارش‌های مشتری"
                   >
                     <ChatAvatar seed={id} />
-                  </a>
+                  </Link>
                 ) : (
                   <ChatAvatar support={m.fromStaff} seed={id} />
                 )}

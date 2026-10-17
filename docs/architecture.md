@@ -70,7 +70,7 @@ Migration `010_notification_event_indexes.sql` adds indexed newest-event lookups
 
 ## Calculated shipping
 
-Migration 012 is additive. `shipping_configuration` starts in `legacy` with disabled providers; saved revisions are audited and archived. Package `lengthMm`, `widthMm`, `heightMm`, `shippingGrams` and `shippingVerified` describe outer, wrapped merchandise. `Package.Weight()` and order-item `grams` retain their original merchandise semantics. Published completeness is computed separately from drafts. Incomplete drafts remain editable; calculated publication and quoting require complete measurements.
+Migration 012 is additive. Migration 019 removes the mode selector; all new checkout uses calculated shipping with providers initially disabled; saved revisions are audited and archived. Package `lengthMm`, `widthMm`, `heightMm`, `shippingGrams` and `shippingVerified` describe outer, wrapped merchandise. `Package.Weight()` and order-item `grams` retain their original merchandise semantics. Published completeness is computed separately from drafts. Incomplete drafts remain editable; calculated publication and quoting require complete measurements.
 
 `internal/packing` is pure and deterministic: upright cuboids, base rotation only, full coplanar support, overlap and weight checks, conservative box selection, and limits of 500 units, 20 parcels and 100,000 placement checks. Dimensions are integer millimetres and gross weights integer grams. Box inset is subtracted on both sides once; empty and filler weights are added once. Manual parcel corrections validate exact historical unit allocation, individual fit and gross weight, and require staff confirmation and a reason.
 

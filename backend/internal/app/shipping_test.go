@@ -32,7 +32,6 @@ func shippingFixture(t *testing.T) (*App, *client, *client, domain.Address) {
 	addr := domain.Address{Recipient: "آزمایش ارسال", Phone: "09121110001", Province: "تهران", City: "تهران", ProvinceID: "tehran-province", CityID: "tehran-city", Street: "خیابان آزمایشی، پلاک یک", PostalCode: "1234567890", Latitude: &lat, Longitude: &lng, PinConfirmed: true}
 	var cfg shippingConfig
 	owner.ok(t, "GET", "/staff/shipping", nil, &cfg)
-	cfg.Mode = "calculated"
 	cfg.Origin = addr
 	cfg.Localities = []locality{{ID: addr.CityID, ProvinceID: addr.ProvinceID, Province: addr.Province, City: addr.City, TapinCity: "1", TapinProvince: "1", Verified: true}, {ID: "karaj-city", ProvinceID: "alborz-province", Province: "البرز", City: "کرج", TapinCity: "2", TapinProvince: "2", Verified: true}}
 	cfg.Boxes = []packing.Box{{ID: "box-1", Name: "کارتن آزمایش", Inside: packing.Size{Length: 200, Width: 200, Height: 200}, Outside: packing.Size{Length: 210, Width: 210, Height: 210}, EmptyGrams: 100, FillerGrams: 20, MaxGrams: 10000, InsetMm: 5, PostalSizeID: "1", Active: true, Verified: true}}
@@ -397,9 +396,11 @@ func TestShippingMeasurementDraftPublicationAndRollback(t *testing.T) {
 	id, _, body := quoteAndCheckout(t, c, addr, "")
 	var cfg shippingConfig
 	owner.ok(t, "GET", "/staff/shipping", nil, &cfg)
-	cfg.Mode = "legacy"
+	cfg.Snapp.Service = "sim-bike-updated"
 	applyTechnicalFixture(t, a, cfg)
-	owner.ok(t, "POST", "/staff/products/turmeric/publish", nil, nil)
+	if code, _ := owner.call("POST", "/staff/products/turmeric/publish", nil); code != 422 {
+		t.Fatal("incomplete measurements accepted", code)
+	}
 	var retry map[string]string
 	c.ok(t, "POST", "/checkout", body, &retry)
 	if retry["orderId"] != id {
@@ -476,7 +477,7 @@ func TestShippingUnknownDoesNotForgetPickup(t *testing.T) {
 
 func applyTechnicalFixture(t *testing.T, a *App, cfg shippingConfig) {
 	t.Helper()
-	raw, err := json.Marshal(shippingTechnical{Mode: cfg.Mode, Localities: cfg.Localities, Snapp: cfg.Snapp, Tapin: cfg.Tapin, PackagingGrams: cfg.PackagingGrams, Rules: cfg.Rules, PostalBoxSizes: postalBoxSizes(cfg.calculatedConfig)})
+	raw, err := json.Marshal(shippingTechnical{Localities: cfg.Localities, Snapp: cfg.Snapp, Tapin: cfg.Tapin, PostalBoxSizes: postalBoxSizes(cfg.calculatedConfig)})
 	if err != nil {
 		t.Fatal(err)
 	}

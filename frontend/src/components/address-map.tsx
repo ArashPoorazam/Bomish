@@ -7,8 +7,10 @@ export function AddressMap({
   address,
   onChange,
   reverse = true,
+  autoConfirm = false,
 }: {
   reverse?: boolean;
+  autoConfirm?: boolean;
   address: Address;
   onChange: (value: Address) => void;
 }) {
@@ -94,7 +96,7 @@ export function AddressMap({
       ...before,
       latitude: point[0],
       longitude: point[1],
-      pinConfirmed: false,
+      pinConfirmed: autoConfirm,
     });
     if (!reverse) return;
     setBusy(true);
@@ -126,7 +128,7 @@ export function AddressMap({
               cityId: "",
               latitude: point[0],
               longitude: point[1],
-              pinConfirmed: false,
+              pinConfirmed: autoConfirm,
             });
         })
         .catch((e) => {
@@ -151,7 +153,7 @@ export function AddressMap({
       clearTimeout(timer);
       sequence.current++;
     };
-  }, [point, reverse]);
+  }, [point, reverse, autoConfirm]);
   useEffect(() => {
     let active = true;
     if (address.latitude === undefined || address.longitude === undefined) {
@@ -201,23 +203,7 @@ export function AddressMap({
         className="map-canvas"
         aria-label="انتخاب محل تحویل روی نقشه"
       />
-      <button
-        className="button secondary"
-        type="button"
-        onClick={() => {
-          const p = map.current?.getCenter();
-          if (p) setPoint([p.lat, p.lng]);
-        }}
-      >
-        انتخاب مرکز نقشه
-      </button>
-      <p role="status">
-        {busy
-          ? "در حال دریافت نشانی…"
-          : point
-            ? "موقعیت انتخاب شد؛ نشانی را بررسی کنید."
-            : "یک نقطه روی نقشه انتخاب کنید."}
-      </p>
+      {busy && <p role="status">در حال دریافت نشانی…</p>}
       {error && (
         <p role="alert" className="error">
           {error}

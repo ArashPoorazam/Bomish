@@ -15,11 +15,13 @@ import { ShippingFulfillment } from "./shipping-fulfillment";
 import { StaffOrderStages, orderStamp } from "./order-stages";
 export function StaffOrderDetail({
   initial,
+  readOnly = false,
   onClose,
   onBusyChange,
   onChanged,
 }: {
   initial: Order;
+  readOnly?: boolean;
   onClose: () => void;
   onBusyChange: (busy: boolean) => void;
   onChanged: () => Promise<void>;
@@ -45,6 +47,10 @@ export function StaffOrderDetail({
     [busy, shippingState, onBusyChange],
   );
   useEffect(() => {
+    if (readOnly) {
+      setLoading(false);
+      return;
+    }
     let live = true;
     setLoading(true);
     setError("");
@@ -70,7 +76,7 @@ export function StaffOrderDetail({
     return () => {
       live = false;
     };
-  }, [initial.id, retry]);
+  }, [initial.id, retry, readOnly]);
   async function change(
     path: string,
     body: unknown,
@@ -107,6 +113,7 @@ export function StaffOrderDetail({
   }
   const packed = order.items.filter((i) => i.packed).length;
   const canPack =
+    !readOnly &&
     ["paid", "packing"].includes(order.status) &&
     (!order.shipping ||
       ["not_requested", "cancelled", "failed"].includes(order.shipping.status));
@@ -140,7 +147,7 @@ export function StaffOrderDetail({
         </div>
       </header>
       <div className="staff-order-detail-body">
-        {order.shipping && (
+        {order.shipping && !readOnly && (
           <ShippingFulfillment
             orderId={order.id}
             customerCharge={order.shippingRials}
@@ -158,7 +165,7 @@ export function StaffOrderDetail({
           </div>
           <StaffOrderStages order={order} expanded />
         </section>
-        {!order.shipping && (
+        {!order.shipping && !readOnly && (
           <section
             className="staff-order-next"
             aria-labelledby="order-next-title"
@@ -282,11 +289,13 @@ export function StaffOrderDetail({
                   {fa(packed)} از {fa(order.items.length)} آماده
                 </span>
               </div>
-              <p className="muted">
-                هر ردیف را پس از بسته‌بندی همه تعداد همان بسته علامت بزنید.
-                تغییرات خودکار ذخیره می‌شوند.
-              </p>
-              {!canPack && (
+              {!readOnly && (
+                <p className="muted">
+                  هر ردیف را پس از بسته‌بندی همه تعداد همان بسته علامت بزنید.
+                  تغییرات خودکار ذخیره می‌شوند.
+                </p>
+              )}
+              {!canPack && !readOnly && (
                 <p className="muted">
                   چک‌لیست فقط برای سفارش پرداخت‌شده و پیش از ارسال قابل ویرایش
                   است.

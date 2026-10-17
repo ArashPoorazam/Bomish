@@ -23,7 +23,6 @@ test("shipping setup keeps technical details out of the interface and saves a so
   let cfg: ShippingConfig = {
     version: 1,
     originRevision: 1,
-    mode: "legacy",
     simulated: true,
     origin: {
       id: "",
@@ -53,10 +52,8 @@ test("shipping setup keeps technical details out of the interface and saves a so
     ],
     snapp: provider,
     tapin: provider,
-    packagingGrams: 0,
     freeShippingRials: 0,
     supportUrl: "",
-    rules: [],
     boxCatalog: JSON.parse(
       readFileSync("../backend/internal/app/shipping_box_catalog.json", "utf8"),
     ),
@@ -118,14 +115,25 @@ test("shipping setup keeps technical details out of the interface and saves a so
     .click();
   const box = page.locator(".box-stock-card").first();
   await expect(box.getByLabel("موجود و قابل استفاده")).toBeDisabled();
-  const inside = box.getByRole("group", { name: "ابعاد داخلی", exact: true });
-  await inside.getByLabel("طول (سانتی‌متر)", { exact: true }).fill("۱۴");
-  await inside.getByLabel("عرض (سانتی‌متر)", { exact: true }).fill("۹");
-  await inside.getByLabel("ارتفاع (سانتی‌متر)", { exact: true }).fill("۹");
+  await expect(
+    box.getByRole("group", { name: "ابعاد داخلی", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    box.getByLabel("ظرفیت وزن ناخالص (گرم)", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    box.getByLabel("وزن پرکننده (گرم)", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    box.getByLabel("حاشیه محافظ هر سمت (سانتی‌متر)", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "ارسال", exact: true }),
+  ).toHaveCount(1);
+  await expect(box.locator(".box-usable-size")).toBeVisible();
   await box.getByLabel("وزن کارتن خالی (گرم)", { exact: true }).fill("۶۰");
-  await box.getByLabel("ظرفیت وزن ناخالص (گرم)", { exact: true }).fill("۱۰۰۰");
   await box
-    .getByLabel("اندازه‌های واقعی و ظرفیت این کارتن را بررسی کردم", {
+    .getByLabel("ابعاد بیرونی و وزن کارتن خالی را بررسی کردم", {
       exact: true,
     })
     .check();
@@ -140,10 +148,10 @@ test("shipping setup keeps technical details out of the interface and saves a so
     active: true,
     verified: true,
     emptyGrams: 60,
-    inside: { lengthMm: 140 },
+    maxGrams: 0,
+    fillerGrams: 0,
     catalog: { id: "cartonbank-post-1", version: "2026-10-12" },
   });
-  expect(saved?.mode).toBe("legacy");
   await box.getByText("مشخصات و اندازه‌گیری کارتن", { exact: true }).click();
   for (const width of [360, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });

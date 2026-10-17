@@ -145,53 +145,32 @@ func (a *App) updateOrder(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, map[string]bool{"ok": true})
 }
 
-type shippingRule struct {
-	ID       string `json:"id,omitempty"`
-	Province string `json:"province"`
-	MaxGrams int64  `json:"maxGrams"`
-	FeeRials int64  `json:"feeRials"`
-}
 type shippingConfig struct {
-	Readiness  []readinessIssue  `json:"readiness"`
-	BoxCatalog []boxCatalogEntry `json:"boxCatalog"`
-	Simulated  bool              `json:"simulated"`
+	BoxDefaults boxDefaults       `json:"boxDefaults"`
+	Readiness   []readinessIssue  `json:"readiness"`
+	BoxCatalog  []boxCatalogEntry `json:"boxCatalog"`
+	Simulated   bool              `json:"simulated"`
 	calculatedConfig
 	Blockers            []string                  `json:"blockers,omitempty"`
 	MissingMeasurements []map[string]any          `json:"missingMeasurements,omitempty"`
 	Providers           map[string]providerHealth `json:"providers,omitempty"`
 	FreeShippingRials   int64                     `json:"freeShippingRials"`
 	SupportURL          string                    `json:"supportUrl"`
-	PackagingGrams      int64                     `json:"packagingGrams"`
-	Rules               []shippingRule            `json:"rules"`
 }
 
 func (a *App) shippingSettings(w http.ResponseWriter, r *http.Request) {
-	v := shippingConfig{Rules: []shippingRule{}}
-	e := a.Pool.QueryRow(r.Context(), "SELECT packaging_grams,free_shipping_rials,support_url FROM settings WHERE id=true").Scan(&v.PackagingGrams, &v.FreeShippingRials, &v.SupportURL)
+	v := shippingConfig{}
+	e := a.Pool.QueryRow(r.Context(), "SELECT free_shipping_rials,support_url FROM settings WHERE id=true").Scan(&v.FreeShippingRials, &v.SupportURL)
 	if e != nil {
 		a.dbError(w, e)
 		return
 	}
-	rows, e := a.Pool.Query(r.Context(), "SELECT id,province,max_grams,fee_rials FROM shipping_rules ORDER BY province,max_grams")
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var x shippingRule
-		if e = rows.Scan(&x.ID, &x.Province, &x.MaxGrams, &x.FeeRials); e != nil {
-			a.dbError(w, e)
-			return
-		}
-		v.Rules = append(v.Rules, x)
-	}
-	if e = rows.Err(); e != nil {
-		a.dbError(w, e)
-		return
-	}
-	rows.Close()
 	v.calculatedConfig, e = readShippingConfig(r.Context(), a.Pool, false)
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+	v.BoxDefaults, e = configuredBoxDefaults()
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -256,7 +235,7 @@ func (a *App) saveShipping(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	v.Mode, v.Localities, v.Snapp, v.Tapin = previous.Mode, previous.Localities, previous.Snapp, previous.Tapin
+	v.Localities, v.Snapp, v.Tapin = previous.Localities, previous.Snapp, previous.Tapin
 	// Browser edits can change physical measurements, but never provider mappings.
 	savedSizes := postalBoxSizes(previous)
 	for i := range v.Boxes {
@@ -266,21 +245,15 @@ func (a *App) saveShipping(w http.ResponseWriter, r *http.Request) {
 			v.Boxes[i].PostalSizeID = "sim-box"
 		}
 	}
+	if e = applyBoxDefaults(&v.calculatedConfig); e != nil {
+		a.dbError(w, e)
+		return
+	}
 	if e = validateConfig(v.calculatedConfig); e != nil {
 		fail(w, 400, e.Error())
 		return
 	}
-	if v.Mode == "calculated" {
-		blockers, err := a.activationBlockers(r.Context(), tx, v.calculatedConfig)
-		if err != nil {
-			a.dbError(w, err)
-			return
-		}
-		if len(blockers) > 0 {
-			write(w, 422, map[string]any{"code": "activation_blocked", "error": "پیش‌نیازهای فعال‌سازی کامل نیست", "blockers": blockers})
-			return
-		}
-	}
+
 	before, _ := json.Marshal(previous.Origin)
 	after, _ := json.Marshal(v.Origin)
 	v.OriginRevision = previous.OriginRevision

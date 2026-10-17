@@ -130,3 +130,20 @@ func TestPackingSkipsUnavailableAndIncompleteCatalogBoxes(t *testing.T) {
 		t.Fatal("stocked box not selected", err)
 	}
 }
+
+func TestUnlimitedCartonWeight(t *testing.T) {
+	b := box(100, 100, 100)
+	b.MaxGrams = 0
+	b.FillerGrams = 0
+	items := []Item{item("heavy", 50, 50, 50, 10000)}
+	parcels, err := Plan(items, []Box{b})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parcels) != 1 || parcels[0].GrossGrams != 10010 {
+		t.Fatalf("unexpected parcels: %+v", parcels)
+	}
+	if err := ValidateCorrections(parcels, items); err != nil {
+		t.Fatal(err)
+	}
+}

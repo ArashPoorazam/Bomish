@@ -172,6 +172,10 @@ func (a *App) courier() carrier.Courier {
 }
 func (a *App) calculateShipping(ctx context.Context, c domain.Cart, in shippingQuoteInput, cfg calculatedConfig, userID string) (shippingSnapshot, error) {
 	s := shippingSnapshot{Config: cfg, Destination: normalizedDestination(in.Address), Algorithm: packing.Version}
+	if cfg.Origin.Validate() != nil || !cfg.Origin.PinConfirmed || len(cfg.Localities) == 0 {
+		return s, &packing.Failure{Code: "shipping_not_configured", Detail: "تنظیمات ارسال فروشگاه هنوز کامل نشده است؛ لطفاً با پشتیبانی تماس بگیرید"}
+	}
+
 	if e := s.Destination.Validate(); e != nil {
 		return s, e
 	}

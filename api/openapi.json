@@ -2116,7 +2116,7 @@
             }
           }
         },
-        "description": "Updates merchant settings (origin, boxes, freeShippingRials and supportUrl) using optimistic version checks. Technical fields returned by GET are ignored on PUT; manage mode, localities, providers, packagingGrams, rules and box postalSizeId mappings through SHIPPING_CONFIG_FILE."
+        "description": "Updates merchant settings (origin, boxes, freeShippingRials and supportUrl) using optimistic version checks. Technical fields returned by GET are ignored on PUT; manage localities, providers and box postalSizeId mappings through SHIPPING_CONFIG_FILE."
       }
     },
     "/staff/uploads": {
@@ -7391,16 +7391,6 @@
       "ShippingConfig": {
         "type": "object",
         "properties": {
-          "packagingGrams": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "rules": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ShippingRule"
-            }
-          },
           "freeShippingRials": {
             "type": "integer",
             "format": "int64"
@@ -7411,13 +7401,6 @@
           "version": {
             "type": "integer",
             "format": "int64"
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "legacy",
-              "calculated"
-            ]
           },
           "originRevision": {
             "type": "integer",
@@ -7500,15 +7483,27 @@
           },
           "simulated": {
             "type": "boolean"
+          },
+          "boxDefaults": {
+            "type": "object",
+            "required": [
+              "wallMm",
+              "insetMm"
+            ],
+            "properties": {
+              "wallMm": {
+                "type": "integer"
+              },
+              "insetMm": {
+                "type": "integer"
+              }
+            }
           }
         },
         "required": [
-          "packagingGrams",
-          "rules",
           "freeShippingRials",
           "supportUrl",
           "version",
-          "mode",
           "originRevision",
           "origin",
           "boxes",
@@ -9677,13 +9672,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "legacy",
-              "calculated"
-            ]
-          },
           "originRevision": {
             "type": "integer",
             "format": "int64"
@@ -9712,7 +9700,6 @@
         },
         "required": [
           "version",
-          "mode",
           "originRevision",
           "origin",
           "boxes",

@@ -28,33 +28,6 @@ type quoteResult struct {
 	WeightGrams        int64  `json:"weightGrams"`
 }
 
-func calculateQuote(ctx context.Context, q querier, c domain.Cart, province string) (quoteResult, error) {
-	v := quoteResult{SubtotalRials: c.SubtotalRials}
-	if len(c.Items) == 0 {
-		return v, errors.New("سبد خرید خالی است")
-	}
-	for _, item := range c.Items {
-		if item.Quantity < 1 || item.Quantity > item.Package.MaxQuantity || item.Grams <= 0 || item.Product.Status != "published" || item.Product.OutOfStock {
-			return v, errUnavailable
-		}
-		v.WeightGrams += item.Grams
-	}
-	var packaging, threshold int64
-	e := q.QueryRow(ctx, "SELECT packaging_grams,free_shipping_rials FROM settings WHERE id=true").Scan(&packaging, &threshold)
-	if e != nil {
-		return v, e
-	}
-	v.WeightGrams += packaging
-	e = q.QueryRow(ctx, "SELECT fee_rials FROM shipping_rules WHERE province=$1 AND max_grams >= $2 ORDER BY max_grams LIMIT 1", province, v.WeightGrams).Scan(&v.ShippingRials)
-	if e != nil {
-		return v, errors.New("برای این استان یا وزن، روش ارسال تعریف نشده است")
-	}
-	if threshold > 0 && v.SubtotalRials >= threshold {
-		v.ShippingRials = 0
-	}
-	v.TotalRials = v.SubtotalRials + v.ShippingRials
-	return v, nil
-}
 func (a *App) quote(w http.ResponseWriter, r *http.Request) {
 	if !requireCustomer(w, r) {
 		return
@@ -73,19 +46,7 @@ func (a *App) quote(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	if cfg.Mode == "calculated" {
-		a.calculatedQuote(w, r, c, in, cfg)
-		return
-	}
-	v, e := calculateQuote(r.Context(), a.Pool, c, in.Province)
-	if e == nil {
-		e = applyDiscount(r.Context(), a.Pool, &v, in.DiscountCode, current(r).UserID, false)
-	}
-	if e != nil {
-		fail(w, 400, e.Error())
-		return
-	}
-	write(w, 200, v)
+	a.calculatedQuote(w, r, c, in, cfg)
 }
 func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 	if !requireCustomer(w, r) {
@@ -163,21 +124,12 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	if cfg.Mode == "legacy" && in.ShippingQuoteID != "" {
-		shippingError(w, 409, "stale_quote", "روش محاسبه ارسال تغییر کرده؛ استعلام تازه لازم است")
+
+	snapshot, e := validateCheckoutQuote(r.Context(), tx, s.UserID, in.ShippingQuoteID, in.Method, c, in.Address, in.DiscountCode, cfg)
+	v := snapshot.Totals
+	if e != nil {
+		shippingError(w, 409, "stale_quote", e.Error())
 		return
-	}
-	var snapshot shippingSnapshot
-	var v quoteResult
-	if cfg.Mode == "calculated" {
-		snapshot, e = validateCheckoutQuote(r.Context(), tx, s.UserID, in.ShippingQuoteID, in.Method, c, in.Address, in.DiscountCode, cfg)
-		v = snapshot.Totals
-		if e != nil {
-			shippingError(w, 409, "stale_quote", e.Error())
-			return
-		}
-	} else {
-		v, e = calculateQuote(r.Context(), tx, c, in.Address.Province)
 	}
 	if e == nil {
 		v.DiscountRials = 0
@@ -200,18 +152,18 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	if cfg.Mode == "calculated" {
-		raw, _ := json.Marshal(snapshot)
-		parcels, _ := json.Marshal(snapshot.Parcels)
-		_, e = tx.Exec(r.Context(), "INSERT INTO order_shipping(order_id,method,snapshot,parcels) VALUES($1,$2,$3,$4)", id, snapshot.Method, raw, parcels)
-		if e == nil {
-			_, e = tx.Exec(r.Context(), "UPDATE shipping_quotes SET order_id=$1 WHERE id=$2", id, in.ShippingQuoteID)
-		}
-		if e != nil {
-			a.dbError(w, e)
-			return
-		}
+
+	raw, _ := json.Marshal(snapshot)
+	parcels, _ := json.Marshal(snapshot.Parcels)
+	_, e = tx.Exec(r.Context(), "INSERT INTO order_shipping(order_id,method,snapshot,parcels) VALUES($1,$2,$3,$4)", id, snapshot.Method, raw, parcels)
+	if e == nil {
+		_, e = tx.Exec(r.Context(), "UPDATE shipping_quotes SET order_id=$1 WHERE id=$2", id, in.ShippingQuoteID)
 	}
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+
 	for _, item := range c.Items {
 		_, e = tx.Exec(r.Context(), "INSERT INTO order_items(order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)", id, item.Product.ID, item.Product.Name, item.Grams, item.Product.PackagePrice(item.Package), item.TotalRials, item.Package.ID, item.Package.Label(), item.Quantity)
 		if e != nil {

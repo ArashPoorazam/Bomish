@@ -8,6 +8,7 @@ import { StaffOrderStages, orderStamp } from "./order-stages";
 import { StaffOrderDetail } from "./order-detail";
 export function OrderManager({
   initialQuery = "",
+  customerHistory = false,
   orders,
   onFilters,
   reload,
@@ -15,6 +16,7 @@ export function OrderManager({
   onDetailChange,
 }: {
   initialQuery?: string;
+  customerHistory?: boolean;
   orders: Order[];
   onFilters?: (filters: Record<string, string>) => void;
   reload: () => Promise<void>;
@@ -43,23 +45,25 @@ export function OrderManager({
     if (!selected && returnFocus.current)
       rowRefs.current.get(returnFocus.current)?.focus();
   }, [selected]);
-  const visible = onFilters
-    ? orders
-    : orders.filter(
-        (o) =>
-          (!filter ||
-            (filter === "active"
-              ? ["paid", "packing", "shipped", "review"].includes(o.status)
-              : o.status === filter)) &&
-          digits(
-            `${o.id} ${o.address.recipient} ${o.address.phone} ${o.tracking}`,
-          ).includes(digits(query)),
-      );
+  const visible =
+    onFilters || customerHistory
+      ? orders
+      : orders.filter(
+          (o) =>
+            (!filter ||
+              (filter === "active"
+                ? ["paid", "packing", "shipped", "review"].includes(o.status)
+                : o.status === filter)) &&
+            digits(
+              `${o.id} ${o.address.recipient} ${o.address.phone} ${o.tracking}`,
+            ).includes(digits(query)),
+        );
   if (selected)
     return (
       <StaffOrderDetail
         key={selected.id}
         initial={selected}
+        readOnly={customerHistory}
         onClose={() => {
           setSelected(null);
           onDetailChange(false);
@@ -70,86 +74,88 @@ export function OrderManager({
     );
   return (
     <div className="staff-orders stack">
-      <div className="catalog-toolbar staff-orders-toolbar">
-        <label>
-          <span>جستجوی سفارش</span>
-          <span className="staff-order-search">
-            <Search size={18} aria-hidden="true" />
-            <input
-              type="search"
-              placeholder="نام، همراه، شماره سفارش یا رهگیری"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </span>
-        </label>
-        <label>
-          وضعیت
-          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="active">نیازمند اقدام</option>
-            <option value="">همه سفارش‌ها</option>
-            {[
-              "paid",
-              "packing",
-              "shipped",
-              "received",
-              "pending",
-              "review",
-              "cancelled",
-              "expired",
-            ].map((s) => (
-              <option key={s} value={s}>
-                {statuses[s]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          روش ارسال
-          <select
-            value={provider}
-            onChange={(e) => setProvider(e.target.value)}
+      {!customerHistory && (
+        <div className="catalog-toolbar staff-orders-toolbar">
+          <label>
+            <span>جستجوی سفارش</span>
+            <span className="staff-order-search">
+              <Search size={18} aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="نام، همراه، شماره سفارش یا رهگیری"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </span>
+          </label>
+          <label>
+            وضعیت
+            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+              <option value="active">نیازمند اقدام</option>
+              <option value="">همه سفارش‌ها</option>
+              {[
+                "paid",
+                "packing",
+                "shipped",
+                "received",
+                "pending",
+                "review",
+                "cancelled",
+                "expired",
+              ].map((s) => (
+                <option key={s} value={s}>
+                  {statuses[s]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            روش ارسال
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+            >
+              <option value="">همه روش‌ها</option>
+              <option value="snapp">پیک اسنپ</option>
+              <option value="post">پست محاسبه‌شده</option>
+              <option value="legacy_postal">پست قبلی</option>
+            </select>
+          </label>
+          <label>
+            پیگیری ارسال
+            <select
+              value={attention}
+              onChange={(e) => setAttention(e.target.value)}
+            >
+              <option value="">همه</option>
+              <option value="ready">آماده درخواست</option>
+              <option value="waiting">در انتظار پیک</option>
+              <option value="unknown">درخواست نامشخص</option>
+              <option value="failed">ارسال ناموفق / بازگشت</option>
+              <option value="missing">نیازمند تکمیل</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={refreshing}
+            onClick={async () => {
+              setRefreshing(true);
+              setError("");
+              try {
+                await reload();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setRefreshing(false);
+              }
+            }}
           >
-            <option value="">همه روش‌ها</option>
-            <option value="snapp">پیک اسنپ</option>
-            <option value="post">پست محاسبه‌شده</option>
-            <option value="legacy_postal">پست قبلی</option>
-          </select>
-        </label>
-        <label>
-          پیگیری ارسال
-          <select
-            value={attention}
-            onChange={(e) => setAttention(e.target.value)}
-          >
-            <option value="">همه</option>
-            <option value="ready">آماده درخواست</option>
-            <option value="waiting">در انتظار پیک</option>
-            <option value="unknown">درخواست نامشخص</option>
-            <option value="failed">ارسال ناموفق / بازگشت</option>
-            <option value="missing">نیازمند تکمیل</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          className="button secondary"
-          disabled={refreshing}
-          onClick={async () => {
-            setRefreshing(true);
-            setError("");
-            try {
-              await reload();
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setRefreshing(false);
-            }
-          }}
-        >
-          <RefreshCw size={16} />
-          {refreshing ? "در حال دریافت…" : "به‌روزرسانی"}
-        </button>
-      </div>
+            <RefreshCw size={16} />
+            {refreshing ? "در حال دریافت…" : "به‌روزرسانی"}
+          </button>
+        </div>
+      )}
       {error && (
         <p className="error" role="alert">
           {error}

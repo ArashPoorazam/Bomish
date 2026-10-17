@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowRight,
@@ -281,23 +282,19 @@ export function StaffRequests({
               >
                 <ArrowRight size={20} />
               </button>
-              <a
+              <Link
                 href={`/staff/customer-orders/${encodeURIComponent(selected.id)}`}
-                target="_blank"
-                rel="noopener noreferrer"
                 aria-label="مشاهده همه سفارش‌های مشتری"
               >
                 <ChatAvatar seed={selected.id} />
-              </a>
+              </Link>
               <div>
                 <h2>
-                  <a
+                  <Link
                     href={`/staff/customer-orders/${encodeURIComponent(selected.id)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
                   >
                     مشتری <bdi>{selected.phone}</bdi>
-                  </a>
+                  </Link>
                 </h2>
                 <p>
                   {kind === "support"

@@ -11,14 +11,14 @@ import (
 )
 
 func TestShippingFileParsing(t *testing.T) {
-	previous := shippingTechnical{Mode: "legacy", Localities: []locality{}, Snapp: providerConfig{Service: "saved"}, Rules: []shippingRule{}}
+	previous := shippingTechnical{Localities: []locality{}, Snapp: providerConfig{Service: "saved"}}
 	for _, input := range []string{`null`, `[]`, `{"mode":null}`, `{"mod":"calculated"}`, `{"snapp":{"apiKey":"secret"}}`, `{} {}`} {
 		if _, err := mergeShippingFile([]byte(input), previous); err == nil {
 			t.Fatalf("accepted %s", input)
 		}
 	}
 	next, err := mergeShippingFile([]byte(`{"snapp":{"shopId":"new"}}`), previous)
-	if err != nil || next.Snapp.Service != "saved" || next.Snapp.ShopID != "new" || next.Mode != "legacy" {
+	if err != nil || next.Snapp.Service != "saved" || next.Snapp.ShopID != "new" {
 		t.Fatal(next, err)
 	}
 	previous.Localities = []locality{{ID: "old", ProvinceID: "old-province", City: "old-city", Verified: true}}
@@ -26,15 +26,12 @@ func TestShippingFileParsing(t *testing.T) {
 	if err != nil || next.Localities[0].City != "" || next.Localities[0].Verified {
 		t.Fatal("array inherited old values", next, err)
 	}
-	for _, v := range []shippingTechnical{
-		{PackagingGrams: -1},
-		{Rules: []shippingRule{{Province: "تهران", MaxGrams: 1, FeeRials: -1}}},
-		{Rules: []shippingRule{{Province: "تهران", MaxGrams: 1}, {Province: "تهران", MaxGrams: 1}}},
-	} {
-		if validateShippingTariffs(v) == nil {
-			t.Fatal("invalid tariffs accepted", v)
+	for _, input := range []string{`{"mode":"legacy"}`, `{"mode":"calculated"}`, `{"rules":[]}`, `{"packagingGrams":200}`} {
+		if _, err := mergeShippingFile([]byte(input), previous); err == nil {
+			t.Fatalf("retired setting accepted: %s", input)
 		}
 	}
+
 }
 
 func TestShippingFileImportPreservesMerchantSettingsAndVersions(t *testing.T) {
@@ -52,12 +49,12 @@ func TestShippingFileImportPreservesMerchantSettingsAndVersions(t *testing.T) {
 		}
 		return a.ApplyShippingConfig(ctx, path)
 	}
-	if err := apply([]byte(`{"packagingGrams":123,"snapp":{"shopId":"file-account"}}`)); err != nil {
+	if err := apply([]byte(`{"snapp":{"shopId":"file-account"}}`)); err != nil {
 		t.Fatal(err)
 	}
 	var after shippingConfig
 	owner.ok(t, "GET", "/staff/shipping", nil, &after)
-	if after.Version != before.Version+1 || after.PackagingGrams != 123 || after.Snapp.ShopID != "file-account" {
+	if after.Version != before.Version+1 || after.Snapp.ShopID != "file-account" {
 		t.Fatal(after)
 	}
 	if !reflect.DeepEqual(after.Origin, before.Origin) || !reflect.DeepEqual(after.Boxes, before.Boxes) || after.FreeShippingRials != before.FreeShippingRials || after.SupportURL != before.SupportURL || after.OriginRevision != before.OriginRevision {
@@ -93,14 +90,11 @@ func TestShippingFileImportPreservesMerchantSettingsAndVersions(t *testing.T) {
 		t.Fatal("failed import changed store")
 	}
 	// Even a crafted browser request can only update merchant-owned fields.
-	after.Mode = "legacy"
 	after.Snapp.ShopID = "browser-account"
-	after.PackagingGrams = 999
-	after.Rules = nil
 	after.FreeShippingRials = 2000000
 	owner.ok(t, "PUT", "/staff/shipping", after, nil)
 	owner.ok(t, "GET", "/staff/shipping", nil, &unchanged)
-	if unchanged.Mode != "calculated" || unchanged.Snapp.ShopID != "file-account" || unchanged.PackagingGrams != 123 || !reflect.DeepEqual(unchanged.Rules, before.Rules) || unchanged.FreeShippingRials != 2000000 {
+	if unchanged.Snapp.ShopID != "file-account" || unchanged.FreeShippingRials != 2000000 {
 		t.Fatal("browser overwrote file-owned settings")
 	}
 	var count int
@@ -113,21 +107,21 @@ func TestShippingFileImportPreservesMerchantSettingsAndVersions(t *testing.T) {
 	}
 }
 
-func TestShippingFileActivationGate(t *testing.T) {
+func TestShippingFileAllowsIncompleteSetup(t *testing.T) {
 	a := setup(t)
 	path := filepath.Join(t.TempDir(), "shipping.json")
-	if err := os.WriteFile(path, []byte(`{"mode":"calculated"}`), 0600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"snapp":{"shopId":"setup-in-progress"}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.ApplyShippingConfig(context.Background(), path); err == nil {
-		t.Fatal("incomplete calculated config activated")
+	if err := a.ApplyShippingConfig(context.Background(), path); err != nil {
+		t.Fatal(err)
+	}
+	c, err := readShippingConfig(context.Background(), a.Pool, false)
+	if err != nil || c.Snapp.ShopID != "setup-in-progress" {
+		t.Fatal(c, err)
 	}
 	if err := a.ApplyShippingConfig(context.Background(), path+".missing"); err == nil {
 		t.Fatal("missing file ignored")
-	}
-	c, err := readShippingConfig(context.Background(), a.Pool, false)
-	if err != nil || c.Mode != "legacy" {
-		t.Fatal("failed activation changed mode", c, err)
 	}
 }
 

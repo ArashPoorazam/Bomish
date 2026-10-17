@@ -9,18 +9,14 @@ import (
 	"io"
 	"os"
 	"reflect"
-	"sort"
 	"strings"
 )
 
 // Only integration settings belong in the file. Merchant settings stay in the UI.
 type shippingTechnical struct {
-	Mode           string            `json:"mode"`
 	Localities     []locality        `json:"localities"`
 	Snapp          providerConfig    `json:"snapp"`
 	Tapin          providerConfig    `json:"tapin"`
-	PackagingGrams int64             `json:"packagingGrams"`
-	Rules          []shippingRule    `json:"rules"`
 	PostalBoxSizes map[string]string `json:"postalBoxSizes"`
 }
 
@@ -52,23 +48,7 @@ func applyPostalBoxSizes(c *calculatedConfig, sizes map[string]string) error {
 }
 
 func readShippingTechnical(ctx context.Context, q querier, c calculatedConfig) (shippingTechnical, error) {
-	v := shippingTechnical{Mode: c.Mode, Localities: c.Localities, Snapp: c.Snapp, Tapin: c.Tapin, Rules: []shippingRule{}, PostalBoxSizes: postalBoxSizes(c)}
-	if err := q.QueryRow(ctx, "SELECT packaging_grams FROM settings WHERE id=true").Scan(&v.PackagingGrams); err != nil {
-		return v, err
-	}
-	rows, err := q.Query(ctx, "SELECT province,max_grams,fee_rials FROM shipping_rules ORDER BY province COLLATE \"C\",max_grams")
-	if err != nil {
-		return v, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var r shippingRule
-		if err = rows.Scan(&r.Province, &r.MaxGrams, &r.FeeRials); err != nil {
-			return v, err
-		}
-		v.Rules = append(v.Rules, r)
-	}
-	return v, rows.Err()
+	return shippingTechnical{Localities: c.Localities, Snapp: c.Snapp, Tapin: c.Tapin, PostalBoxSizes: postalBoxSizes(c)}, nil
 }
 
 func mergeShippingFile(raw []byte, previous shippingTechnical) (shippingTechnical, error) {
@@ -94,9 +74,7 @@ func mergeShippingFile(raw []byte, previous shippingTechnical) (shippingTechnica
 	if _, ok := fields["localities"]; ok {
 		next.Localities = nil
 	}
-	if _, ok := fields["rules"]; ok {
-		next.Rules = nil
-	}
+
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&next); err != nil {
@@ -105,31 +83,7 @@ func mergeShippingFile(raw []byte, previous shippingTechnical) (shippingTechnica
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		return next, errors.New("expected a single JSON object")
 	}
-	for i := range next.Rules {
-		next.Rules[i].ID = ""
-	}
-	sort.Slice(next.Rules, func(i, j int) bool {
-		if next.Rules[i].Province == next.Rules[j].Province {
-			return next.Rules[i].MaxGrams < next.Rules[j].MaxGrams
-		}
-		return next.Rules[i].Province < next.Rules[j].Province
-	})
 	return next, nil
-}
-
-func validateShippingTariffs(v shippingTechnical) error {
-	if v.PackagingGrams < 0 || v.PackagingGrams > 10000 || len(v.Rules) > 500 {
-		return errors.New("invalid packaging weight or tariff count")
-	}
-	seen := map[string]bool{}
-	for _, r := range v.Rules {
-		key := fmt.Sprintf("%s/%d", r.Province, r.MaxGrams)
-		if seen[key] || r.Province == "" || r.MaxGrams < 1 || r.MaxGrams > 10000000 || r.FeeRials < 0 || r.FeeRials > 10000000000 {
-			return errors.New("invalid or duplicate shipping tariff")
-		}
-		seen[key] = true
-	}
-	return nil
 }
 
 // ExportShippingConfig produces an editable snapshot without secrets or merchant settings.
@@ -184,25 +138,17 @@ func (a *App) ApplyShippingConfig(ctx context.Context, path string) error {
 	if reflect.DeepEqual(previous, next) {
 		return nil
 	}
-	c.Mode, c.Localities, c.Snapp, c.Tapin = next.Mode, next.Localities, next.Snapp, next.Tapin
+	c.Localities, c.Snapp, c.Tapin = next.Localities, next.Snapp, next.Tapin
 	if err = applyPostalBoxSizes(&c, next.PostalBoxSizes); err != nil {
+		return err
+	}
+	if err = applyBoxDefaults(&c); err != nil {
 		return err
 	}
 	if err = validateConfig(c); err != nil {
 		return err
 	}
-	if err = validateShippingTariffs(next); err != nil {
-		return err
-	}
-	if c.Mode == "calculated" {
-		blockers, e := a.activationBlockers(ctx, tx, c)
-		if e != nil {
-			return e
-		}
-		if len(blockers) > 0 {
-			return fmt.Errorf("shipping activation blocked: %v", blockers)
-		}
-	}
+
 	c.Version = version + 1
 	content, err := json.Marshal(c)
 	if err != nil {
@@ -213,19 +159,6 @@ func (a *App) ApplyShippingConfig(ctx context.Context, path string) error {
 	}
 	if _, err = tx.Exec(ctx, "UPDATE shipping_configuration SET version=$1,content=$2,updated_at=now() WHERE id=true", c.Version, content); err != nil {
 		return err
-	}
-	if _, err = tx.Exec(ctx, "UPDATE settings SET packaging_grams=$1 WHERE id=true", next.PackagingGrams); err != nil {
-		return err
-	}
-	if !reflect.DeepEqual(previous.Rules, next.Rules) {
-		if _, err = tx.Exec(ctx, "DELETE FROM shipping_rules"); err != nil {
-			return err
-		}
-		for _, r := range next.Rules {
-			if _, err = tx.Exec(ctx, "INSERT INTO shipping_rules(id,province,max_grams,fee_rials) VALUES($1,$2,$3,$4)", token(), r.Province, r.MaxGrams, r.FeeRials); err != nil {
-				return err
-			}
-		}
 	}
 	detail, _ := json.Marshal(map[string]any{"configVersion": c.Version, "technical": next})
 	if _, err = tx.Exec(ctx, "INSERT INTO audit_events(action,entity_id,detail) VALUES('shipping.config_file','settings',$1)", detail); err != nil {

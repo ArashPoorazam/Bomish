@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { Address } from "@/lib/types";
 import { api } from "@/lib/api";
 import { digits } from "@/lib/format";
-import { ShippingLocalities, PinConfirmation } from "./shipping-address";
+import { ShippingLocalities } from "./shipping-address";
 import { AddressMap } from "./address-map";
 const blank: Address = {
   id: "",
@@ -54,16 +54,13 @@ export function AddressEditor({
       }}
     >
       <h3>{initial ? "ویرایش نشانی" : "نشانی جدید"}</h3>
-      <AddressMap address={address} onChange={setAddress} />
+      <AddressMap autoConfirm address={address} onChange={setAddress} />
       <ShippingLocalities address={address} onChange={setAddress} />
-      <PinConfirmation address={address} onChange={setAddress} />
       <div className="form-grid">
         {(
           [
             ["recipient", "نام گیرنده"],
             ["phone", "شماره همراه گیرنده"],
-            ["province", "استان"],
-            ["city", "شهر"],
             ["street", "نشانی کامل، پلاک و واحد"],
             ["postalCode", "کد پستی"],
           ] as const
@@ -81,12 +78,6 @@ export function AddressEditor({
                 setAddress({
                   ...address,
                   [k]: e.target.value,
-                  ...(["province", "city", "street"].includes(k)
-                    ? { pinConfirmed: false }
-                    : {}),
-                  ...(["province", "city"].includes(k)
-                    ? { cityId: "", provinceId: "" }
-                    : {}),
                 })
               }
             />

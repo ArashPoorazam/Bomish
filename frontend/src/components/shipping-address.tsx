@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { api } from "@/lib/api";
 import type { Address, Locality } from "@/lib/types";
 const localityName = (value: string) =>
@@ -18,6 +18,7 @@ export function ShippingLocalities({
   onChange: (a: Address) => void;
   localities?: Locality[];
 }) {
+  const listId = useId();
   const [items, setItems] = useState<Locality[]>(provided ?? []),
     [error, setError] = useState(""),
     [retry, setRetry] = useState(0);
@@ -42,7 +43,7 @@ export function ShippingLocalities({
     };
   }, [provided, retry]);
   useEffect(() => {
-    // Map lookups provide names; shipping needs the matching verified IDs.
+    // Keep readable map results even when postal IDs are not configured yet.
     if (address.cityId || !address.province || !address.city) return;
     const matches = items.filter(
       (item) =>
@@ -57,7 +58,6 @@ export function ShippingLocalities({
       provinceId: match.provinceId,
       city: match.city,
       cityId: match.id,
-      pinConfirmed: false,
     });
   }, [items, address, onChange]);
   const provinces = [
@@ -67,64 +67,68 @@ export function ShippingLocalities({
     <section className="stack">
       <div className="form-grid">
         <label>
-          استان تأییدشده
-          <select
-            value={address.provinceId ?? ""}
+          استان
+          <input
+            required
+            autoComplete="address-level1"
+            list={`${listId}-provinces`}
+            value={address.province}
+            placeholder="استان"
+            onChange={(e) => {
+              const province = e.target.value;
+              const match = provinces.find(
+                ([, name]) => localityName(name) === localityName(province),
+              );
+              onChange({
+                ...address,
+                province,
+                provinceId: match?.[0] ?? "",
+                city: "",
+                cityId: "",
+                pinConfirmed: false,
+              });
+            }}
+          />
+          <datalist id={`${listId}-provinces`}>
+            {provinces.map(([id, name]) => (
+              <option key={id} value={name} />
+            ))}
+          </datalist>
+        </label>
+        <label>
+          شهر
+          <input
+            required
+            autoComplete="address-level2"
+            list={`${listId}-cities`}
+            value={address.city}
+            placeholder="شهر"
             onChange={(e) =>
               onChange({
                 ...address,
-                provinceId: e.target.value,
-                province:
-                  provinces.find(([id]) => id === e.target.value)?.[1] ?? "",
+                city: e.target.value,
                 cityId: "",
-                city: "",
                 pinConfirmed: false,
               })
             }
-          >
-            <option value="">استان را انتخاب کنید</option>
-            {provinces.map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          شهر تأییدشده
-          <select
-            value={address.cityId ?? ""}
-            onChange={(e) => {
-              const l = items.find((v) => v.id === e.target.value);
-              if (l)
-                onChange({
-                  ...address,
-                  cityId: l.id,
-                  city: l.city,
-                  pinConfirmed: false,
-                });
-            }}
-          >
-            <option value="">شهر را انتخاب کنید</option>
+          />
+          <datalist id={`${listId}-cities`}>
             {items
-              .filter((l) => l.provinceId === address.provinceId)
-              .map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.city}
-                </option>
+              .filter(
+                (item) =>
+                  localityName(item.province) ===
+                  localityName(address.province),
+              )
+              .map((item) => (
+                <option key={item.id} value={item.city} />
               ))}
-          </select>
+          </datalist>
         </label>
       </div>
-      {!address.cityId && (
-        <p className="notice">
-          برای محاسبه ارسال، شهر نشانی را از فهرست تأیید کنید. نشانی قبلی شما
-          حفظ شده است.
-        </p>
-      )}
-      {!items.length && !error && (
-        <p>هنوز شهر تأییدشده‌ای برای ارسال ثبت نشده است.</p>
-      )}
+      <p className="muted">
+        با انتخاب موقعیت روی نقشه، استان و شهر تکمیل می‌شوند؛ در صورت نیاز آن‌ها
+        را اصلاح کنید.
+      </p>
       {error && (
         <p role="alert" className="error">
           {error}

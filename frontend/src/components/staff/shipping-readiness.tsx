@@ -21,7 +21,7 @@ export function ShippingReadiness({
           <p>ارسال زنده غیرفعال است؛ هیچ پیک واقعی درخواست نمی‌شود.</p>
         </div>
         <span className="badge">
-          {v.mode === "legacy" ? "تعرفه‌های قبلی" : "محاسبه خودکار · آزمایشی"}
+          {v.simulated ? "محاسبه خودکار · آزمایشی" : "محاسبه خودکار"}
         </span>
       </div>
       <div className="readiness-columns">

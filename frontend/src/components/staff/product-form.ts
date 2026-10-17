@@ -48,11 +48,7 @@ export const productSteps = [
   },
 ] as const;
 export type ProductStep = (typeof productSteps)[number]["id"];
-export function productIssues(
-  p: Product,
-  publish: boolean,
-  calculated = false,
-) {
+export function productIssues(p: Product, publish: boolean) {
   const issues: { step: ProductStep; text: string }[] = [];
   if (!p.name.trim() || !p.slug.trim() || !p.categoryId)
     issues.push({
@@ -110,7 +106,7 @@ export function productIssues(
       ((pack.unit === "g" || pack.unit === "kg") &&
         pack.shippingGrams > 0 &&
         pack.shippingGrams < pack.amount * (pack.unit === "kg" ? 1000 : 1));
-    if (enteredInvalid || (publish && calculated && incomplete.length))
+    if (enteredInvalid || (publish && incomplete.length))
       issues.push({
         step: "packages",
         text: `بسته ${i + 1}: ${incomplete.join("، ")}`,

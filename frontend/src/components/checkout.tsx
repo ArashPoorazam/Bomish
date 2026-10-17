@@ -1,6 +1,6 @@
 "use client";
 import { CheckoutSteps } from "./checkout-steps";
-import { ShippingLocalities, PinConfirmation } from "./shipping-address";
+import { ShippingLocalities } from "./shipping-address";
 import { providerName } from "@/lib/shipping";
 import { AddressMap } from "./address-map";
 import { useRouter } from "next/navigation";
@@ -21,39 +21,7 @@ const blank: Address = {
   street: "",
   postalCode: "",
 };
-const provinces = [
-  "تهران",
-  "البرز",
-  "اصفهان",
-  "فارس",
-  "خراسان رضوی",
-  "گیلان",
-  "مازندران",
-  "آذربایجان شرقی",
-  "آذربایجان غربی",
-  "اردبیل",
-  "ایلام",
-  "بوشهر",
-  "چهارمحال و بختیاری",
-  "خراسان جنوبی",
-  "خراسان شمالی",
-  "خوزستان",
-  "زنجان",
-  "سمنان",
-  "سیستان و بلوچستان",
-  "قزوین",
-  "قم",
-  "کردستان",
-  "کرمان",
-  "کرمانشاه",
-  "کهگیلویه و بویراحمد",
-  "گلستان",
-  "لرستان",
-  "مرکزی",
-  "هرمزگان",
-  "همدان",
-  "یزد",
-];
+
 export function Checkout() {
   const router = useRouter();
   const { cart, user, refresh } = useStore();
@@ -71,15 +39,9 @@ export function Checkout() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [key, setKey] = useState("");
-  const [calculated, setCalculated] = useState(false),
-    [quoteBusy, setQuoteBusy] = useState(false),
+  const [quoteBusy, setQuoteBusy] = useState(false),
     [quoteRetry, setQuoteRetry] = useState(0);
   const quoteSequence = useRef(0);
-  useEffect(() => {
-    api<{ shippingMode: string }>("/settings")
-      .then((v) => setCalculated(v.shippingMode === "calculated"))
-      .catch((e) => setError(e.message));
-  }, []);
   const [codeInput, setCodeInput] = useState("");
   const [appliedCode, setAppliedCode] = useState("");
   const [codeError, setCodeError] = useState("");
@@ -110,16 +72,14 @@ export function Checkout() {
     setAddress((a) => ({
       ...a,
       [k]: v,
-      ...(["street", "city", "province"].includes(k)
-        ? { pinConfirmed: false }
-        : {}),
+      ...(["city", "province"].includes(k) ? { pinConfirmed: false } : {}),
     }));
     setQuote(null);
     setKey(crypto.randomUUID());
   }
   const destinationKey = JSON.stringify(address);
   useEffect(() => {
-    if (!calculated || orderId) return;
+    if (orderId) return;
     const sequence = ++quoteSequence.current;
     setQuote(null);
     setKey(crypto.randomUUID());
@@ -158,7 +118,6 @@ export function Checkout() {
       quoteSequence.current++;
     };
   }, [
-    calculated,
     destinationKey,
     cartSnapshot,
     appliedCode,
@@ -177,27 +136,9 @@ export function Checkout() {
     );
     return () => clearTimeout(timer);
   }, [quote, orderId]);
-  async function getQuote(e: React.FormEvent) {
+  function getQuote(e: React.FormEvent) {
     e.preventDefault();
-    if (calculated) {
-      setQuoteRetry((n) => n + 1);
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const q = await api<Quote>("/checkout/quote", "POST", {
-        province: address.province,
-        discountCode: appliedCode,
-      });
-      setQuote(q);
-      setCodeError("");
-    } catch (e) {
-      setQuote(null);
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    setQuoteRetry((n) => n + 1);
   }
   async function applyCode(remove = false) {
     if (busy || orderId) return;
@@ -384,12 +325,10 @@ export function Checkout() {
                 ) : null}
                 <div className="checkout-map">
                   <p className="checkout-map-heading">
-                    انتخاب موقعیت روی نقشه{" "}
-                    <small>
-                      {calculated ? "برای بررسی روش ارسال" : "اختیاری"}
-                    </small>
+                    انتخاب موقعیت روی نقشه <small>برای بررسی روش ارسال</small>
                   </p>
                   <AddressMap
+                    autoConfirm
                     key={address.id || "new"}
                     address={address}
                     onChange={(v) => {
@@ -398,15 +337,9 @@ export function Checkout() {
                     }}
                   />
                 </div>
-                {calculated && (
-                  <>
-                    <ShippingLocalities
-                      address={address}
-                      onChange={setAddress}
-                    />
-                    <PinConfirmation address={address} onChange={setAddress} />
-                  </>
-                )}
+                <>
+                  <ShippingLocalities address={address} onChange={setAddress} />
+                </>
                 <div className="form-grid">
                   <label>
                     نام گیرنده
@@ -427,30 +360,7 @@ export function Checkout() {
                       onChange={(e) => update("phone", e.target.value)}
                     />
                   </label>
-                  {!calculated && (
-                    <label>
-                      استان
-                      <select
-                        value={address.province}
-                        onChange={(e) => update("province", e.target.value)}
-                      >
-                        {provinces.map((p) => (
-                          <option key={p}>{p}</option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  {!calculated && (
-                    <label>
-                      شهر
-                      <input
-                        autoComplete="address-level2"
-                        required
-                        value={address.city}
-                        onChange={(e) => update("city", e.target.value)}
-                      />
-                    </label>
-                  )}
+
                   <label className="span-2">
                     نشانی کامل، پلاک و واحد
                     <textarea
@@ -502,84 +412,81 @@ export function Checkout() {
               بسته
             </span>
           </div>
-          {calculated && (
-            <section className="delivery-selection stack" aria-live="polite">
-              <h3>روش ارسال</h3>
-              {quoteBusy ? (
-                <p>در حال دریافت هزینه ارسال…</p>
-              ) : quote ? (
-                <>
-                  <strong>
-                    {providerName(quote.method)} · {quote.parcelCount} کارتن
-                    ارسال
-                  </strong>
-                  {quote.simulated && (
-                    <span className="badge">شبیه‌سازی‌شده</span>
-                  )}
-                  <p>
-                    {quote.method === "snapp"
-                      ? "درخواست پیک پس از آماده‌شدن سفارش ثبت می‌شود. موجود بودن پیک تضمین نشده است."
-                      : "مرسوله پس از بسته‌بندی به پست سپرده می‌شود."}
-                  </p>
-                  {quote.fallbackReason && <p>{quote.fallbackReason}</p>}
-                  {quote.requiresAcceptance && (
-                    <button
-                      type="button"
-                      className="button secondary"
-                      disabled={busy || quoteBusy}
-                      onClick={async () => {
-                        const sequence = quoteSequence.current;
-                        setQuoteBusy(true);
-                        setError("");
-                        try {
-                          const accepted = await api<Quote>(
-                            "/checkout/quote",
-                            "POST",
-                            {
-                              address,
-                              discountCode: appliedCode,
-                              method: "post",
-                              acceptFallback: true,
-                              acceptedQuoteId: quote.shippingQuoteId,
-                            },
-                          );
-                          if (sequence === quoteSequence.current)
-                            setQuote(accepted);
-                        } catch (e) {
-                          if (sequence === quoteSequence.current) {
-                            setError((e as Error).message);
-                            setQuote(null);
-                          }
-                        } finally {
-                          if (sequence === quoteSequence.current)
-                            setQuoteBusy(false);
+          <section className="delivery-selection stack" aria-live="polite">
+            <h3>روش ارسال</h3>
+            {quoteBusy ? (
+              <p>در حال دریافت هزینه ارسال…</p>
+            ) : quote ? (
+              <>
+                <strong>
+                  {providerName(quote.method)} · {quote.parcelCount} کارتن ارسال
+                </strong>
+                {quote.simulated && (
+                  <span className="badge">شبیه‌سازی‌شده</span>
+                )}
+                <p>
+                  {quote.method === "snapp"
+                    ? "درخواست پیک پس از آماده‌شدن سفارش ثبت می‌شود. موجود بودن پیک تضمین نشده است."
+                    : "مرسوله پس از بسته‌بندی به پست سپرده می‌شود."}
+                </p>
+                {quote.fallbackReason && <p>{quote.fallbackReason}</p>}
+                {quote.requiresAcceptance && (
+                  <button
+                    type="button"
+                    className="button secondary"
+                    disabled={busy || quoteBusy}
+                    onClick={async () => {
+                      const sequence = quoteSequence.current;
+                      setQuoteBusy(true);
+                      setError("");
+                      try {
+                        const accepted = await api<Quote>(
+                          "/checkout/quote",
+                          "POST",
+                          {
+                            address,
+                            discountCode: appliedCode,
+                            method: "post",
+                            acceptFallback: true,
+                            acceptedQuoteId: quote.shippingQuoteId,
+                          },
+                        );
+                        if (sequence === quoteSequence.current)
+                          setQuote(accepted);
+                      } catch (e) {
+                        if (sequence === quoteSequence.current) {
+                          setError((e as Error).message);
+                          setQuote(null);
                         }
-                      }}
-                    >
-                      ارسال با پست به مبلغ {money(quote.shippingRials)} تومان را
-                      می‌پذیرم
-                    </button>
-                  )}
-                  <small>
-                    اعتبار تا{" "}
-                    {quote.expiresAt
-                      ? new Date(quote.expiresAt).toLocaleTimeString("fa-IR")
-                      : "—"}
-                  </small>
-                </>
-              ) : (
-                <p>هزینه ارسال پس از تکمیل نشانی مشخص می‌شود.</p>
-              )}
-              <button
-                type="button"
-                className="button secondary"
-                disabled={quoteBusy}
-                onClick={() => setQuoteRetry((n) => n + 1)}
-              >
-                محاسبه دوباره ارسال
-              </button>
-            </section>
-          )}
+                      } finally {
+                        if (sequence === quoteSequence.current)
+                          setQuoteBusy(false);
+                      }
+                    }}
+                  >
+                    ارسال با پست به مبلغ {money(quote.shippingRials)} تومان را
+                    می‌پذیرم
+                  </button>
+                )}
+                <small>
+                  اعتبار تا{" "}
+                  {quote.expiresAt
+                    ? new Date(quote.expiresAt).toLocaleTimeString("fa-IR")
+                    : "—"}
+                </small>
+              </>
+            ) : (
+              <p>هزینه ارسال پس از تکمیل نشانی مشخص می‌شود.</p>
+            )}
+            <button
+              type="button"
+              className="button secondary"
+              disabled={quoteBusy}
+              onClick={() => setQuoteRetry((n) => n + 1)}
+            >
+              محاسبه دوباره ارسال
+            </button>
+          </section>
           {cart.items.map((it) => (
             <div
               className="summary-line checkout-product"

@@ -1,5 +1,4 @@
 {
-  "mode": "legacy",
   "localities": [
     {
       "id": "tehran-city",
@@ -45,13 +44,5 @@
       "heightMm": 0
     }
   },
-  "packagingGrams": 200,
-  "rules": [
-    {
-      "province": "تهران",
-      "maxGrams": 2200,
-      "feeRials": 650000
-    }
-  ],
   "postalBoxSizes": {}
 }

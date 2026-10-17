@@ -21,6 +21,8 @@ services:
       DATABASE_URL: postgres://bomish:${POSTGRES_PASSWORD:-bomish-local-only}@db:5432/bomish?sslmode=disable
       SEED_DEMO: "true"
       SHIPPING_CONFIG_FILE: /app/config/shipping.json
+      SHIPPING_BOX_WALL_MM: ${SHIPPING_BOX_WALL_MM:-6}
+      SHIPPING_BOX_INSET_MM: ${SHIPPING_BOX_INSET_MM:-10}
       SHIPPING_SIMULATED: ${SHIPPING_SIMULATED:-false}
       SNAPP_API_KEY: ${SNAPP_API_KEY:-}
       TAPIN_API_KEY: ${TAPIN_API_KEY:-}

@@ -37,7 +37,6 @@ type providerConfig struct {
 }
 type calculatedConfig struct {
 	Version        int64          `json:"version"`
-	Mode           string         `json:"mode"`
 	OriginRevision int64          `json:"originRevision"`
 	Origin         domain.Address `json:"origin"`
 	Boxes          []packing.Box  `json:"boxes"`
@@ -75,6 +74,9 @@ func readShippingConfig(ctx context.Context, q querier, lock bool) (calculatedCo
 	}
 	if c.Localities == nil {
 		c.Localities = []locality{}
+	}
+	if e == nil {
+		e = applyBoxDefaults(&c)
 	}
 	return c, e
 }
@@ -216,14 +218,6 @@ type readinessIssue struct {
 	Message string `json:"message"`
 }
 
-func (a *App) activationBlockers(ctx context.Context, q querier, c calculatedConfig) ([]string, error) {
-	issues, err := a.shippingReadiness(ctx, q, c)
-	blockers := []string{}
-	for _, issue := range issues {
-		blockers = append(blockers, issue.Message)
-	}
-	return blockers, err
-}
 func findLocality(c calculatedConfig, a domain.Address) (locality, bool) {
 	for _, l := range c.Localities {
 		if l.ID == a.CityID && l.ProvinceID == a.ProvinceID && l.City == a.City && l.Province == a.Province {
@@ -250,9 +244,7 @@ func (a *App) localities(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, out)
 }
 func validateConfig(c calculatedConfig) error {
-	if c.Mode != "legacy" && c.Mode != "calculated" {
-		return errors.New("روش محاسبه معتبر نیست")
-	}
+
 	if len(c.Boxes) > 100 || len(c.Localities) > 10000 {
 		return errors.New("تعداد تنظیمات بیش از حد است")
 	}

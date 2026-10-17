@@ -290,11 +290,15 @@
 }
 .story-signature {
   position: absolute;
-  left: -8px;
-  bottom: -30px;
-  font-size: 95px;
-  font-weight: 800;
-  opacity: 0.07;
+  left: -12px;
+  bottom: -24px;
+  width: 280px;
+  max-width: 80%;
+  height: auto;
+  object-fit: contain;
+  opacity: 0.14;
+  mix-blend-mode: multiply;
+  pointer-events: none;
 }
 .magazine-preview {
   min-width: 0;

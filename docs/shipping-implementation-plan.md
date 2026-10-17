@@ -1,3 +1,5 @@
+> Historical implementation plan: legacy-mode and tariff rollback sections below are superseded by migration 019. Shipping is now calculated-only; see `integrations.md` for current setup.
+
 # Bomish shipping implementation handoff
 
 Implement package measurements, calculated delivery pricing, and staff fulfillment controls in the existing Bomish application. This document replaces the earlier conversational plan and supplies the context needed by an agent with no conversation history. This is the historical implementation specification. The simulation workflow is now implemented; the current five-step package editor, sourced carton catalog and shipping setup are described in [the integration guide](integrations.md#simplified-staff-shipping-workflow). Where they differ, that guide supersedes the older wizard and setup instructions below.

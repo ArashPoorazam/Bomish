@@ -35,12 +35,7 @@ func (a *App) publicSettings(w http.ResponseWriter, r *http.Request) {
 	if !validSupportURL(support) {
 		support = ""
 	}
-	cfg, e := readShippingConfig(r.Context(), a.Pool, false)
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	write(w, 200, map[string]any{"shippingMode": cfg.Mode, "freeShippingRials": threshold, "supportUrl": support, "mapEnabled": os.Getenv("NESHAN_API_KEY") != ""})
+	write(w, 200, map[string]any{"freeShippingRials": threshold, "supportUrl": support, "mapEnabled": os.Getenv("NESHAN_API_KEY") != ""})
 }
 func (a *App) reverseAddress(w http.ResponseWriter, r *http.Request) {
 	if !requireCustomer(w, r) {
