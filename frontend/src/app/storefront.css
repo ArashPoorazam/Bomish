@@ -767,10 +767,10 @@
   color: #853e31;
 }
 .order-item-preview {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 4px;
   margin-block: 12px;
   font-size: 13px;
   overflow-wrap: anywhere;

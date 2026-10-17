@@ -1,11 +1,9 @@
 "use client";
 import Image from "next/image";
-import Link from "next/link";
-import { ArrowLeft, Pause, Play } from "lucide-react";
+import { Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { HomeSlide } from "@/lib/types";
 import { fa } from "@/lib/format";
-import { homeCollections } from "@/lib/home-collections";
 
 const fallback: HomeSlide = {
   image: "/images/spices.png",
@@ -62,7 +60,7 @@ export function HomeSlideshow({ slides }: { slides: HomeSlide[] }) {
     !reduced;
   useEffect(() => {
     if (!running) return;
-    const timer = window.setTimeout(() => advance(), 8000);
+    const timer = window.setTimeout(() => advance(), 4000);
     return () => clearTimeout(timer);
   }, [running, advance, frame.tick]);
   const picture = (index: number, outgoing = false) => {
@@ -87,9 +85,7 @@ export function HomeSlideshow({ slides }: { slides: HomeSlide[] }) {
     );
   };
   const current = pictures[frame.index];
-  const collection =
-    homeCollections[current.collection || "products"] ||
-    homeCollections.products;
+  const previous = frame.previous >= 0 ? pictures[frame.previous] : null;
   return (
     <div
       className="home-hero-feature"
@@ -199,23 +195,34 @@ export function HomeSlideshow({ slides }: { slides: HomeSlide[] }) {
           </div>
         )}
       </div>
-      <div
-        className="hero-slide-caption"
-        aria-live={running ? "off" : "polite"}
-        aria-atomic="true"
-      >
-        <div>
-          <h2>{current.title || collection.title}</h2>
-          <p>{current.caption || collection.caption}</p>
-        </div>
-        <Link
-          className="text-link"
-          href={collection.href}
-          onFocus={() => setPaused(true)}
+      {(current.title ||
+        current.caption ||
+        previous?.title ||
+        previous?.caption) && (
+        <div
+          className="hero-slide-caption"
+          aria-live={running ? "off" : "polite"}
+          aria-atomic="true"
         >
-          {collection.label} <ArrowLeft size={16} />
-        </Link>
-      </div>
+          {previous && (
+            <div
+              key={`${frame.tick}-caption-old`}
+              className="hero-caption-text is-outgoing"
+              aria-hidden="true"
+            >
+              {previous.title && <h2>{previous.title}</h2>}
+              {previous.caption && <p>{previous.caption}</p>}
+            </div>
+          )}
+          <div
+            key={`${frame.tick}-caption-new`}
+            className={`hero-caption-text${previous ? " is-incoming" : ""}`}
+          >
+            {current.title && <h2>{current.title}</h2>}
+            {current.caption && <p>{current.caption}</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

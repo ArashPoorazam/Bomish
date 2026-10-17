@@ -6,7 +6,12 @@ export default function Login() {
   const router = useRouter();
   return (
     <AuthLayout>
-      <LoginForm onSuccess={() => router.push("/account")} />
+      <LoginForm
+        onSuccess={() => {
+          const next = new URLSearchParams(window.location.search).get("next");
+          router.replace(next === "/checkout" ? "/checkout" : "/account");
+        }}
+      />
     </AuthLayout>
   );
 }

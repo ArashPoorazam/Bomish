@@ -85,7 +85,10 @@ test("SMS login, shipping quote, payment and order history", async ({
   await page.getByLabel("تعداد بسته", { exact: true }).fill("2");
   await page.getByRole("button", { name: "افزودن به سبد" }).click();
   await page.getByRole("link", { name: "ادامه خرید" }).click();
+  await expect(page).toHaveURL(/\/login\?next=\/checkout$/);
+  await expect(page.locator(".auth-customer")).toBeVisible();
   await loginCustomer(page);
+  await expect(page).toHaveURL(/\/checkout$/);
   await page.getByLabel("نام گیرنده", { exact: true }).fill("خریدار آزمایشی");
   await page.getByLabel("شماره همراه گیرنده").fill("۰۹۱۲۱۲۳۴۵۶۷");
   await page.getByLabel("شهر", { exact: true }).fill("تهران");

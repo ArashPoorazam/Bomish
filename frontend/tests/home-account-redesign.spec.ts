@@ -51,9 +51,6 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
       .getByLabel("توضیح تصویر ۲", { exact: true })
       .fill("تصویر دوم آزمایشی");
     await page
-      .getByRole("combobox", { name: "مجموعه تصویر ۲", exact: true })
-      .selectOption("herbs");
-    await page
       .getByLabel("عنوان تصویر ۲", { exact: true })
       .fill("عطر سبزی در آشپزخانه");
     await page
@@ -74,7 +71,7 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
     );
     await expect(
       page.getByRole("combobox", { name: "مجموعه تصویر ۱", exact: true }),
-    ).toHaveValue("herbs");
+    ).toHaveCount(0);
     await expect(page.getByLabel("عنوان تصویر ۱", { exact: true })).toHaveValue(
       "عطر سبزی در آشپزخانه",
     );
@@ -102,10 +99,7 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
     await expect(page.locator(".hero-slide-caption h2")).toHaveText(
       "عطر سبزی در آشپزخانه",
     );
-    await expect(page.locator(".hero-slide-caption a")).toHaveAttribute(
-      "href",
-      "/products?category=herbs",
-    );
+    await expect(page.locator(".hero-slide-caption a")).toHaveCount(0);
     await expect(region.getByRole("img")).toHaveAttribute(
       "alt",
       "تصویر دوم آزمایشی",
@@ -114,7 +108,7 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
       "aria-live",
       "off",
     );
-    await page.clock.runFor(8100);
+    await page.clock.runFor(4100);
     await expect(dots.nth(1)).toHaveAttribute("aria-pressed", "true");
     const keyframes = await region
       .locator(".is-incoming")
@@ -124,7 +118,7 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
           .map((k) => k.transform),
       );
     expect(keyframes).toEqual(["translateX(-100%)", "translateX(0px)"]);
-    await page.clock.runFor(8100);
+    await page.clock.runFor(4100);
     await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
     await region.hover();
     await page.clock.runFor(10000);
@@ -150,7 +144,7 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
       });
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    await page.clock.runFor(8100);
+    await page.clock.runFor(4100);
     await expect(dots.nth(1)).toHaveAttribute("aria-pressed", "true");
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.clock.runFor(15000);

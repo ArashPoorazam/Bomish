@@ -31,6 +31,13 @@ export default async function Home() {
     serverApi<Article[]>("/articles"),
     serverApi<HomeSlide[]>("/home/slides").catch(() => []),
   ]);
+  const favorites = [...selected];
+  for (const product of offers.slice(0, 4)) {
+    if (favorites.length >= 4) break;
+    if (!favorites.some((favorite) => favorite.id === product.id)) {
+      favorites.push(product);
+    }
+  }
   return (
     <HomeMotion>
       <section className="hero container">
@@ -106,7 +113,7 @@ export default async function Home() {
         <ProductRail
           title="محبوب‌های بومیش"
           eyebrow="انتخاب مشتریان در ۳۰ روز گذشته"
-          products={selected}
+          products={favorites}
           href="/products?collection=bestsellers"
         />
       </div>

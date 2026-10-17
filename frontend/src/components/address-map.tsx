@@ -87,6 +87,8 @@ export function AddressMap({
       before.street,
       before.city,
       before.province,
+      before.provinceId,
+      before.cityId,
     ]);
     change.current({
       ...before,
@@ -111,11 +113,17 @@ export function AddressMap({
                 latest.current.street,
                 latest.current.city,
                 latest.current.province,
+                latest.current.provinceId,
+                latest.current.cityId,
               ])
           )
             change.current({
               ...latest.current,
               street: v.street,
+              province: v.province,
+              city: v.city,
+              provinceId: "",
+              cityId: "",
               latitude: point[0],
               longitude: point[1],
               pinConfirmed: false,
@@ -185,8 +193,8 @@ export function AddressMap({
         </button>
       </div>
       <p className="muted">
-        روی محل خانه بزنید؛ نشانی با نشان تکمیل می‌شود. پلاک و واحد را بررسی و
-        اضافه کنید.
+        روی محل خانه بزنید؛ استان، شهر و نشانی با نشان تکمیل می‌شوند. پلاک و
+        واحد را بررسی و اضافه کنید.
       </p>
       <div
         ref={node}

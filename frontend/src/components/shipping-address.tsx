@@ -2,6 +2,13 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Address, Locality } from "@/lib/types";
+const localityName = (value: string) =>
+  value
+    .trim()
+    .replace(/ي/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/[\s\u200c]+/g, "");
+
 export function ShippingLocalities({
   address,
   onChange,
@@ -34,6 +41,25 @@ export function ShippingLocalities({
       active = false;
     };
   }, [provided, retry]);
+  useEffect(() => {
+    // Map lookups provide names; shipping needs the matching verified IDs.
+    if (address.cityId || !address.province || !address.city) return;
+    const matches = items.filter(
+      (item) =>
+        localityName(item.province) === localityName(address.province) &&
+        localityName(item.city) === localityName(address.city),
+    );
+    if (matches.length !== 1) return;
+    const match = matches[0];
+    onChange({
+      ...address,
+      province: match.province,
+      provinceId: match.provinceId,
+      city: match.city,
+      cityId: match.id,
+      pinConfirmed: false,
+    });
+  }, [items, address, onChange]);
   const provinces = [
     ...new Map(items.map((l) => [l.provinceId, l.province])).entries(),
   ];

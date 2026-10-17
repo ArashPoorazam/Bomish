@@ -46,16 +46,14 @@ export function OrderSummary({ order: o }: { order: Order }) {
           {statuses[o.status] || o.status}
         </span>
       </div>
-      <p className="order-item-preview">
-        {o.items
-          .slice(0, 2)
-          .map(
-            (i) =>
-              `${i.name} · ${i.packageLabel || weight(i.grams)} × ${fa(i.quantity)}`,
-          )
-          .join("، ")}
-        {o.items.length > 2 ? ` و ${fa(o.items.length - 2)} محصول دیگر` : ""}
-      </p>
+      <ul className="order-item-preview">
+        {o.items.map((item, index) => (
+          <li key={index}>
+            {item.name} · {item.packageLabel || weight(item.grams)} ×{" "}
+            {fa(item.quantity)}
+          </li>
+        ))}
+      </ul>
       <div className="order-summary-bottom">
         <strong>
           {money(o.totalRials)} <small>تومان</small>

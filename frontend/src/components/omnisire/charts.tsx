@@ -79,7 +79,14 @@ export function LineChart({
       if (value !== null) max = Math.max(max, value);
     return max;
   }, 1);
-  const max = monetary ? rawMax : Math.max(4, Math.ceil(rawMax / 4) * 4);
+  // Choose round intervals in the displayed unit (tomans for money).
+  const unit = monetary ? 10 : 1;
+  const targetStep = Math.max(1, rawMax / unit / 4);
+  const magnitude = 10 ** Math.floor(Math.log10(targetStep));
+  const step =
+    [1, 2, 5, 10].find((factor) => factor * magnitude >= targetStep)! *
+    magnitude;
+  const max = step * 4 * unit;
   const W = width,
     H = width < 500 ? 240 : 310,
     left = monetary ? 85 : 45,
@@ -152,7 +159,7 @@ export function LineChart({
                 >
                   {new Intl.NumberFormat("fa-IR", {
                     notation: "compact",
-                    maximumFractionDigits: 1,
+                    maximumFractionDigits: 3,
                   }).format((max * t) / (monetary ? 10 : 1))}
                 </text>
               </g>

@@ -233,7 +233,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 <strong>{money(cart.subtotalRials)} تومان</strong>
               </div>
               <p className="muted">هزینه ارسال در مرحله بعد محاسبه می‌شود.</p>
-              <Link href="/checkout" onClick={close} className="button full">
+              <Link
+                href={
+                  user?.authenticated ? "/checkout" : "/login?next=/checkout"
+                }
+                onClick={close}
+                className="button full"
+              >
                 ادامه خرید <ArrowLeft size={18} />
               </Link>
             </div>

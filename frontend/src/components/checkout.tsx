@@ -1,4 +1,5 @@
 "use client";
+import { CheckoutSteps } from "./checkout-steps";
 import { ShippingLocalities, PinConfirmation } from "./shipping-address";
 import { providerName } from "@/lib/shipping";
 import { AddressMap } from "./address-map";
@@ -9,7 +10,6 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import type { Address, Quote } from "@/lib/types";
 import { useStore } from "./store-provider";
-import { LoginForm } from "./login-form";
 import { money, digits } from "@/lib/format";
 import { CheckCircle2, ArrowLeft, TicketPercent } from "lucide-react";
 const blank: Address = {
@@ -57,6 +57,11 @@ const provinces = [
 export function Checkout() {
   const router = useRouter();
   const { cart, user, refresh } = useStore();
+  useEffect(() => {
+    if (user && !user.authenticated) {
+      router.replace("/login?next=/checkout");
+    }
+  }, [user, router]);
   const [address, setAddress] = useState<Address>(blank),
     [saved, setSaved] = useState<Address[]>([]),
     [save, setSave] = useState(true),
@@ -276,8 +281,8 @@ export function Checkout() {
   if (!user) return <div className="loading">در حال آماده‌سازی خرید…</div>;
   if (!user.authenticated)
     return (
-      <div className="auth-layout">
-        <LoginForm compact onSuccess={() => {}} />
+      <div className="loading" role="status">
+        در حال انتقال به صفحه ورود…
       </div>
     );
   if (outcome)
@@ -314,16 +319,13 @@ export function Checkout() {
       </div>
     );
   return (
-    <div className="container section">
-      <div className="page-heading">
+    <div className="container section checkout-page">
+      <div className="page-heading checkout-heading">
         <span className="eyebrow">چند قدم تا یک طعم تازه</span>
         <h1>تکمیل خرید</h1>
+        <p>نشانی را وارد کنید، هزینه نهایی را ببینید و سفارش را تأیید کنید.</p>
       </div>
-      <div className="checkout-steps">
-        <span>۱. ورود به حساب ✓</span>
-        <strong>۲. نشانی و ارسال</strong>
-        <span>۳. پرداخت</span>
-      </div>
+      <CheckoutSteps payment={!!orderId} />
       <div className="checkout-layout">
         <div className="form-card">
           {orderId ? (
@@ -355,7 +357,10 @@ export function Checkout() {
                 disabled={busy}
                 inert={busy}
               >
-                <h2>سفارش را کجا بفرستیم؟</h2>
+                <div className="checkout-form-heading">
+                  <h2>سفارش را کجا بفرستیم؟</h2>
+                  <p>اطلاعات گیرنده و نشانی دقیق تحویل را وارد کنید.</p>
+                </div>
                 {saved.length > 0 ? (
                   <label>
                     نشانی‌های ذخیره‌شده
@@ -377,14 +382,22 @@ export function Checkout() {
                     </select>
                   </label>
                 ) : null}
-                <AddressMap
-                  key={address.id || "new"}
-                  address={address}
-                  onChange={(v) => {
-                    setAddress(v);
-                    setQuote(null);
-                  }}
-                />
+                <div className="checkout-map">
+                  <p className="checkout-map-heading">
+                    انتخاب موقعیت روی نقشه{" "}
+                    <small>
+                      {calculated ? "برای بررسی روش ارسال" : "اختیاری"}
+                    </small>
+                  </p>
+                  <AddressMap
+                    key={address.id || "new"}
+                    address={address}
+                    onChange={(v) => {
+                      setAddress(v);
+                      setQuote(null);
+                    }}
+                  />
+                </div>
                 {calculated && (
                   <>
                     <ShippingLocalities
@@ -482,7 +495,13 @@ export function Checkout() {
           ) : null}
         </div>
         <aside className="form-card checkout-summary">
-          <h2>خلاصه سفارش</h2>
+          <div className="checkout-summary-heading">
+            <h2>خلاصه سفارش</h2>
+            <span>
+              {fa(cart.items.reduce((total, item) => total + item.quantity, 0))}{" "}
+              بسته
+            </span>
+          </div>
           {calculated && (
             <section className="delivery-selection stack" aria-live="polite">
               <h3>روش ارسال</h3>
@@ -562,7 +581,10 @@ export function Checkout() {
             </section>
           )}
           {cart.items.map((it) => (
-            <div className="summary-line" key={it.product.id + it.package.id}>
+            <div
+              className="summary-line checkout-product"
+              key={it.product.id + it.package.id}
+            >
               <strong>
                 {it.product.name}
                 <small>
@@ -657,14 +679,14 @@ export function Checkout() {
           )}
           {quote ? (
             <>
-              <div className="summary-line">
+              <div className="summary-line checkout-total" aria-live="polite">
                 <strong>مبلغ قابل پرداخت</strong>
                 <strong>{money(quote.totalRials)} تومان</strong>
               </div>
               {!orderId ? (
                 <button
                   className="button full"
-                  style={{ marginTop: 24 }}
+                  style={{ marginTop: 16 }}
                   disabled={busy || quoteBusy || !!quote.requiresAcceptance}
                   onClick={createOrder}
                 >
@@ -673,7 +695,13 @@ export function Checkout() {
               ) : null}
             </>
           ) : null}
-          <p className="muted" style={{ marginTop: 20 }}>
+          {!quote && !orderId && (
+            <p className="checkout-next-hint">
+              پس از تکمیل نشانی و محاسبه ارسال، مبلغ نهایی و دکمه پرداخت نمایش
+              داده می‌شود.
+            </p>
+          )}
+          <p className="muted checkout-price-note">
             قیمت‌ها برای بسته‌ها و تعداد انتخابی شما محاسبه شده است.
           </p>
         </aside>

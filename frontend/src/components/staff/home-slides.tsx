@@ -11,7 +11,6 @@ import {
 import { api } from "@/lib/api";
 import { fa } from "@/lib/format";
 import type { HomeSlide } from "@/lib/types";
-import { homeCollections } from "@/lib/home-collections";
 import { useLiveQuery } from "@/hooks/use-live-query";
 import type { HomeEditorState } from "./home-management";
 
@@ -190,40 +189,11 @@ export function HomeSlidesEditor({
                     />
                   </label>
                   <label>
-                    مجموعه تصویر {fa(i + 1)}
-                    <select
-                      value={slide.collection || "products"}
-                      onChange={(e) =>
-                        update(
-                          slides.map((s, index) =>
-                            index === i
-                              ? {
-                                  ...s,
-                                  collection: e.target
-                                    .value as HomeSlide["collection"],
-                                }
-                              : s,
-                          ),
-                        )
-                      }
-                    >
-                      {Object.entries(homeCollections).map(
-                        ([key, collection]) => (
-                          <option key={key} value={key}>
-                            {collection.label}
-                          </option>
-                        ),
-                      )}
-                    </select>
-                  </label>
-                  <label>
                     عنوان تصویر {fa(i + 1)}
                     <input
                       value={slide.title || ""}
                       maxLength={80}
-                      placeholder={
-                        homeCollections[slide.collection || "products"].title
-                      }
+                      placeholder="عنوان دلخواه برای نمایش در صفحه اصلی"
                       onChange={(e) =>
                         update(
                           slides.map((s, index) =>
@@ -239,9 +209,7 @@ export function HomeSlidesEditor({
                       value={slide.caption || ""}
                       maxLength={160}
                       rows={2}
-                      placeholder={
-                        homeCollections[slide.collection || "products"].caption
-                      }
+                      placeholder="توضیح دلخواه برای نمایش در صفحه اصلی"
                       onChange={(e) =>
                         update(
                           slides.map((s, index) =>
@@ -252,7 +220,7 @@ export function HomeSlidesEditor({
                     />
                   </label>
                   <small>
-                    عنوان و متن کوتاه اختیاری‌اند؛ در صورت خالی بودن، متن مجموعه
+                    عنوان و متن کوتاه اختیاری‌اند؛ فقط متن واردشده در صفحه اصلی
                     نمایش داده می‌شود.
                   </small>
                 </div>
