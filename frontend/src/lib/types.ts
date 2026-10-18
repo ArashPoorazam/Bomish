@@ -27,3 +27,5 @@ export type ProviderHealth = components["schemas"]["ProviderHealth"];
 export type Parcel = components["schemas"]["Parcel"];
 export type DeliveryRecord = components["schemas"]["DeliveryRecord"];
 export type ShippingSnapshot = components["schemas"]["ShippingSnapshot"];
+
+export type StaffCourier = components["schemas"]["StaffCourier"];

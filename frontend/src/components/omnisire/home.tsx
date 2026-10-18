@@ -1,4 +1,5 @@
 "use client";
+import { useStaffPermission } from "../staff/permissions";
 import Link from "next/link";
 import {
   Users,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import { Workspace, Stats, Feedback, useLoad } from "./shared";
 export function OmnisireHome() {
+  const can = useStaffPermission();
   const { data, error, loading } = useLoad<{
     revenue: number;
     orders: number;
@@ -72,16 +74,18 @@ export function OmnisireHome() {
             text: "تاریخچه تغییرات و فعالیت‌ها.",
             Icon: History,
           },
-        ].map(({ href, label, text, Icon }) => (
-          <Link className="omni-launch" key={href} href={"/omnisire/" + href}>
-            <Icon size={26} />
-            <h2>{label}</h2>
-            <p>{text}</p>
-            <span>
-              ورود به بخش <ArrowUpLeft size={18} />
-            </span>
-          </Link>
-        ))}
+        ]
+          .filter(({ href }) => can(href))
+          .map(({ href, label, text, Icon }) => (
+            <Link className="omni-launch" key={href} href={"/omnisire/" + href}>
+              <Icon size={26} />
+              <h2>{label}</h2>
+              <p>{text}</p>
+              <span>
+                ورود به بخش <ArrowUpLeft size={18} />
+              </span>
+            </Link>
+          ))}
       </div>
     </Workspace>
   );

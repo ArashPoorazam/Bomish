@@ -217,7 +217,7 @@ test("staff navigation, category editing page, and member cancellation", async (
   await expect(page).toHaveURL(/section=categories/);
   expect(saved).toEqual([{ name: "ادویه تازه", description: "توضیح" }]);
   await page.goto("/omnisire/members");
-  await page.getByRole("button", { name: "همکار جدید", exact: true }).click();
+  await page.getByRole("link", { name: "همکار جدید", exact: true }).click();
   await expect(
     page.getByLabel("شماره کارت بانکی", { exact: true }),
   ).toHaveAttribute("placeholder", "1111 - 2222 - 3333 - 4444");

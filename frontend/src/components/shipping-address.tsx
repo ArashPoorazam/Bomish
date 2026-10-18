@@ -13,10 +13,12 @@ export function ShippingLocalities({
   address,
   onChange,
   localities: provided,
+  showMapHint = true,
 }: {
   address: Address;
   onChange: (a: Address) => void;
   localities?: Locality[];
+  showMapHint?: boolean;
 }) {
   const listId = useId();
   const [items, setItems] = useState<Locality[]>(provided ?? []),
@@ -125,10 +127,12 @@ export function ShippingLocalities({
           </datalist>
         </label>
       </div>
-      <p className="muted">
-        با انتخاب موقعیت روی نقشه، استان و شهر تکمیل می‌شوند؛ در صورت نیاز آن‌ها
-        را اصلاح کنید.
-      </p>
+      {showMapHint && (
+        <p className="muted">
+          با انتخاب موقعیت روی نقشه، استان و شهر تکمیل می‌شوند؛ در صورت نیاز
+          آن‌ها را اصلاح کنید.
+        </p>
+      )}
       {error && (
         <p role="alert" className="error">
           {error}

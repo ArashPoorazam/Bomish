@@ -1,4 +1,5 @@
 "use client";
+import { useStaffPermission } from "@/components/staff/permissions";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
@@ -30,6 +31,7 @@ export function Chat({
   onBusyChange?: (busy: boolean) => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const can = useStaffPermission();
   const [localDraft, setLocalDraft] = useState<ChatDraft>(emptyDraft);
   const currentDraft = draft || localDraft;
   const { body, image } = currentDraft;
@@ -291,14 +293,16 @@ export function Chat({
           {sendError}
         </p>
       )}
-      <MessageComposer
-        body={body}
-        busy={busy}
-        onSend={send}
-        image={image}
-        onImageChange={(image) => updateDraft({ body, image, key: "" })}
-        onChange={(body) => updateDraft({ body, image, key: "" })}
-      />
+      {(!staff || can("support.edit")) && (
+        <MessageComposer
+          body={body}
+          busy={busy}
+          onSend={send}
+          image={image}
+          onImageChange={(image) => updateDraft({ body, image, key: "" })}
+          onChange={(body) => updateDraft({ body, image, key: "" })}
+        />
+      )}
     </div>
   );
 }

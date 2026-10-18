@@ -116,7 +116,8 @@ export function OrderManager({
               onChange={(e) => setProvider(e.target.value)}
             >
               <option value="">همه روش‌ها</option>
-              <option value="snapp">پیک اسنپ</option>
+              <option value="snapp">ارسال تهران / اسنپ</option>
+              <option value="own_courier">پیک بومیش</option>
               <option value="post">پست محاسبه‌شده</option>
               <option value="legacy_postal">پست قبلی</option>
             </select>

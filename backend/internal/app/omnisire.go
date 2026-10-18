@@ -33,8 +33,32 @@ func (a *App) omnisireRoutes(m *http.ServeMux) {
 		"POST /api/v1/omnisire/exports/{id}/retry":                    a.retryExport,
 	}
 	for route, h := range routes {
-		m.HandleFunc(route, a.permit(h, "omnisire"))
+		section, action := "overview", "view"
+		switch {
+		case strings.Contains(route, "/members"):
+			section = "members"
+			if strings.HasPrefix(route, "POST ") {
+				action = "edit"
+				if route == "POST /api/v1/omnisire/members" {
+					action = "create"
+				}
+			}
+			if strings.HasPrefix(route, "PATCH ") {
+				action = "edit"
+			}
+			if strings.HasPrefix(route, "DELETE ") {
+				action = "delete"
+			}
+		case strings.Contains(route, "/events"):
+			section = "events"
+		case strings.Contains(route, "/analytics"):
+			section = "analytics"
+		case strings.Contains(route, "/exports"):
+			section, action = "analytics", "export"
+		}
+		m.HandleFunc(route, a.permit(h, section, action))
 	}
+	m.HandleFunc("GET /api/v1/omnisire/permission-options", a.permit(a.permissionOptions, "members"))
 	m.HandleFunc("GET /api/v1/staff/sales", a.permit(a.personalSales, "sales"))
 	m.HandleFunc("POST /api/v1/referral", a.captureReferral)
 	m.HandleFunc("GET /api/v1/staff/product-options", a.productOptions)

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { MapPin } from "lucide-react";
 import type { Map as LeafletMap, CircleMarker } from "leaflet";
 import type { Address } from "@/lib/types";
 import { api } from "@/lib/api";
@@ -8,9 +9,11 @@ export function AddressMap({
   onChange,
   reverse = true,
   autoConfirm = false,
+  showInstructions = true,
 }: {
   reverse?: boolean;
   autoConfirm?: boolean;
+  showInstructions?: boolean;
   address: Address;
   onChange: (value: Address) => void;
 }) {
@@ -185,19 +188,22 @@ export function AddressMap({
       <div className="between">
         <h3>نشانی را روی نقشه پیدا کنید</h3>
         <button
-          className="button secondary"
+          className="button secondary address-map-location"
           type="button"
           onClick={() =>
             map.current?.locate({ setView: false, enableHighAccuracy: true })
           }
         >
           موقعیت من
+          <MapPin size={18} aria-hidden="true" />
         </button>
       </div>
-      <p className="muted">
-        روی محل خانه بزنید؛ استان، شهر و نشانی با نشان تکمیل می‌شوند. پلاک و
-        واحد را بررسی و اضافه کنید.
-      </p>
+      {showInstructions && (
+        <p className="muted">
+          روی محل خانه بزنید؛ استان، شهر و نشانی با نشان تکمیل می‌شوند. پلاک و
+          واحد را بررسی و اضافه کنید.
+        </p>
+      )}
       <div
         ref={node}
         className="map-canvas"

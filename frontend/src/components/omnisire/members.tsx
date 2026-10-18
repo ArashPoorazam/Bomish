@@ -1,11 +1,16 @@
 "use client";
-import { sectionLabels } from "./workspace-navigation";
+import {
+  Permission,
+  PermissionFields,
+  useStaffPermission,
+} from "../staff/permissions";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, ArrowUpLeft, ShieldCheck } from "lucide-react";
+import { Plus, ArrowUpLeft, ShieldCheck, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
 import { digits, money } from "@/lib/format";
+import type { components } from "@/lib/api-types";
 import type { Member } from "@/lib/types";
 import {
   Workspace,
@@ -26,30 +31,37 @@ const empty = {
   role: "salesperson",
   active: true,
   restrictions: [] as string[],
+  permissionOverrides: {} as Record<string, boolean>,
   password: "",
 };
-const defaults: Record<string, string[]> = {
-  manager: [
-    "products",
-    "articles",
-    "categories",
-    "pricing",
-    "orders",
-    "requests",
-    "shipping",
-    "sales",
-  ],
-  editor: ["products", "articles", "categories", "pricing", "sales"],
-  operator: ["orders", "requests", "sales"],
-  salesperson: ["sales"],
+type PermissionOptions = components["schemas"]["StaffPermissionOptions"];
+const actionLabels: Record<string, string> = {
+  create: "ایجاد",
+  edit: "ویرایش / انجام عملیات",
+  delete: "حذف / بایگانی",
+  manage: "تغییر روش ارسال / رفع وضعیت نامشخص",
+  export: "دریافت خروجی",
 };
+function memberOverrides(member?: Member): Record<string, boolean> {
+  const overrides: Record<string, boolean> = {};
+  for (const key of member?.restrictions || []) {
+    const sections =
+      key === "requests"
+        ? ["support", "custom"]
+        : key === "products"
+          ? ["products", "home"]
+          : [key];
+    for (const section of sections) overrides[section] = false;
+  }
+  return { ...overrides, ...member?.permissionOverrides };
+}
 export const formatCard = (s: string) =>
   digits(s)
     .replace(/\D/g, "")
     .slice(0, 16)
     .match(/.{1,4}/g)
     ?.join(" - ") || "";
-function MemberForm({
+export function MemberForm({
   initial,
   onSave,
   creating = false,
@@ -62,9 +74,20 @@ function MemberForm({
 }) {
   const [v, setV] = useState(
     initial
-      ? { ...empty, ...initial, bankCard: initial.bankCard || "" }
+      ? {
+          ...empty,
+          ...initial,
+          bankCard: initial.bankCard || "",
+          permissionOverrides: memberOverrides(initial),
+        }
       : empty,
   );
+  const { data: options, error: optionsError } = useLoad<PermissionOptions>(
+    "/omnisire/permission-options",
+  );
+  const inherited = options?.defaults[v.role] || [];
+  const enabled = (key: string) =>
+    v.permissionOverrides[key] ?? inherited.includes(key);
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const field = (k: string, value: unknown) =>
@@ -84,7 +107,8 @@ function MemberForm({
             bankCard: digits(v.bankCard).replace(/\D/g, ""),
             role: v.role,
             active: v.active,
-            restrictions: v.restrictions,
+            restrictions: [],
+            permissionOverrides: v.permissionOverrides,
             password: creating ? v.password : "",
           };
           const res = await api<{ id?: string; totpSecret?: string }>(
@@ -148,7 +172,6 @@ function MemberForm({
             value={v.role}
             onChange={(e) => {
               field("role", e.target.value);
-              field("restrictions", []);
             }}
           >
             {Object.entries(roleLabels)
@@ -174,29 +197,66 @@ function MemberForm({
           </label>
         )}
       </div>
+      {v.role === "courier" && (
+        <p className="notice">
+          همکار فعال با نقش «پیک» در فهرست ارسال سفارش‌های تهران نمایش داده
+          می‌شود. این نقش به‌صورت پیش‌فرض دسترسی مدیریت سفارش‌ها ندارد.
+        </p>
+      )}
       <fieldset className="omni-access">
         <legend>
           <ShieldCheck size={18} />
           دسترسی‌های فعال این همکار
         </legend>
-        <p>خاموش کردن یک بخش، دسترسی به همان بخش را محدود می‌کند.</p>
-        <div>
-          {(defaults[v.role] || []).map((p) => (
-            <label className="check-label" key={p}>
-              <input
-                type="checkbox"
-                checked={!v.restrictions.includes(p)}
-                onChange={() =>
-                  field(
-                    "restrictions",
-                    v.restrictions.includes(p)
-                      ? v.restrictions.filter((x) => x !== p)
-                      : [...v.restrictions, p],
-                  )
-                }
-              />
-              {p === "requests" ? "درخواست‌ها" : sectionLabels[p]}
-            </label>
+        <div className="permission-heading">
+          <p>
+            نقش، دسترسی‌های پیش‌فرض را تعیین می‌کند. تغییرات اختصاصی با تغییر
+            نقش حفظ می‌شوند.
+          </p>
+          <button
+            type="button"
+            className="button secondary permission-reset"
+            title="بازنشانی به دسترسی‌های پیش‌فرض نقش"
+            disabled={busy || !options}
+            onClick={() => field("permissionOverrides", {})}
+          >
+            <RotateCcw size={18} aria-hidden="true" />
+            بازنشانی
+          </button>
+        </div>
+        <Feedback error={optionsError} loading={!options && !optionsError} />
+        <div className="permission-sections">
+          {options?.sections.map((section) => (
+            <div className="permission-section" key={section.key}>
+              <strong>{section.label}</strong>
+              <div className="permission-options">
+                {["view", ...section.actions].map((action) => {
+                  const key =
+                    action === "view"
+                      ? section.key
+                      : `${section.key}.${action}`;
+                  return (
+                    <label className="check-label" key={key}>
+                      <input
+                        type="checkbox"
+                        checked={enabled(section.key) && enabled(key)}
+                        disabled={
+                          busy || (action !== "view" && !enabled(section.key))
+                        }
+                        onChange={(e) =>
+                          field("permissionOverrides", {
+                            ...v.permissionOverrides,
+                            [key]: e.target.checked,
+                          })
+                        }
+                      />
+                      {action === "view" ? "مشاهده بخش" : actionLabels[action]}
+                      {key in v.permissionOverrides && <small>اختصاصی</small>}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           ))}
         </div>
       </fieldset>
@@ -210,7 +270,7 @@ function MemberForm({
       </label>
       <Feedback error={error} />
       <div className="inline-actions">
-        <button className="button" disabled={busy}>
+        <button className="button" disabled={busy || !options}>
           {busy
             ? "در حال ذخیره…"
             : creating
@@ -237,11 +297,7 @@ export function MembersPage() {
     [status, setStatus] = useState(""),
     [sort, setSort] = useState("balance"),
     [unpaid, setUnpaid] = useState(false),
-    [page, setPage] = useState(1),
-    [creating, setCreating] = useState(false),
-    [revision, setRevision] = useState(0),
-    [secret, setSecret] = useState(""),
-    [created, setCreated] = useState("");
+    [page, setPage] = useState(1);
   const params = new URLSearchParams({
     q,
     role,
@@ -252,54 +308,20 @@ export function MembersPage() {
   });
   const { data, error, loading } = useLoad<PageData>(
     "/omnisire/members?" + params,
-    revision,
   );
   return (
     <Workspace
       owner
       title="همکاران"
       actions={
-        <button
-          className="button"
-          onClick={() => {
-            setCreating(!creating);
-            setSecret("");
-          }}
-        >
-          <Plus size={18} />
-          همکار جدید
-        </button>
+        <Permission name="members.create">
+          <Link className="button" href="/omnisire/members/new">
+            <Plus size={18} aria-hidden="true" />
+            همکار جدید
+          </Link>
+        </Permission>
       }
     >
-      {creating && (
-        <Panel title="همکار جدید">
-          {secret ? (
-            <div className="notice">
-              <h3>حساب آماده است</h3>
-              <p>
-                کلید رمزساز فقط همین‌بار نمایش داده می‌شود. آن را به همکار تحویل
-                دهید.
-              </p>
-              <code className="omni-secret" dir="ltr">
-                {secret}
-              </code>
-              <Link className="button" href={`/omnisire/members/${created}`}>
-                مشاهده پرونده همکار
-              </Link>
-            </div>
-          ) : (
-            <MemberForm
-              onCancel={() => setCreating(false)}
-              creating
-              onSave={(id, key) => {
-                setCreated(id || "");
-                setSecret(key || "");
-                setRevision((x) => x + 1);
-              }}
-            />
-          )}
-        </Panel>
-      )}
       <Panel title="اعضای تیم">
         <div className="omni-filters">
           <label>
@@ -457,6 +479,7 @@ export function MembersPage() {
   );
 }
 export function MemberPage({ id }: { id: string }) {
+  const can = useStaffPermission();
   const [revision, setRevision] = useState(0);
   const {
     data: m,
@@ -517,15 +540,17 @@ export function MemberPage({ id }: { id: string }) {
               ["sales", "فروش و حساب"],
               ["activity", "فعالیت‌ها"],
               ["profile", "اطلاعات و دسترسی"],
-            ].map(([v, l]) => (
-              <button
-                key={v}
-                className={tab === v ? "selected" : ""}
-                onClick={() => setTab(v)}
-              >
-                {l}
-              </button>
-            ))}
+            ]
+              .filter(([v]) => v !== "activity" || can("events"))
+              .map(([v, l]) => (
+                <button
+                  key={v}
+                  className={tab === v ? "selected" : ""}
+                  onClick={() => setTab(v)}
+                >
+                  {l}
+                </button>
+              ))}
           </nav>
           {tab === "sales" && (
             <SalesContent memberId={id} bankCard={m.bankCard || ""} />
@@ -540,106 +565,112 @@ export function MemberPage({ id }: { id: string }) {
               ) : (
                 <>
                   <Panel title="مشخصات و دسترسی">
-                    <MemberForm
-                      key={revision}
-                      initial={m}
-                      onSave={() => {
-                        setRevision((x) => x + 1);
-                        setMessage(
-                          "تغییرات ذخیره شد. نشست‌های قبلی این همکار بسته شدند.",
-                        );
-                      }}
-                    />
-                  </Panel>
-                  <Panel title="بازیابی اطلاعات ورود">
-                    <form
-                      className="stack"
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        setBusy(true);
-                        setFailure("");
-                        try {
-                          const res = await api<{ totpSecret: string }>(
-                            `/omnisire/members/${id}/credentials`,
-                            "POST",
-                            { password, resetTotp },
-                          );
-                          setSecret(res.totpSecret);
-                          setPassword("");
-                          setResetTotp(false);
-                          setMessage(
-                            "اطلاعات ورود تغییر کرد و نشست‌های قبلی بسته شدند.",
-                          );
-                        } catch (e) {
-                          setFailure((e as Error).message);
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
-                    >
-                      <label>
-                        گذرواژه جدید (اختیاری)
-                        <input
-                          type="password"
-                          minLength={12}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                        />
-                      </label>
-                      <label className="check-label">
-                        <input
-                          type="checkbox"
-                          checked={resetTotp}
-                          onChange={(e) => setResetTotp(e.target.checked)}
-                        />
-                        ساخت کلید جدید رمزساز
-                      </label>
-                      <button
-                        className="button secondary"
-                        disabled={busy || (!password && !resetTotp)}
-                      >
-                        بازیابی ورود
-                      </button>
-                      {secret && (
-                        <p className="notice">
-                          کلید رمزساز جدید — فقط همین‌بار نمایش داده می‌شود:
-                          <code className="omni-secret" dir="ltr">
-                            {secret}
-                          </code>
-                        </p>
-                      )}
-                    </form>
-                  </Panel>
-                  <Panel title="بایگانی حساب">
-                    <p>
-                      دسترسی و درآمد آینده متوقف می‌شود. سوابق و بدهی‌های قبلی
-                      باقی می‌مانند.
-                    </p>
-                    <button
-                      className="button danger"
-                      disabled={busy}
-                      onClick={async () => {
-                        if (
-                          !confirm(
-                            "حساب این همکار بایگانی شود؟ ورود و کمیسیون‌های آینده متوقف خواهد شد.",
-                          )
-                        )
-                          return;
-                        setBusy(true);
-                        try {
-                          await api(`/omnisire/members/${id}`, "DELETE");
+                    <PermissionFields name="members.edit">
+                      <MemberForm
+                        key={revision}
+                        initial={m}
+                        onSave={() => {
                           setRevision((x) => x + 1);
-                          router.refresh();
-                        } catch (e) {
-                          setFailure((e as Error).message);
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
-                    >
-                      بایگانی همکار
-                    </button>
+                          setMessage(
+                            "تغییرات ذخیره شد. نشست‌های قبلی این همکار بسته شدند.",
+                          );
+                        }}
+                      />
+                    </PermissionFields>
                   </Panel>
+                  <Permission name="members.edit">
+                    <Panel title="بازیابی اطلاعات ورود">
+                      <form
+                        className="stack"
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          setBusy(true);
+                          setFailure("");
+                          try {
+                            const res = await api<{ totpSecret: string }>(
+                              `/omnisire/members/${id}/credentials`,
+                              "POST",
+                              { password, resetTotp },
+                            );
+                            setSecret(res.totpSecret);
+                            setPassword("");
+                            setResetTotp(false);
+                            setMessage(
+                              "اطلاعات ورود تغییر کرد و نشست‌های قبلی بسته شدند.",
+                            );
+                          } catch (e) {
+                            setFailure((e as Error).message);
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        <label>
+                          گذرواژه جدید (اختیاری)
+                          <input
+                            type="password"
+                            minLength={12}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                          />
+                        </label>
+                        <label className="check-label">
+                          <input
+                            type="checkbox"
+                            checked={resetTotp}
+                            onChange={(e) => setResetTotp(e.target.checked)}
+                          />
+                          ساخت کلید جدید رمزساز
+                        </label>
+                        <button
+                          className="button secondary"
+                          disabled={busy || (!password && !resetTotp)}
+                        >
+                          بازیابی ورود
+                        </button>
+                        {secret && (
+                          <p className="notice">
+                            کلید رمزساز جدید — فقط همین‌بار نمایش داده می‌شود:
+                            <code className="omni-secret" dir="ltr">
+                              {secret}
+                            </code>
+                          </p>
+                        )}
+                      </form>
+                    </Panel>
+                  </Permission>
+                  <Permission name="members.delete">
+                    <Panel title="بایگانی حساب">
+                      <p>
+                        دسترسی و درآمد آینده متوقف می‌شود. سوابق و بدهی‌های قبلی
+                        باقی می‌مانند.
+                      </p>
+                      <button
+                        className="button danger"
+                        disabled={busy}
+                        onClick={async () => {
+                          if (
+                            !confirm(
+                              "حساب این همکار بایگانی شود؟ ورود و کمیسیون‌های آینده متوقف خواهد شد.",
+                            )
+                          )
+                            return;
+                          setBusy(true);
+                          try {
+                            await api(`/omnisire/members/${id}`, "DELETE");
+                            setRevision((x) => x + 1);
+                            router.refresh();
+                          } catch (e) {
+                            setFailure((e as Error).message);
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        بایگانی همکار
+                      </button>
+                    </Panel>
+                  </Permission>
                 </>
               )}
             </>

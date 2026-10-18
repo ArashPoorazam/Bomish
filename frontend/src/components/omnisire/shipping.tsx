@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { hasStaffPermission } from "@/lib/staff-permissions";
 import type { ShippingConfig } from "@/lib/types";
 import { useStore } from "@/components/store-provider";
 import { ShippingEditor } from "@/components/staff/operations";
+import { PermissionFields } from "../staff/permissions";
 import { Workspace, Feedback } from "./shared";
 
 export function ShippingPage() {
@@ -14,7 +16,7 @@ export function ShippingPage() {
   const [revision, setRevision] = useState(0);
   const [editor, setEditor] = useState({ dirty: false, busy: false });
   useEffect(() => {
-    if (user?.role !== "owner") return;
+    if (!hasStaffPermission(user, "shipping")) return;
     let live = true;
     setLoading(true);
     setError("");
@@ -31,7 +33,7 @@ export function ShippingPage() {
     return () => {
       live = false;
     };
-  }, [user?.role, user?.staffId, revision]);
+  }, [user?.role, user?.staffId, user?.permissions, revision]);
   return (
     <Workspace
       owner
@@ -48,7 +50,11 @@ export function ShippingPage() {
           تلاش دوباره
         </button>
       )}
-      {config && <ShippingEditor initial={config} onStateChange={setEditor} />}
+      {config && (
+        <PermissionFields name="shipping.edit">
+          <ShippingEditor initial={config} onStateChange={setEditor} />
+        </PermissionFields>
+      )}
     </Workspace>
   );
 }

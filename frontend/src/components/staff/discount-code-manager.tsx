@@ -1,4 +1,5 @@
 "use client";
+import { useStaffPermission } from "@/components/staff/permissions";
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Copy, Plus, TicketPercent, X } from "lucide-react";
 import { api } from "@/lib/api";
@@ -11,6 +12,7 @@ export function DiscountCodeManager({
   onBusyChange: (busy: boolean) => void;
 }) {
   const [codes, setCodes] = useState<DiscountCode[]>([]);
+  const can = useStaffPermission();
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [creating, setCreating] = useState(false);
@@ -47,7 +49,7 @@ export function DiscountCodeManager({
         </div>
         <button
           className="button"
-          disabled={!!busy}
+          disabled={!!busy || !can("pricing.create")}
           onClick={() => {
             setMessage("");
             dialog.current?.showModal();
@@ -187,7 +189,7 @@ export function DiscountCodeManager({
                     <div className="discount-code-actions">
                       <button
                         className={`button ${c.active ? "secondary" : ""}`}
-                        disabled={!!busy || !!expired}
+                        disabled={!!busy || !!expired || !can("pricing.edit")}
                         onClick={async () => {
                           setBusy(c.code);
                           setError("");
@@ -225,7 +227,7 @@ export function DiscountCodeManager({
                       </button>
                       <button
                         className="button secondary"
-                        disabled={!!busy}
+                        disabled={!!busy || !can("pricing.delete")}
                         onClick={async () => {
                           setBusy(c.code);
                           setError("");

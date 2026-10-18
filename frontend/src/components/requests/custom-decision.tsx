@@ -1,4 +1,5 @@
 "use client";
+import { PermissionFields } from "@/components/staff/permissions";
 import { useEffect, useRef, useState } from "react";
 import { Check, Package, Banknote, CalendarDays } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
@@ -92,115 +93,120 @@ export function CustomDecision({
           </div>
         )}
       </div>
-      <form
-        className="request-form decision-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (busy || conflict || !response.trim()) return;
-          setBusy(true);
-          setError("");
-          setSaved(false);
-          try {
-            await api(`/staff/requests/${r.id}`, "PATCH", {
-              status,
-              response,
-              version: r.version,
-            });
-            await onSaved();
-            setResponse(response.trim());
-            setSaved(true);
-          } catch (e) {
-            setError((e as Error).message);
-            setConflict(e instanceof ApiError && e.status === 409);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <div>
-          <span className="request-eyebrow">بررسی و پاسخ</span>
-          <h3>نتیجه را با مشتری در میان بگذارید</h3>
-          <p>متن پاسخ و نتیجه بررسی در حساب مشتری نمایش داده می‌شود.</p>
-        </div>
-        <fieldset disabled={busy}>
-          <label>
-            نتیجه بررسی
-            <select
-              aria-label="نتیجه بررسی"
-              name="status"
-              value={status}
-              onChange={(e) => {
-                setStatus(
-                  e.target.value as Exclude<CustomerRequest["status"], "new">,
-                );
-                setSaved(false);
-              }}
-            >
-              <option value="follow_up">پیگیری</option>
-              <option value="accepted">پذیرش</option>
-              <option value="rejected">عدم پذیرش</option>
-            </select>
-          </label>
-          <label>
-            پاسخ قابل مشاهده برای مشتری
-            <textarea
-              name="response"
-              required
-              maxLength={4000}
-              rows={5}
-              value={response}
-              placeholder="جزئیات بررسی یا مرحله بعد را برای مشتری بنویسید…"
-              onChange={(e) => {
-                setResponse(e.target.value);
-                setSaved(false);
-              }}
-            />
-          </label>
-          <div className="decision-actions">
-            <button className="button" disabled={!response.trim() || conflict}>
-              {busy ? "در حال ثبت…" : "ثبت نتیجه"}
-            </button>
-            <span>{dirty ? "تغییرات هنوز ثبت نشده‌اند" : ""}</span>
+      <PermissionFields name="custom.edit">
+        <form
+          className="request-form decision-form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (busy || conflict || !response.trim()) return;
+            setBusy(true);
+            setError("");
+            setSaved(false);
+            try {
+              await api(`/staff/requests/${r.id}`, "PATCH", {
+                status,
+                response,
+                version: r.version,
+              });
+              await onSaved();
+              setResponse(response.trim());
+              setSaved(true);
+            } catch (e) {
+              setError((e as Error).message);
+              setConflict(e instanceof ApiError && e.status === 409);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <div>
+            <span className="request-eyebrow">بررسی و پاسخ</span>
+            <h3>نتیجه را با مشتری در میان بگذارید</h3>
+            <p>متن پاسخ و نتیجه بررسی در حساب مشتری نمایش داده می‌شود.</p>
           </div>
-        </fieldset>
-        {saved && (
-          <p className="request-success" role="status">
-            <Check size={17} /> نتیجه ثبت شد و برای مشتری قابل مشاهده است.
-          </p>
-        )}
-        {error && (
-          <div role="alert">
-            <p className="error">{error}</p>
-            {conflict && (
-              <>
-                <p>
-                  نسخه جدید را دریافت کنید؛ متن پاسخ شما حفظ می‌شود. سپس دوباره
-                  نتیجه را بررسی و ثبت کنید.
-                </p>
-                <button
-                  type="button"
-                  className="text-link"
-                  disabled={busy}
-                  onClick={async () => {
-                    setBusy(true);
-                    try {
-                      await onReload();
-                      setConflict(false);
-                      setError("");
-                    } catch (e) {
-                      setError((e as Error).message);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  دریافت آخرین نسخه
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </form>
+          <fieldset disabled={busy}>
+            <label>
+              نتیجه بررسی
+              <select
+                aria-label="نتیجه بررسی"
+                name="status"
+                value={status}
+                onChange={(e) => {
+                  setStatus(
+                    e.target.value as Exclude<CustomerRequest["status"], "new">,
+                  );
+                  setSaved(false);
+                }}
+              >
+                <option value="follow_up">پیگیری</option>
+                <option value="accepted">پذیرش</option>
+                <option value="rejected">عدم پذیرش</option>
+              </select>
+            </label>
+            <label>
+              پاسخ قابل مشاهده برای مشتری
+              <textarea
+                name="response"
+                required
+                maxLength={4000}
+                rows={5}
+                value={response}
+                placeholder="جزئیات بررسی یا مرحله بعد را برای مشتری بنویسید…"
+                onChange={(e) => {
+                  setResponse(e.target.value);
+                  setSaved(false);
+                }}
+              />
+            </label>
+            <div className="decision-actions">
+              <button
+                className="button"
+                disabled={!response.trim() || conflict}
+              >
+                {busy ? "در حال ثبت…" : "ثبت نتیجه"}
+              </button>
+              <span>{dirty ? "تغییرات هنوز ثبت نشده‌اند" : ""}</span>
+            </div>
+          </fieldset>
+          {saved && (
+            <p className="request-success" role="status">
+              <Check size={17} /> نتیجه ثبت شد و برای مشتری قابل مشاهده است.
+            </p>
+          )}
+          {error && (
+            <div role="alert">
+              <p className="error">{error}</p>
+              {conflict && (
+                <>
+                  <p>
+                    نسخه جدید را دریافت کنید؛ متن پاسخ شما حفظ می‌شود. سپس
+                    دوباره نتیجه را بررسی و ثبت کنید.
+                  </p>
+                  <button
+                    type="button"
+                    className="text-link"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        await onReload();
+                        setConflict(false);
+                        setError("");
+                      } catch (e) {
+                        setError((e as Error).message);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    دریافت آخرین نسخه
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </form>
+      </PermissionFields>
     </div>
   );
 }

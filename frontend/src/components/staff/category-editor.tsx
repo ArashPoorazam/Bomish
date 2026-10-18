@@ -1,4 +1,5 @@
 "use client";
+import { PermissionFields } from "@/components/staff/permissions";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -21,7 +22,11 @@ export function CategoryPage({ id }: { id: string }) {
       <Feedback error={error} loading={loading} />
       {data &&
         (id === "new" || category ? (
-          <CategoryEditor key={id} initial={category} />
+          <PermissionFields
+            name={id === "new" ? "categories.create" : "categories.edit"}
+          >
+            <CategoryEditor key={id} initial={category} />
+          </PermissionFields>
         ) : (
           <p role="alert">دسته‌بندی پیدا نشد.</p>
         ))}

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useStore } from "@/components/store-provider";
 import { api } from "@/lib/api";
+import { hasStaffPermission } from "@/lib/staff-permissions";
 import { fa } from "@/lib/format";
 import type { Product, Category, Article, Order } from "@/lib/types";
 import {
@@ -20,6 +21,7 @@ import {
 } from "../omnisire/workspace-navigation";
 import { StaffRequests } from "../requests/staff-requests";
 import { HomeManagement } from "./home-management";
+import { PermissionFields } from "./permissions";
 import { OrderManager } from "./order-manager";
 export function Dashboard({
   initialSection = "",
@@ -30,7 +32,8 @@ export function Dashboard({
 }) {
   const { user } = useStore();
   const permissions = user?.permissions || [];
-  const key = permissions.join(",");
+  const key = `${user?.role}:${permissions.join(",")}`;
+  const can = (permission: string) => hasStaffPermission(user, permission);
   const [tab, setTab] = useState(initialSection);
   const requestVersion = useRef(0);
   const [error, setError] = useState(""),
@@ -56,16 +59,16 @@ export function Dashboard({
   }, []);
   useEffect(() => {
     if (!user?.role) return;
-    if (!permissions.includes(sectionPermission(tab)))
+    if (!can(sectionPermission(tab)))
       setTab(
-        (
-          permissions.find((x) => x !== "omnisire" && x !== "shipping") || ""
-        ).replace(/^requests$/, "support"),
+        Object.keys(sectionLabels).find((key) => can(sectionPermission(key))) ||
+          "",
       );
   }, [key, tab]);
   const reload = useCallback(async () => {
     const request = ++requestVersion.current;
-    if (!user?.role || !tab || tab === "sales") return;
+    if (!user?.role || !tab || !can(sectionPermission(tab)) || tab === "sales")
+      return;
     setBusy(true);
     setError("");
     try {
@@ -175,7 +178,7 @@ export function Dashboard({
           products={products}
           categories={categories}
           owner
-          canPrice={permissions.includes("pricing")}
+          canPrice={can("pricing.edit")}
           onFilters={onFilters}
           reload={reload}
           onEditorStateChange={setEditor}
@@ -218,7 +221,11 @@ export function Dashboard({
       {tab === "custom" && (
         <StaffRequests key="custom" kind="custom" onStateChange={setEditor} />
       )}
-      {tab === "suggestions" && <HomeManagement onState={setEditor} />}
+      {tab === "suggestions" && (
+        <PermissionFields name="home.edit">
+          <HomeManagement onState={setEditor} />
+        </PermissionFields>
+      )}
       {tab === "sales" && (
         <div className="omni-welcome">
           <h2>فروش‌های شما، دستاورد شما</h2>
@@ -233,9 +240,9 @@ export function Dashboard({
         !viewingOrder && (
           <Pager data={listData} page={page} onPage={setPage} />
         )}{" "}
-      {!permissions.length && (
-        <p className="notice">در حال حاضر بخشی برای حساب شما فعال نیست.</p>
-      )}
+      {!Object.keys(sectionLabels).some((key) =>
+        can(sectionPermission(key)),
+      ) && <p className="notice">در حال حاضر بخشی برای حساب شما فعال نیست.</p>}
     </Workspace>
   );
 }

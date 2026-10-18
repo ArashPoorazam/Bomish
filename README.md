@@ -141,7 +141,7 @@ Fill private service keys and support details in the root `.env`; see [integrati
 
 See [architecture and behavior](docs/architecture.md), [launch requirements](docs/launch.md), and [asset provenance](docs/assets.md). No public deployment has been made.
 
-Shipping always uses calculated delivery: Tehran city uses Snapp when serviceable and other destinations use post. There is no legacy tariff mode. Complete the pickup address, cartons, package measurements, locality mappings and provider setup before checkout can quote delivery. Technical settings live in `config/shipping.json`; development simulation uses `SHIPPING_SIMULATED=true`. Live carriers still require verified merchant contracts; see [shipping integration](docs/integrations.md#shipping-provider-integration-and-simulation).
+Shipping always uses calculated delivery: Tehran city uses Snapp pricing when serviceable; after packing, staff choose Snapp dispatch or assign an active staff member with the «پیک» role. Other destinations use post. There is no legacy tariff mode. Complete the pickup address, cartons, package measurements, locality mappings and provider setup before checkout can quote delivery. Technical settings live in `config/shipping.json`; development simulation uses `SHIPPING_SIMULATED=true`. Live carriers still require verified merchant contracts; see [shipping integration](docs/integrations.md#shipping-provider-integration-and-simulation).
 
 Technical shipping settings live in [`config/shipping.json`](config/shipping.json), with a [field template](config/shipping.example.json) and [editing/apply instructions](docs/integrations.md#shipping-configuration-file). API keys remain in `.env`.
 

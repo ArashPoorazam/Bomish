@@ -12,7 +12,11 @@ export const deliveryStatuses: Record<string, string> = {
   returning: "⚠ مرسوله در حال بازگشت",
 };
 export const providerName = (method?: string) =>
-  method === "snapp" ? "پیک اسنپ" : "پست";
+  method === "own_courier"
+    ? "پیک بومیش"
+    : method === "snapp"
+      ? "پیک اسنپ"
+      : "پست";
 export function measurementIssues(p: Package) {
   const result: string[] = [];
   for (const [key, label] of [

@@ -87,18 +87,24 @@
   min-width: 0;
 }
 .checkout-map {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 12px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
 }
-.checkout-map-heading {
-  margin-bottom: 12px;
+.checkout-map .address-map {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+}
+.checkout-map .map-canvas {
+  width: 100%;
+  margin-top: 0;
+}
+.checkout-map .muted {
   font-size: 13px;
-  color: var(--green);
-}
-.checkout-map-heading small {
-  color: var(--muted);
-  margin-inline-start: 8px;
+  line-height: 1.9;
 }
 .checkout-summary-heading {
   display: flex;

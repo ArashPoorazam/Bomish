@@ -3,6 +3,9 @@ package app
 import "net/http"
 
 func (a *App) shippingRoutes(m *http.ServeMux) {
+	m.HandleFunc("GET /api/v1/staff/shipping/couriers", a.permit(a.shippingCouriers, "orders", "edit"))
+	m.HandleFunc("POST /api/v1/staff/orders/{id}/own-courier", a.permit(a.dispatchOwnCourier, "orders"))
+	m.HandleFunc("POST /api/v1/staff/orders/{id}/own-courier/delivered", a.permit(a.deliverOwnCourier, "orders"))
 	m.HandleFunc("GET /api/v1/shipping/localities", a.localities)
 	m.HandleFunc("POST /api/v1/staff/shipping/providers/{provider}/check", a.permit(a.checkShippingProvider, "shipping"))
 	m.HandleFunc("POST /api/v1/staff/shipping/preview", a.permit(a.shippingPreview, "shipping"))

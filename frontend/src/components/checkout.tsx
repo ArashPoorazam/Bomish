@@ -301,6 +301,10 @@ export function Checkout() {
                 <div className="checkout-form-heading">
                   <h2>سفارش را کجا بفرستیم؟</h2>
                   <p>اطلاعات گیرنده و نشانی دقیق تحویل را وارد کنید.</p>
+                  <p>
+                    روی محل خانه بزنید؛ استان، شهر و نشانی با نشان تکمیل
+                    می‌شوند. پلاک و واحد را بررسی و اضافه کنید.
+                  </p>
                 </div>
                 {saved.length > 0 ? (
                   <label>
@@ -324,11 +328,9 @@ export function Checkout() {
                   </label>
                 ) : null}
                 <div className="checkout-map">
-                  <p className="checkout-map-heading">
-                    انتخاب موقعیت روی نقشه <small>برای بررسی روش ارسال</small>
-                  </p>
                   <AddressMap
                     autoConfirm
+                    showInstructions={false}
                     key={address.id || "new"}
                     address={address}
                     onChange={(v) => {
@@ -336,10 +338,11 @@ export function Checkout() {
                       setQuote(null);
                     }}
                   />
+                  <p className="muted">
+                    با انتخاب موقعیت روی نقشه، استان و شهر تکمیل می‌شوند؛ در
+                    صورت نیاز آن‌ها را اصلاح کنید.
+                  </p>
                 </div>
-                <>
-                  <ShippingLocalities address={address} onChange={setAddress} />
-                </>
                 <div className="form-grid">
                   <label>
                     نام گیرنده
@@ -360,7 +363,13 @@ export function Checkout() {
                       onChange={(e) => update("phone", e.target.value)}
                     />
                   </label>
-
+                </div>
+                <ShippingLocalities
+                  address={address}
+                  onChange={setAddress}
+                  showMapHint={false}
+                />
+                <div className="form-grid">
                   <label className="span-2">
                     نشانی کامل، پلاک و واحد
                     <textarea
@@ -419,14 +428,17 @@ export function Checkout() {
             ) : quote ? (
               <>
                 <strong>
-                  {providerName(quote.method)} · {quote.parcelCount} کارتن ارسال
+                  {quote.method === "snapp"
+                    ? "ارسال با پیک در تهران"
+                    : providerName(quote.method)}{" "}
+                  · {quote.parcelCount} کارتن ارسال
                 </strong>
                 {quote.simulated && (
                   <span className="badge">شبیه‌سازی‌شده</span>
                 )}
                 <p>
                   {quote.method === "snapp"
-                    ? "درخواست پیک پس از آماده‌شدن سفارش ثبت می‌شود. موجود بودن پیک تضمین نشده است."
+                    ? "هزینه بر اساس نرخ اسنپ محاسبه می‌شود. پس از بسته‌بندی، سفارش با اسنپ یا پیک بومیش ارسال خواهد شد."
                     : "مرسوله پس از بسته‌بندی به پست سپرده می‌شود."}
                 </p>
                 {quote.fallbackReason && <p>{quote.fallbackReason}</p>}

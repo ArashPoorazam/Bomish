@@ -17,8 +17,12 @@ func (a *App) requestNotifications(w http.ResponseWriter, r *http.Request) {
 			a.dbError(w, e)
 			return
 		}
-		out["support"], out["custom"] = support, custom
-		out["supportEvent"], out["customEvent"] = supportEvent, customEvent
+		if can(r, "support") {
+			out["support"], out["supportEvent"] = support, supportEvent
+		}
+		if can(r, "custom") {
+			out["custom"], out["customEvent"] = custom, customEvent
+		}
 	}
 	if can(r, "orders") {
 		var count, event int64

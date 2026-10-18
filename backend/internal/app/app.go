@@ -75,15 +75,15 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("GET /api/v1/orders/{id}", a.getOrder)
 	m.HandleFunc("POST /api/v1/events", a.recordEvent)
 	m.HandleFunc("GET /api/v1/staff/product-discounts", a.permit(a.listProductDiscounts, "pricing"))
-	m.HandleFunc("POST /api/v1/staff/product-discounts", a.permit(a.createProductDiscount, "pricing"))
+	m.HandleFunc("POST /api/v1/staff/product-discounts", a.permit(a.createProductDiscount, "pricing", "create"))
 	m.HandleFunc("PATCH /api/v1/staff/product-discounts/{id}", a.permit(a.changeProductDiscount, "pricing"))
-	m.HandleFunc("DELETE /api/v1/staff/product-discounts/{id}", a.permit(a.changeProductDiscount, "pricing"))
-	m.HandleFunc("DELETE /api/v1/staff/discount-codes/{code}", a.permit(a.deleteDiscountCode, "pricing"))
+	m.HandleFunc("DELETE /api/v1/staff/product-discounts/{id}", a.permit(a.changeProductDiscount, "pricing", "delete"))
+	m.HandleFunc("DELETE /api/v1/staff/discount-codes/{code}", a.permit(a.deleteDiscountCode, "pricing", "delete"))
 	m.HandleFunc("POST /api/v1/staff/pricing", a.permit(a.adjustPrices, "pricing"))
 	m.HandleFunc("GET /api/v1/staff/discount-codes", a.permit(a.listDiscountCodes, "pricing"))
-	m.HandleFunc("POST /api/v1/staff/discount-codes", a.permit(a.createDiscountCode, "pricing"))
+	m.HandleFunc("POST /api/v1/staff/discount-codes", a.permit(a.createDiscountCode, "pricing", "create"))
 	m.HandleFunc("PATCH /api/v1/staff/discount-codes/{code}", a.permit(a.toggleDiscountCode, "pricing"))
-	m.HandleFunc("DELETE /api/v1/staff/categories/{id}", a.permit(a.deleteCategory, "categories"))
+	m.HandleFunc("DELETE /api/v1/staff/categories/{id}", a.permit(a.deleteCategory, "categories", "delete"))
 	m.HandleFunc("GET /api/v1/session", a.sessionInfo)
 	m.HandleFunc("POST /api/v1/logout", a.logout)
 	m.HandleFunc("POST /api/v1/auth/request", a.requestOTP)
@@ -106,28 +106,28 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("GET /api/v1/orders", a.orders)
 	m.HandleFunc("POST /api/v1/orders/{id}/simulate", a.simulatePayment)
 	m.HandleFunc("GET /api/v1/staff/products", a.permit(a.staffProducts, "products"))
-	m.HandleFunc("PUT /api/v1/staff/products/{id}", a.permit(a.saveProduct, "products"))
+	m.HandleFunc("PUT /api/v1/staff/products/{id}", a.permitAny(a.saveProduct, "products.create", "products.edit"))
 	m.HandleFunc("POST /api/v1/staff/products/{id}/publish", a.permit(a.publishProduct, "products"))
-	m.HandleFunc("POST /api/v1/staff/products/{id}/archive", a.permit(a.archiveProduct, "products"))
+	m.HandleFunc("POST /api/v1/staff/products/{id}/archive", a.permit(a.archiveProduct, "products", "delete"))
 	m.HandleFunc("POST /api/v1/staff/products/{id}/availability", a.permit(a.setAvailability, "products"))
-	m.HandleFunc("PUT /api/v1/staff/categories/{id}", a.permit(a.saveCategory, "categories"))
+	m.HandleFunc("PUT /api/v1/staff/categories/{id}", a.permitAny(a.saveCategory, "categories.create", "categories.edit"))
 	m.HandleFunc("GET /api/v1/staff/articles", a.permit(a.staffArticles, "articles"))
-	m.HandleFunc("PUT /api/v1/staff/articles/{id}", a.permit(a.saveArticle, "articles"))
+	m.HandleFunc("PUT /api/v1/staff/articles/{id}", a.permitAny(a.saveArticle, "articles.create", "articles.edit", "articles.delete"))
 	m.HandleFunc("GET /api/v1/staff/orders", a.permit(a.staffOrders, "orders"))
 	m.HandleFunc("GET /api/v1/staff/orders/{id}", a.permit(a.staffOrder, "orders"))
 	m.HandleFunc("PATCH /api/v1/staff/orders/{id}/packing", a.permit(a.packOrderItem, "orders"))
 	m.HandleFunc("PATCH /api/v1/staff/orders/{id}", a.permit(a.updateOrder, "orders"))
 	m.HandleFunc("GET /api/v1/staff/shipping", a.permit(a.shippingSettings, "shipping"))
 	m.HandleFunc("PUT /api/v1/staff/shipping", a.permit(a.saveShipping, "shipping"))
-	m.HandleFunc("POST /api/v1/staff/uploads", a.permitAny(a.upload, "products", "articles"))
+	m.HandleFunc("POST /api/v1/staff/uploads", a.permitAny(a.upload, "products.create", "products.edit", "articles.create", "articles.edit", "home.edit"))
 	m.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(os.Getenv("UPLOAD_DIR")))))
 	a.shippingRoutes(m)
 	a.requestRoutes(m)
 	m.HandleFunc("GET /api/v1/home/slides", a.homeSlides)
-	m.HandleFunc("GET /api/v1/staff/home/slides", a.permit(a.homeSlides, "products"))
-	m.HandleFunc("PUT /api/v1/staff/home/slides", a.permit(a.saveHomeSlides, "products"))
-	m.HandleFunc("GET /api/v1/staff/suggestions", a.permit(a.suggestions, "products"))
-	m.HandleFunc("PUT /api/v1/staff/suggestions", a.permit(a.saveSuggestions, "products"))
+	m.HandleFunc("GET /api/v1/staff/home/slides", a.permit(a.homeSlides, "home"))
+	m.HandleFunc("PUT /api/v1/staff/home/slides", a.permit(a.saveHomeSlides, "home"))
+	m.HandleFunc("GET /api/v1/staff/suggestions", a.permit(a.suggestions, "home"))
+	m.HandleFunc("PUT /api/v1/staff/suggestions", a.permit(a.saveSuggestions, "home"))
 	a.omnisireRoutes(m)
 	return a.middleware(m)
 }
@@ -162,9 +162,10 @@ func (a *App) middleware(next http.Handler) http.Handler {
 		r = r.WithContext(ctx)
 		s := session{}
 		var restrictions []string
+		var overrides map[string]bool
 		if c, e := r.Cookie(sessionCookieName(r)); e == nil {
 			s.Hash = hash(c.Value)
-			e = a.Pool.QueryRow(ctx, `SELECT s.csrf,coalesce(s.user_id,''),coalesce(s.staff_id,''),coalesce(t.role,''),coalesce(t.restrictions,'{}') FROM sessions s LEFT JOIN staff t ON t.id=s.staff_id AND t.active AND t.archived_at IS NULL WHERE s.token_hash=$1 AND s.expires_at>now()`, s.Hash).Scan(&s.CSRF, &s.UserID, &s.StaffID, &s.Role, &restrictions)
+			e = a.Pool.QueryRow(ctx, `SELECT s.csrf,coalesce(s.user_id,''),coalesce(s.staff_id,''),coalesce(t.role,''),coalesce(t.restrictions,'{}'),coalesce(t.permission_overrides,'{}'::jsonb) FROM sessions s LEFT JOIN staff t ON t.id=s.staff_id AND t.active AND t.archived_at IS NULL WHERE s.token_hash=$1 AND s.expires_at>now()`, s.Hash).Scan(&s.CSRF, &s.UserID, &s.StaffID, &s.Role, &restrictions, &overrides)
 			if e == pgx.ErrNoRows {
 				// Never replace a cookie on an ordinary in-flight request: it may
 				// carry the token just rotated by a concurrent login.
@@ -184,7 +185,7 @@ func (a *App) middleware(next http.Handler) http.Handler {
 			s.StaffID = ""
 			s.Role = ""
 		}
-		s.Permissions = effectivePermissions(s.Role, restrictions)
+		s.Permissions = effectivePermissions(s.Role, restrictions, overrides)
 		if s.Role == "" {
 			s.StaffID = ""
 		}
@@ -203,7 +204,7 @@ func (a *App) middleware(next http.Handler) http.Handler {
 				return
 			}
 		}
-		s.Permissions = effectivePermissions(s.Role, restrictions)
+		s.Permissions = effectivePermissions(s.Role, restrictions, overrides)
 		next.ServeHTTP(w, r.WithContext(context.WithValue(ctx, sessionKey{}, s)))
 	})
 }

@@ -1,6 +1,9 @@
 "use client";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
+import { hasStaffPermission } from "@/lib/staff-permissions";
+import { usePathname } from "next/navigation";
+import { sectionPermission } from "./workspace-navigation";
 import { ArrowUpLeft, LogOut, Menu, X } from "lucide-react";
 import { WorkspaceNavigation } from "./workspace-navigation";
 import {
@@ -27,6 +30,7 @@ export const roleLabels: Record<string, string> = {
   editor: "ویرایشگر",
   operator: "مسئول سفارش",
   salesperson: "فروشنده",
+  courier: "پیک",
 };
 export const stamp = (v: unknown) =>
   v
@@ -88,6 +92,12 @@ export function Workspace({
   description?: string;
 }) {
   const { user, refresh, sessionError } = useStore();
+  const path = usePathname();
+  const requiredPermission = owner
+    ? path.split("/")[2] || "overview"
+    : activeSection
+      ? sectionPermission(activeSection)
+      : null;
   const requests = activeSection === "support" || activeSection === "custom";
   const notifications = useRequestNotifications();
   const [open, setOpen] = useState(false);
@@ -131,12 +141,12 @@ export function Workspace({
       </p>
     );
   if (!user.role) return <StaffLogin />;
-  if (owner && user.role !== "owner")
+  if (requiredPermission && !hasStaffPermission(user, requiredPermission))
     return (
       <div className="auth-layout">
         <div className="form-card">
-          <h1>دسترسی ویژه مالک</h1>
-          <p>این فضا فقط در اختیار مالک فروشگاه است.</p>
+          <h1>دسترسی محدود</h1>
+          <p>دسترسی به این بخش برای حساب شما فعال نیست.</p>
           <Link className="button" href="/staff">
             بازگشت به فضای کار
           </Link>
@@ -169,6 +179,7 @@ export function Workspace({
         <WorkspaceNavigation
           owner={owner}
           permissions={user.permissions || []}
+          role={user.role}
           activeSection={activeSection}
           onSectionChange={onSectionChange}
           locked={navigationLocked}

@@ -32,7 +32,7 @@ export function CustomerOrderHistory({ requestId }: { requestId: string }) {
   return (
     <Workspace
       title="سفارش‌های مشتری"
-      activeSection="orders"
+      activeSection={section}
       navigationLocked={editor.busy}
       description="همه سفارش‌های این مشتری در تمام وضعیت‌ها؛ برای مشاهده جزئیات، روی سفارش بزنید."
       titleDetail={customer ? <bdi>{customer.phone}</bdi> : undefined}

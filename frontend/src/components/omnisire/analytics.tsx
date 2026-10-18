@@ -1,4 +1,5 @@
 "use client";
+import { Permission } from "@/components/staff/permissions";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Info, SlidersHorizontal, X } from "lucide-react";
 import { fa } from "@/lib/format";
@@ -348,15 +349,17 @@ export function AnalyticsPage({
         </details>
         <div className="analytics-export-row">
           <p>جزئیات قابل جستجو و دریافت</p>
-          <ExportReport
-            filters={tableParams.toString()}
-            disabled={
-              result.loading ||
-              !!result.error ||
-              !result.data?.total ||
-              debouncedQuery !== filters.q
-            }
-          />
+          <Permission name="analytics.export">
+            <ExportReport
+              filters={tableParams.toString()}
+              disabled={
+                result.loading ||
+                !!result.error ||
+                !result.data?.total ||
+                debouncedQuery !== filters.q
+              }
+            />
+          </Permission>
         </div>
         <ReportTable
           data={result.data}

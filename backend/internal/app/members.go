@@ -11,14 +11,15 @@ import (
 )
 
 type memberInput struct {
-	FullName     string   `json:"fullName"`
-	Username     string   `json:"username"`
-	Phone        string   `json:"phone"`
-	BankCard     string   `json:"bankCard"`
-	Role         string   `json:"role"`
-	Active       bool     `json:"active"`
-	Restrictions []string `json:"restrictions"`
-	Password     string   `json:"password"`
+	FullName            string          `json:"fullName"`
+	Username            string          `json:"username"`
+	Phone               string          `json:"phone"`
+	BankCard            string          `json:"bankCard"`
+	Role                string          `json:"role"`
+	Active              bool            `json:"active"`
+	Restrictions        []string        `json:"restrictions"`
+	PermissionOverrides map[string]bool `json:"permissionOverrides"`
+	Password            string          `json:"password"`
 }
 
 func (v *memberInput) validate() bool {
@@ -26,7 +27,7 @@ func (v *memberInput) validate() bool {
 	v.Username = strings.TrimSpace(v.Username)
 	v.Phone = domain.Phone(v.Phone)
 	v.BankCard = strings.NewReplacer(" ", "", "-", "").Replace(domain.Normalize(v.BankCard))
-	if v.FullName == "" || len(v.FullName) > 200 || len(v.Username) < 2 || len(v.Username) > 80 || !domain.ValidPhone(v.Phone) || len(v.BankCard) != 16 || !slices.Contains([]string{"manager", "editor", "operator", "salesperson"}, v.Role) {
+	if v.FullName == "" || len(v.FullName) > 200 || len(v.Username) < 2 || len(v.Username) > 80 || !domain.ValidPhone(v.Phone) || len(v.BankCard) != 16 || !slices.Contains([]string{"manager", "editor", "operator", "salesperson", "courier"}, v.Role) {
 		return false
 	}
 	for _, c := range v.BankCard {
@@ -36,6 +37,11 @@ func (v *memberInput) validate() bool {
 	}
 	for _, p := range v.Restrictions {
 		if !slices.Contains(staffSections, p) {
+			return false
+		}
+	}
+	for key := range v.PermissionOverrides {
+		if !validPermission(key) {
 			return false
 		}
 	}
@@ -52,7 +58,7 @@ func newTOTP() string {
 	return base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b)
 }
 
-const memberColumns = `s.id,s.username,s.full_name AS "fullName",s.phone,s.role,s.active,s.restrictions,s.archived_at AS "archivedAt",s.created_at AS "createdAt",s.referral_code AS "referralCode",(s.bank_card='' OR s.full_name='' OR s.phone='') AS "profileIncomplete",coalesce(l.balance,0) AS "balanceRials"`
+const memberColumns = `s.id,s.username,s.full_name AS "fullName",s.phone,s.role,s.active,s.restrictions,s.permission_overrides AS "permissionOverrides",s.archived_at AS "archivedAt",s.created_at AS "createdAt",s.referral_code AS "referralCode",(s.bank_card='' OR s.full_name='' OR s.phone='') AS "profileIncomplete",coalesce(l.balance,0) AS "balanceRials"`
 const memberJoin = ` FROM staff s LEFT JOIN (SELECT staff_id,sum(amount_rials)::bigint balance FROM member_ledger GROUP BY staff_id) l ON l.staff_id=s.id `
 
 func (a *App) listMembers(w http.ResponseWriter, r *http.Request) {
@@ -89,6 +95,9 @@ func (a *App) createMember(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "نام، شماره همراه، کارت ۱۶ رقمی، نقش و گذرواژه حداقل ۱۲ نویسه را بررسی کنید")
 		return
 	}
+	if v.PermissionOverrides == nil {
+		v.PermissionOverrides = map[string]bool{}
+	}
 	id, secret := token(), newTOTP()
 	tx, e := a.Pool.Begin(r.Context())
 	if e != nil {
@@ -96,12 +105,12 @@ func (a *App) createMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	_, e = tx.Exec(r.Context(), `INSERT INTO staff(id,username,password_hash,totp_secret,role,active,full_name,phone,bank_card,restrictions) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, id, v.Username, PasswordHash(v.Password), secret, v.Role, v.Active, v.FullName, v.Phone, v.BankCard, v.Restrictions)
+	_, e = tx.Exec(r.Context(), `INSERT INTO staff(id,username,password_hash,totp_secret,role,active,full_name,phone,bank_card,restrictions,permission_overrides) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, id, v.Username, PasswordHash(v.Password), secret, v.Role, v.Active, v.FullName, v.Phone, v.BankCard, v.Restrictions, v.PermissionOverrides)
 	if e != nil {
 		fail(w, 409, "نام کاربری تکراری یا اطلاعات نامعتبر است")
 		return
 	}
-	if e = auditDetail(r.Context(), tx, current(r).StaffID, "staff.create", id, map[string]any{"role": v.Role}); e == nil {
+	if e = auditDetail(r.Context(), tx, current(r).StaffID, "staff.create", id, map[string]any{"role": v.Role, "restrictions": v.Restrictions, "permissionOverrides": v.PermissionOverrides}); e == nil {
 		e = tx.Commit(r.Context())
 	}
 	if e != nil {
@@ -141,17 +150,17 @@ func (a *App) editMember(w http.ResponseWriter, r *http.Request) {
 		fail(w, 403, "حساب مالک یا حساب بایگانی‌شده قابل تغییر نیست")
 		return
 	}
-	before, e := queryMaps(r.Context(), tx, `SELECT role,active,restrictions FROM staff WHERE id=$1`, id)
+	before, e := queryMaps(r.Context(), tx, `SELECT role,active,restrictions,permission_overrides FROM staff WHERE id=$1`, id)
 	if e != nil {
 		a.dbError(w, e)
 		return
 	}
-	_, e = tx.Exec(r.Context(), `UPDATE staff SET username=$2,full_name=$3,phone=$4,bank_card=$5,role=$6,active=$7,restrictions=$8 WHERE id=$1`, id, v.Username, v.FullName, v.Phone, v.BankCard, v.Role, v.Active, v.Restrictions)
+	_, e = tx.Exec(r.Context(), `UPDATE staff SET username=$2,full_name=$3,phone=$4,bank_card=$5,role=$6,active=$7,restrictions=$8,permission_overrides=coalesce($9::jsonb,permission_overrides) WHERE id=$1`, id, v.Username, v.FullName, v.Phone, v.BankCard, v.Role, v.Active, v.Restrictions, v.PermissionOverrides)
 	if e == nil {
 		_, e = tx.Exec(r.Context(), "DELETE FROM sessions WHERE staff_id=$1", id)
 	}
 	if e == nil {
-		e = auditDetail(r.Context(), tx, current(r).StaffID, "staff.update", id, map[string]any{"before": before[0], "after": map[string]any{"role": v.Role, "active": v.Active, "restrictions": v.Restrictions}})
+		e = auditDetail(r.Context(), tx, current(r).StaffID, "staff.update", id, map[string]any{"before": before[0], "after": map[string]any{"role": v.Role, "active": v.Active, "restrictions": v.Restrictions, "permissionOverrides": v.PermissionOverrides}})
 	}
 	if e == nil {
 		e = tx.Commit(r.Context())

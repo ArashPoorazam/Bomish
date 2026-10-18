@@ -1,4 +1,5 @@
 "use client";
+import { Permission } from "@/components/staff/permissions";
 import { useState } from "react";
 import { Copy, Check, Wallet, ArrowUpRight } from "lucide-react";
 import { api } from "@/lib/api";
@@ -186,21 +187,23 @@ export function SalesContent({
             </div>
           </div>
           {memberId && (
-            <div className="between">
-              <p>
-                {!bankCard
-                  ? "برای ثبت پرداخت ابتدا کارت بانکی همکار را تکمیل کنید."
-                  : "پرداخت بانکی را خارج از سایت انجام دهید و رسید آن را اینجا ثبت کنید."}
-              </p>
-              <button
-                className="button"
-                disabled={!bankCard || s.balanceRials <= 0}
-                onClick={() => start("payment")}
-              >
-                <Wallet size={18} />
-                ثبت پرداخت
-              </button>
-            </div>
+            <Permission name="members.edit">
+              <div className="between">
+                <p>
+                  {!bankCard
+                    ? "برای ثبت پرداخت ابتدا کارت بانکی همکار را تکمیل کنید."
+                    : "پرداخت بانکی را خارج از سایت انجام دهید و رسید آن را اینجا ثبت کنید."}
+                </p>
+                <button
+                  className="button"
+                  disabled={!bankCard || s.balanceRials <= 0}
+                  onClick={() => start("payment")}
+                >
+                  <Wallet size={18} />
+                  ثبت پرداخت
+                </button>
+              </div>
+            </Permission>
           )}
         </>
       )}
@@ -367,20 +370,24 @@ export function SalesContent({
             memberId && part !== "customers"
               ? (row) =>
                   part === "orders" ? (
-                    <button
-                      className="text-link"
-                      disabled={!row.eligible}
-                      onClick={() => start("refund", String(row.id))}
-                    >
-                      ثبت استرداد
-                    </button>
+                    <Permission name="members.edit">
+                      <button
+                        className="text-link"
+                        disabled={!row.eligible}
+                        onClick={() => start("refund", String(row.id))}
+                      >
+                        ثبت استرداد
+                      </button>
+                    </Permission>
                   ) : row.rawKind === "payment" && !row.reversed ? (
-                    <button
-                      className="text-link"
-                      onClick={() => start("reverse", String(row.id))}
-                    >
-                      اصلاح پرداخت
-                    </button>
+                    <Permission name="members.edit">
+                      <button
+                        className="text-link"
+                        onClick={() => start("reverse", String(row.id))}
+                      >
+                        اصلاح پرداخت
+                      </button>
+                    </Permission>
                   ) : row.reversed ? (
                     <span className="muted">اصلاح شده</span>
                   ) : null

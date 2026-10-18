@@ -49,6 +49,102 @@
 .shipping-dialog::backdrop {
   background: #13251ba8;
 }
+.shipping-packing-step,
+.shipping-dispatch,
+.shipping-courier-summary {
+  border: 1px solid #c9d7c5;
+  border-radius: 16px;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  min-width: 0;
+}
+.shipping-packing-step > summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding-block: 0.25rem;
+}
+.shipping-packing-step[open] > summary {
+  margin-bottom: 1rem;
+}
+.shipping-dispatch,
+.shipping-courier-summary {
+  background: #f5f8f0;
+}
+.shipping-dispatch-price {
+  font-size: 0.9rem;
+  color: #475b42;
+}
+.shipping-dispatch-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.shipping-dispatch-options legend {
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+}
+.shipping-dispatch-option {
+  display: flex;
+  flex-direction: row;
+  text-align: start;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid #c9d7c5;
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fffdf5;
+  cursor: pointer;
+  min-width: 0;
+}
+.shipping-dispatch-option.selected {
+  border-color: #235943;
+  box-shadow: inset 0 0 0 1px #235943;
+  background: #eaf2e5;
+}
+.shipping-dispatch-option:focus-within {
+  outline: 3px solid #235943;
+  outline-offset: 3px;
+}
+.shipping-dispatch-option input {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  accent-color: #235943;
+}
+.shipping-dispatch-option svg {
+  flex-shrink: 0;
+}
+.shipping-dispatch-option span {
+  display: grid;
+  gap: 0.3rem;
+}
+.shipping-dispatch-option small {
+  color: #475b42;
+  line-height: 1.8;
+}
+.shipping-dispatch-body {
+  border-top: 1px solid #c9d7c5;
+  padding-top: 1rem;
+}
+.shipping-dispatch-body select {
+  width: 100%;
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .shipping-dispatch-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .shipping-dispatch-body .button {
+    width: 100%;
+  }
+}
+@media print {
+  .shipping-dispatch {
+    display: none;
+  }
+}
 .delivery-selection {
   padding: 1rem;
   border: 1px solid #c9d7c5;

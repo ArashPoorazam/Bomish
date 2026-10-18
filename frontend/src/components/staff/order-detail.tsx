@@ -1,4 +1,5 @@
 "use client";
+import { useStaffPermission } from "@/components/staff/permissions";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -26,6 +27,7 @@ export function StaffOrderDetail({
   onBusyChange: (busy: boolean) => void;
   onChanged: () => Promise<void>;
 }) {
+  const can = useStaffPermission();
   const heading = useRef<HTMLHeadingElement>(null),
     lock = useRef(false);
   const [order, setOrder] = useState(initial),
@@ -38,6 +40,7 @@ export function StaffOrderDetail({
   useEffect(() => {
     heading.current?.focus();
   }, []);
+  const [packingRevision, setPackingRevision] = useState(0);
   const [shippingState, setShippingState] = useState({
     dirty: false,
     busy: false,
@@ -97,6 +100,7 @@ export function StaffOrderDetail({
         `/staff/orders/${encodeURIComponent(order.id)}`,
       );
       setOrder(fresh);
+      if (path.endsWith("/packing")) setPackingRevision((v) => v + 1);
       setMessage(success);
       await onChanged();
     } catch (e) {
@@ -113,6 +117,7 @@ export function StaffOrderDetail({
   }
   const packed = order.items.filter((i) => i.packed).length;
   const canPack =
+    can("orders.edit") &&
     !readOnly &&
     ["paid", "packing"].includes(order.status) &&
     (!order.shipping ||
@@ -147,8 +152,100 @@ export function StaffOrderDetail({
         </div>
       </header>
       <div className="staff-order-detail-body">
+        <section className="staff-order-status-card">
+          <div className="between">
+            <h3>وضعیت سفارش</h3>
+            <span className="badge">{statuses[order.status]}</span>
+          </div>
+          <StaffOrderStages order={order} expanded />
+        </section>
+        <section className="staff-order-panel">
+          <div className="between">
+            <h3>
+              <PackageCheck size={20} /> اقلام و چک‌لیست بسته‌بندی
+            </h3>
+            <span className="badge">
+              {fa(packed)} از {fa(order.items.length)} آماده
+            </span>
+          </div>
+          {!readOnly && (
+            <p className="muted">
+              هر ردیف را پس از بسته‌بندی همه تعداد همان بسته علامت بزنید.
+              تغییرات خودکار ذخیره می‌شوند.
+            </p>
+          )}
+          {!canPack && !readOnly && (
+            <p className="muted">
+              چک‌لیست فقط برای سفارش پرداخت‌شده و پیش از ارسال قابل ویرایش است.
+            </p>
+          )}
+          <progress
+            className="staff-packing-progress"
+            max={Math.max(1, order.items.length)}
+            value={packed}
+            aria-label="پیشرفت بسته‌بندی"
+          />
+          <div className="staff-packing-items">
+            {order.items.map((item) => (
+              <label
+                key={`${item.productId}:${item.packageId}`}
+                className={`staff-packing-item ${item.packed ? "is-packed" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={!!item.packed}
+                  disabled={
+                    busy ||
+                    loading ||
+                    shippingState.busy ||
+                    shippingState.dirty ||
+                    !!error ||
+                    !canPack
+                  }
+                  aria-label={`بسته‌بندی ${item.name}، ${item.packageLabel || weight(item.grams)}، ${fa(item.quantity)} بسته`}
+                  onChange={(e) =>
+                    void change(
+                      `/staff/orders/${encodeURIComponent(order.id)}/packing`,
+                      {
+                        productId: item.productId,
+                        packageId: item.packageId,
+                        packed: e.target.checked,
+                      },
+                      "وضعیت بسته‌بندی ذخیره شد.",
+                      {
+                        ...order,
+                        items: order.items.map((row) =>
+                          row.productId === item.productId &&
+                          row.packageId === item.packageId
+                            ? { ...row, packed: e.target.checked }
+                            : row,
+                        ),
+                      },
+                    )
+                  }
+                />
+                <span className="staff-packing-item-info">
+                  <strong>{item.name}</strong>
+                  <span>
+                    {item.packageLabel || weight(item.grams)} ·{" "}
+                    <strong>{fa(item.quantity)} بسته</strong>
+                  </span>
+                  <small>
+                    {item.packed ? "بسته‌بندی شده" : "بسته‌بندی نشده"}
+                  </small>
+                </span>
+                <span className="staff-packing-item-price">
+                  {money(item.totalRials)} تومان
+                  <small>هر بسته {money(item.priceRials)} تومان</small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
         {order.shipping && !readOnly && (
           <ShippingFulfillment
+            key={`${order.id}:${packingRevision}`}
+            packingBusy={busy}
             orderId={order.id}
             customerCharge={order.shippingRials}
             onStateChange={setShippingState}
@@ -158,13 +255,6 @@ export function StaffOrderDetail({
             }}
           />
         )}
-        <section className="staff-order-status-card">
-          <div className="between">
-            <h3>وضعیت سفارش</h3>
-            <span className="badge">{statuses[order.status]}</span>
-          </div>
-          <StaffOrderStages order={order} expanded />
-        </section>
         {!order.shipping && !readOnly && (
           <section
             className="staff-order-next"
@@ -172,7 +262,7 @@ export function StaffOrderDetail({
           >
             <div className="staff-order-next-copy">
               <h3 id="order-next-title">قدم بعدی</h3>
-              {next && (
+              {next && can("orders.edit") && (
                 <p className="staff-order-transition">
                   <span>{statuses[order.status]}</span>
                   <ArrowLeft size={18} aria-hidden="true" />
@@ -219,7 +309,7 @@ export function StaffOrderDetail({
                   />
                 </label>
               )}
-              {next && (
+              {next && can("orders.edit") && (
                 <button
                   type="button"
                   className="button"
@@ -280,83 +370,6 @@ export function StaffOrderDetail({
         )}
         <div className="staff-order-detail-grid">
           <div className="stack">
-            <section className="staff-order-panel">
-              <div className="between">
-                <h3>
-                  <PackageCheck size={20} /> اقلام و چک‌لیست بسته‌بندی
-                </h3>
-                <span className="badge">
-                  {fa(packed)} از {fa(order.items.length)} آماده
-                </span>
-              </div>
-              {!readOnly && (
-                <p className="muted">
-                  هر ردیف را پس از بسته‌بندی همه تعداد همان بسته علامت بزنید.
-                  تغییرات خودکار ذخیره می‌شوند.
-                </p>
-              )}
-              {!canPack && !readOnly && (
-                <p className="muted">
-                  چک‌لیست فقط برای سفارش پرداخت‌شده و پیش از ارسال قابل ویرایش
-                  است.
-                </p>
-              )}
-              <progress
-                className="staff-packing-progress"
-                max={Math.max(1, order.items.length)}
-                value={packed}
-                aria-label="پیشرفت بسته‌بندی"
-              />
-              <div className="staff-packing-items">
-                {order.items.map((item) => (
-                  <label
-                    key={`${item.productId}:${item.packageId}`}
-                    className={`staff-packing-item ${item.packed ? "is-packed" : ""}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!item.packed}
-                      disabled={busy || loading || !!error || !canPack}
-                      aria-label={`بسته‌بندی ${item.name}، ${item.packageLabel || weight(item.grams)}، ${fa(item.quantity)} بسته`}
-                      onChange={(e) =>
-                        void change(
-                          `/staff/orders/${encodeURIComponent(order.id)}/packing`,
-                          {
-                            productId: item.productId,
-                            packageId: item.packageId,
-                            packed: e.target.checked,
-                          },
-                          "وضعیت بسته‌بندی ذخیره شد.",
-                          {
-                            ...order,
-                            items: order.items.map((row) =>
-                              row.productId === item.productId &&
-                              row.packageId === item.packageId
-                                ? { ...row, packed: e.target.checked }
-                                : row,
-                            ),
-                          },
-                        )
-                      }
-                    />
-                    <span className="staff-packing-item-info">
-                      <strong>{item.name}</strong>
-                      <span>
-                        {item.packageLabel || weight(item.grams)} ·{" "}
-                        <strong>{fa(item.quantity)} بسته</strong>
-                      </span>
-                      <small>
-                        {item.packed ? "بسته‌بندی شده" : "بسته‌بندی نشده"}
-                      </small>
-                    </span>
-                    <span className="staff-packing-item-price">
-                      {money(item.totalRials)} تومان
-                      <small>هر بسته {money(item.priceRials)} تومان</small>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </section>
             <section className="staff-order-panel">
               <h3>مبالغ سفارش</h3>
               <dl className="staff-order-totals">

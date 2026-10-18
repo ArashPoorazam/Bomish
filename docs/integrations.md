@@ -127,7 +127,7 @@ The product wizard has five steps. In **بسته‌ها**, each stable package c
 
 In **ارسال**, complete the pickup address, select stocked cartons, then review delivery policy and the free-shipping threshold. Readiness separates merchant preparation from integration setup. Provider settings, city and postal carton mappings, are managed in `config/shipping.json`; quotation testing remains a separate expandable section. The interface retains read-only integration readiness and directs staff to the technical operator when setup is incomplete. Saves are explicit and retain concurrent-edit protection. All stores use calculated shipping; carrier requests in this release require simulation.
 
-The routing rule is **Tehran city: Snapp; all other cities: post**, including other cities in Tehran province. Internal locality identity is independent of postal provider mappings. Missing postal mappings do not block an eligible Snapp quote. Postal orders select among boxes with eligible postal mappings and limits. When Snapp is unavailable or over capacity, checkout shows the postal reason and price. Acceptance refers to that exact unexpired quote ID, bound to the customer, cart, address, discount and configuration revision; it neither silently requotes nor enables future automatic fallback.
+The pricing rule is **Tehran city: Snapp; all other cities: post**, including other cities in Tehran province. Internal locality identity is independent of postal provider mappings. Missing postal mappings do not block an eligible Snapp quote. Postal orders select among boxes with eligible postal mappings and limits. When Snapp is unavailable or over capacity, checkout shows the postal reason and price. Acceptance refers to that exact unexpired quote ID, bound to the customer, cart, address, discount and configuration revision; it neither silently requotes nor enables future automatic fallback.
 
 The versioned Cartonbank catalog is embedded in `backend/internal/app/shipping_box_catalog.json`. Each listing has its own source URL and nominal exterior dimensions; these are supplier specifications, not a universal national size standard. For example, [the size-one supplier listing](https://cartonbank.com/product/کارتن-پستی-سایز-یک/) distinguishes usable interior dimensions and manufacturing tolerance. Selecting a catalog entry copies its reference into the store configuration. Staff must supply and confirm actual usable interior dimensions, empty weight, capacity and shared padding before activating it. Postal mappings are separate technical configuration. Incomplete entries are excluded from packing. Existing custom boxes and historical snapshots are preserved; catalog updates never rewrite them. Development fixtures have a separate simulation label and cannot be activated outside simulation.
 
@@ -193,3 +193,46 @@ Do not use a carton name as the key; names can change. Renaming a carton or edit
 The remaining integration and runtime controls already live in `.env`, not the staff interface. `.env.example` includes the full set: carrier/map/SMS credentials and switches, SMS sender/template, postal tracking URL template, default support URL, public site URL/indexing, app origin, database connection, listen address, uploads path, demo seeding, frontend API address and optional build directory. These remain environment settings because they include secrets or are needed before the database/configuration importer starts. The native launcher and Compose supply their own database/service paths; commented direct-run examples should only be enabled when launching services manually.
 
 Physical dimensions, carton weights/capacities, free-shipping threshold, customer-facing support link, order tracking numbers, prices and discounts remain everyday business controls in the interface.
+
+
+### Staff permission overrides
+
+Migration `020_staff_permission_overrides.sql` adds `staff.permission_overrides`.
+Roles provide defaults; the `permissionOverrides` object on member create/update
+stores explicit boolean grants and denials. Omitted keys inherit the selected
+role. Changing roles preserves this object; sending `{}` with `restrictions: []`
+resets to role defaults. Omitting `permissionOverrides` on update preserves it.
+Legacy `restrictions` remain supported. Owner accounts retain full access and
+cannot be edited or archived through member management.
+
+`GET /omnisire/permission-options` returns the supported sections, actions and role
+defaults. Bare section keys permit viewing. Action keys (for example
+`products.create`, `products.edit`, `products.delete`) require section access as
+well. Delete includes archiving. `orders.manage` additionally permits delivery
+method changes and resolving unknown shipments; these operations also require
+`orders.edit`. `analytics.export` controls report exports. Member editing includes
+permission/credential management and recording account adjustments; grant it
+only to staff intended to administer other staff accounts.
+
+Permissions are read from the database for each request. Member updates invalidate
+the member's existing sessions. The staff navigation and action controls use the
+same effective permissions returned by `/session?workspace=staff`.
+
+
+## Tehran dispatch: Snapp or a staff courier
+
+Tehran checkout uses the existing Snapp quotation, including the configured fees and free-shipping policy. Customers see that dispatch may use Snapp or Bomish’s own courier. The paid invoice and stored quote never change when staff choose the courier. Postal fallback and delivery outside eligible Tehran coverage remain unchanged.
+
+After confirming the item checklist, physical cartons and readiness, staff see a separate dispatch panel. **اسنپ** requires a fresh dispatch-price review and uses the existing booking/reconciliation workflow. **پیک بومیش** lists only active, non-archived members with role **پیک** (`courier`). Create or edit these accounts in **همکاران**. This role defaults to personal sales access, without order or member management; existing permission overrides still apply.
+
+Selecting a member alone does not dispatch. Staff confirm that all cartons have been handed to the named courier, then submit the handoff. This atomically saves the member ID and identity snapshot, records an audited delivery event, marks the order shipped and queues the existing shipment milestone notification. A separate confirmation records customer receipt. Own-courier dispatch does not call Snapp, requires no new fare quote, and leaves actual cost unknown. The member’s later renaming, suspension, role change or archival does not erase the assignment.
+
+An active or unresolved Snapp booking blocks internal dispatch. Resolve or complete cancellation first. Parcel or checklist changes invalidate readiness and dispatch-price review. Concurrent dispatches use the existing version check and order lock, so only one dispatch can succeed. Customers see «پیک بومیش» after handoff without staff identity or financial information; staff can filter orders by that method.
+
+Migration `021_staff_courier.sql` adds the role and nullable assignment fields without altering historical orders. It runs on API startup. New endpoints require `orders.edit`:
+
+- `GET /staff/shipping/couriers`: minimal active courier roster.
+- `POST /staff/orders/{id}/own-courier`: `{version, courierId}` confirms handoff.
+- `POST /staff/orders/{id}/own-courier/delivered`: `{version}` confirms receipt.
+
+Staff delivery responses include optional `assignedCourier: {id, fullName, phone}`. The stored `method` remains the pricing method; the customer delivery projection and order filter use `own_courier` once assigned. Live Snapp quotes and bookings still require the verified merchant integration described above; this change does not enable an unverified production contract.

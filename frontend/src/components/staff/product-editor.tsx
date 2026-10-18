@@ -1,4 +1,5 @@
 "use client";
+import { useStaffPermission } from "@/components/staff/permissions";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
@@ -81,6 +82,7 @@ export function ProductEditor({
 }) {
   // Normalize before the first render: legacy API records contain null arrays.
   const [p, setP] = useState(() => normalizeProduct(product));
+  const can = useStaffPermission();
   const [saved, setSaved] = useState(() =>
     JSON.stringify(normalizeProduct(product)),
   );
@@ -120,6 +122,7 @@ export function ProductEditor({
   const dirty = JSON.stringify(p) !== saved;
   const locked = !!busy || uploading;
   const existing = products.find((x) => x.id === p.id);
+  const writable = can(existing ? "products.edit" : "products.create");
   const issues = productIssues(editorProduct, true);
   useEffect(() => {
     onStateChange({ dirty, busy: locked });
@@ -149,7 +152,7 @@ export function ProductEditor({
     requestAnimationFrame(() => heading.current?.focus());
   }
   async function save(publish: boolean) {
-    if (locked) return;
+    if (locked || !writable) return;
     feedbackTrigger.current = document.activeElement as HTMLElement;
     const invalid = productIssues(editorProduct, publish);
     if (invalid.length) {
@@ -264,7 +267,7 @@ export function ProductEditor({
             <button
               type="button"
               className="button secondary"
-              disabled={locked}
+              disabled={locked || !can("products.edit")}
               aria-pressed={!p.outOfStock}
               onClick={() => void availability(false)}
             >
@@ -274,7 +277,7 @@ export function ProductEditor({
             <button
               type="button"
               className="button secondary"
-              disabled={locked}
+              disabled={locked || !can("products.edit")}
               aria-pressed={p.outOfStock}
               onClick={() => void availability(true)}
             >
@@ -286,7 +289,7 @@ export function ProductEditor({
             <button
               type="button"
               className="button subtle-danger"
-              disabled={locked}
+              disabled={locked || !can("products.delete")}
               onClick={async () => {
                 if (
                   !window.confirm(
@@ -351,7 +354,10 @@ export function ProductEditor({
           else void save(false);
         }}
       >
-        <fieldset disabled={locked} className="product-step-fields">
+        <fieldset
+          disabled={locked || !writable}
+          className="product-step-fields"
+        >
           <div className="product-step-heading">
             <h3 ref={heading} tabIndex={-1}>
               {productSteps[stepIndex].title}
@@ -510,7 +516,7 @@ export function ProductEditor({
             <button
               type="button"
               className="button secondary draft-button"
-              disabled={locked}
+              disabled={locked || !writable}
               onClick={() => void save(false)}
             >
               <Save size={16} aria-hidden="true" />
@@ -532,7 +538,7 @@ export function ProductEditor({
               <button
                 className="button publish-button"
                 type="button"
-                disabled={locked}
+                disabled={locked || !writable || !can("products.edit")}
                 onClick={() => void save(true)}
               >
                 <Send size={16} aria-hidden="true" />

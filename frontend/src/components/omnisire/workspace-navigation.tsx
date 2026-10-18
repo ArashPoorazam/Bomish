@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { hasStaffPermission } from "@/lib/staff-permissions";
 import { fa } from "@/lib/format";
 import { usePathname } from "next/navigation";
 import {
@@ -36,14 +37,29 @@ export const reportSections = [
   ["searches", "جستجوها"],
 ];
 export const sectionPermission = (key: string) =>
-  key === "support" || key === "custom"
-    ? "requests"
-    : key === "suggestions"
-      ? "products"
-      : key;
+  key === "suggestions" ? "home" : key;
+const managementLinks = [
+  {
+    id: "overview",
+    href: "/omnisire",
+    label: "نمای کلی",
+    Icon: LayoutDashboard,
+  },
+  { id: "members", href: "/omnisire/members", label: "همکاران", Icon: Users },
+  {
+    id: "analytics",
+    href: "/omnisire/analytics",
+    label: "تحلیل داده‌ها",
+    Icon: ChartNoAxesCombined,
+    children: reportSections,
+  },
+  { id: "shipping", href: "/omnisire/shipping", label: "ارسال", Icon: Truck },
+  { id: "events", href: "/omnisire/events", label: "رویدادها", Icon: History },
+];
 export function WorkspaceNavigation({
   owner,
   permissions,
+  role,
   activeSection,
   onSectionChange,
   locked,
@@ -52,6 +68,7 @@ export function WorkspaceNavigation({
 }: {
   owner: boolean;
   permissions: string[];
+  role: string;
   activeSection?: string;
   onSectionChange?: (s: string) => void;
   locked: boolean;
@@ -60,40 +77,10 @@ export function WorkspaceNavigation({
 }) {
   const path = usePathname();
   const [closed, setClosed] = useState<Record<string, boolean>>({});
+  const can = (key: string) => hasStaffPermission({ role, permissions }, key);
+  const management = managementLinks.filter((item) => can(item.id));
   const groups = owner
-    ? [
-        {
-          id: "home",
-          href: "/omnisire",
-          label: "نمای کلی",
-          Icon: LayoutDashboard,
-        },
-        {
-          id: "members",
-          href: "/omnisire/members",
-          label: "همکاران",
-          Icon: Users,
-        },
-        {
-          id: "analytics",
-          href: "/omnisire/analytics",
-          label: "تحلیل داده‌ها",
-          Icon: ChartNoAxesCombined,
-          children: reportSections,
-        },
-        {
-          id: "shipping",
-          href: "/omnisire/shipping",
-          label: "ارسال",
-          Icon: Truck,
-        },
-        {
-          id: "events",
-          href: "/omnisire/events",
-          label: "رویدادها",
-          Icon: History,
-        },
-      ]
+    ? management
     : [
         {
           id: "store",
@@ -103,7 +90,7 @@ export function WorkspaceNavigation({
           children: Object.entries(sectionLabels).filter(
             ([key]) =>
               !["orders", "support", "custom", "sales"].includes(key) &&
-              permissions.includes(sectionPermission(key)),
+              can(sectionPermission(key)),
           ),
         },
         {
@@ -114,10 +101,10 @@ export function WorkspaceNavigation({
           children: Object.entries(sectionLabels).filter(
             ([key]) =>
               ["orders", "support", "custom"].includes(key) &&
-              permissions.includes(sectionPermission(key)),
+              can(sectionPermission(key)),
           ),
         },
-        ...(permissions.includes("sales")
+        ...(can("sales")
           ? [
               {
                 id: "sales",
@@ -127,6 +114,7 @@ export function WorkspaceNavigation({
               },
             ]
           : []),
+        ...management,
       ];
   const badge = (key: string) => {
     const n = counts?.[key as keyof NotificationCounts] || 0;

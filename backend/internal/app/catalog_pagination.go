@@ -127,7 +127,7 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 	listResponse(w, r, out, total)
 }
 func (a *App) productOptions(w http.ResponseWriter, r *http.Request) {
-	if !(can(r, "products") || can(r, "articles") || can(r, "categories") || can(r, "pricing")) {
+	if !(can(r, "products") || can(r, "articles") || can(r, "categories") || can(r, "pricing") || can(r, "home")) {
 		fail(w, 403, "به این بخش دسترسی ندارید")
 		return
 	}

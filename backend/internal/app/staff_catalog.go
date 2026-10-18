@@ -55,6 +55,9 @@ func (a *App) saveProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	if !authorizeCatalogSave(w, r, tx, "products", "products", p.ID) {
+		return
+	}
 	if _, e = tx.Exec(r.Context(), "SELECT set_config('bomish.actor',$1,true)", current(r).StaffID); e != nil {
 		a.dbError(w, e)
 		return
@@ -66,7 +69,7 @@ func (a *App) saveProduct(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, err)
 		return
 	}
-	if !can(r, "pricing") {
+	if !can(r, "pricing.edit") {
 		var previous domain.Product
 		_ = json.Unmarshal(oldRaw, &previous)
 		var draft []byte
@@ -130,18 +133,7 @@ func (a *App) publishProduct(w http.ResponseWriter, r *http.Request) {
 	var p domain.Product
 	_ = json.Unmarshal(raw, &p)
 
-	for _, v := range p.Packages {
-		if err = v.ValidateMeasurements(true); err != nil {
-			shippingError(w, 422, "missing_measurements", err.Error())
-			return
-		}
-	}
-
-	if e = p.Validate(true); e != nil {
-		fail(w, 400, e.Error())
-		return
-	}
-	if !can(r, "pricing") {
+	if !can(r, "pricing.edit") {
 		var published []byte
 		var previous domain.Product
 		if e = tx.QueryRow(r.Context(), "SELECT content FROM products WHERE id=$1", id).Scan(&published); e != nil {
@@ -154,6 +146,19 @@ func (a *App) publishProduct(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	for _, v := range p.Packages {
+		if err = v.ValidateMeasurements(true); err != nil {
+			shippingError(w, 422, "missing_measurements", err.Error())
+			return
+		}
+	}
+
+	if e = p.Validate(true); e != nil {
+		fail(w, 400, e.Error())
+		return
+	}
+
 	p.Status = "published"
 	raw, _ = json.Marshal(p)
 	_, e = tx.Exec(r.Context(), `UPDATE products SET slug=$1,name=$2,category_id=$3,first_published_at=CASE WHEN status='draft' THEN coalesce(first_published_at,now()) ELSE first_published_at END,status='published',price_rials=$4,min_grams=$5,step_grams=$6,max_grams=$7,content=$8,search_text=$9,updated_at=now() WHERE id=$10`, p.Slug, p.Name, p.CategoryID, p.PriceRials, p.MinGrams, p.StepGrams, p.MaxGrams, raw, searchText(p), id)
@@ -278,6 +283,9 @@ func (a *App) saveCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	if !authorizeCatalogSave(w, r, tx, "categories", "categories", r.PathValue("id")) {
+		return
+	}
 	before, e := queryMaps(r.Context(), tx, "SELECT name,description FROM categories WHERE id=$1", r.PathValue("id"))
 	if e != nil {
 		a.dbError(w, e)
@@ -353,6 +361,10 @@ func (a *App) saveArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v.ID = r.PathValue("id")
+	if v.Status == "archived" {
+		a.archiveArticle(w, r)
+		return
+	}
 	if (v.Status != "draft" && v.Status != "published" && v.Status != "archived") || v.Title == "" || v.Slug == "" || strings.ContainsAny(v.Slug, " /?#\\") || (v.Image != "" && !domain.ValidImage(v.Image)) {
 		fail(w, 400, "نام، نشانی و تصویر مقاله را بررسی کنید")
 		return
@@ -371,6 +383,9 @@ func (a *App) saveArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	if !authorizeCatalogSave(w, r, tx, "articles", "articles", v.ID) {
+		return
+	}
 	if _, e = tx.Exec(r.Context(), "SELECT set_config('bomish.actor',$1,true)", current(r).StaffID); e != nil {
 		a.dbError(w, e)
 		return
@@ -411,4 +426,56 @@ func samePricing(a, b domain.Product) bool {
 		}
 	}
 	return true
+}
+
+// The table is selected only by the three catalog handlers above.
+func authorizeCatalogSave(w http.ResponseWriter, r *http.Request, tx pgx.Tx, section, table, id string) bool {
+	if _, err := tx.Exec(r.Context(), "SELECT pg_advisory_xact_lock(hashtextextended($1,0))", table+":"+id); err != nil {
+		fail(w, 500, "ذخیره انجام نشد")
+		return false
+	}
+	var exists bool
+	if err := tx.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM "+table+" WHERE id=$1)", id).Scan(&exists); err != nil {
+		fail(w, 500, "دریافت اطلاعات انجام نشد")
+		return false
+	}
+	action := "create"
+	if exists {
+		action = "edit"
+	}
+	return requirePermission(w, r, section+"."+action)
+}
+
+// Archiving cannot smuggle content changes through a delete-only grant.
+func (a *App) archiveArticle(w http.ResponseWriter, r *http.Request) {
+	if !requirePermission(w, r, "articles.delete") {
+		return
+	}
+	tx, err := a.Pool.Begin(r.Context())
+	if err != nil {
+		a.dbError(w, err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	id := r.PathValue("id")
+	tag, err := tx.Exec(r.Context(), `UPDATE articles SET status='archived',content=jsonb_set(content,'{status}','"archived"'),updated_at=now() WHERE id=$1`, id)
+	if err != nil {
+		a.dbError(w, err)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		fail(w, 404, "مقاله پیدا نشد")
+		return
+	}
+	if _, err = tx.Exec(r.Context(), "DELETE FROM article_drafts WHERE article_id=$1", id); err == nil {
+		err = auditDetail(r.Context(), tx, current(r).StaffID, "article.save", id, map[string]string{"status": "archived"})
+	}
+	if err == nil {
+		err = tx.Commit(r.Context())
+	}
+	if err != nil {
+		a.dbError(w, err)
+		return
+	}
+	write(w, 200, map[string]bool{"ok": true})
 }

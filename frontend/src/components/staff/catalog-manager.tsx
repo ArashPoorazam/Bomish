@@ -1,4 +1,5 @@
 "use client";
+import { Permission } from "@/components/staff/permissions";
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import { Plus, RotateCcw, ArrowRight, PackageX } from "lucide-react";
@@ -100,13 +101,15 @@ export function CatalogManager({
     >
       {!selected && (
         <div className="catalog-toolbar-area">
-          <button
-            className="button catalog-add-product"
-            disabled={editorState.busy}
-            onClick={() => selectProduct(newProduct())}
-          >
-            <Plus size={18} aria-hidden="true" /> افزودن محصول
-          </button>
+          <Permission name="products.create">
+            <button
+              className="button catalog-add-product"
+              disabled={editorState.busy}
+              onClick={() => selectProduct(newProduct())}
+            >
+              <Plus size={18} aria-hidden="true" /> افزودن محصول
+            </button>
+          </Permission>
           <section
             className="catalog-toolbar"
             aria-label="جستجو و فیلتر محصولات"
@@ -308,12 +311,14 @@ export function CategoryManager({
   return (
     <div className="staff-workspace">
       <div className="catalog-toolbar-area">
-        <Link
-          className="button catalog-add-product"
-          href="/staff/categories/new"
-        >
-          <Plus size={18} aria-hidden="true" /> دسته‌بندی جدید
-        </Link>
+        <Permission name="categories.create">
+          <Link
+            className="button catalog-add-product"
+            href="/staff/categories/new"
+          >
+            <Plus size={18} aria-hidden="true" /> دسته‌بندی جدید
+          </Link>
+        </Permission>
         <section className="catalog-toolbar" aria-label="جستجوی دسته‌بندی‌ها">
           <div className="catalog-toolbar-heading">
             <strong>جستجو</strong>
@@ -365,24 +370,26 @@ export function CategoryManager({
                       ویرایش
                     </Link>
                     {count === 0 && (
-                      <button
-                        className="text-link"
-                        disabled={busy}
-                        onClick={async () => {
-                          setBusy(true);
-                          setError("");
-                          try {
-                            await api("/staff/categories/" + c.id, "DELETE");
-                            await reload();
-                          } catch (e) {
-                            setError((e as Error).message);
-                          } finally {
-                            setBusy(false);
-                          }
-                        }}
-                      >
-                        حذف دسته خالی
-                      </button>
+                      <Permission name="categories.delete">
+                        <button
+                          className="text-link"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            setError("");
+                            try {
+                              await api("/staff/categories/" + c.id, "DELETE");
+                              await reload();
+                            } catch (e) {
+                              setError((e as Error).message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          حذف دسته خالی
+                        </button>
+                      </Permission>
                     )}
                   </div>
                 </article>

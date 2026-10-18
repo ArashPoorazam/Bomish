@@ -27,9 +27,7 @@ test("owner creates salesperson, referral earns commission, payout appears in sa
       fullPage: true,
     });
     await owner.goto("/omnisire/members");
-    await owner
-      .getByRole("button", { name: "همکار جدید", exact: true })
-      .click();
+    await owner.getByRole("link", { name: "همکار جدید", exact: true }).click();
     const name = "فروشنده مرورگر " + Date.now(),
       username = "sales-" + Date.now();
     await owner.getByLabel("نام و نام خانوادگی", { exact: true }).fill(name);

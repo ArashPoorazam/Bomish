@@ -295,7 +295,7 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
     .getByLabel("نشانی‌های ذخیره‌شده")
     .selectOption({ index: 1 });
   await expect(
-    customerPage.getByText("پیک اسنپ · 1 کارتن ارسال"),
+    customerPage.getByText("ارسال با پیک در تهران · 1 کارتن ارسال"),
   ).toBeVisible();
   await customerPage.screenshot({
     path: testInfo.outputPath("checkout-mobile.png"),
@@ -318,7 +318,7 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
     .getByRole("button", { name: new RegExp(`جزئیات سفارش ${id.slice(0, 8)}`) })
     .click();
   await expect(
-    page.getByRole("heading", { name: "پیک اسنپ · ارسال سفارش" }),
+    page.getByRole("heading", { name: "ارسال تهران · ارسال سفارش" }),
   ).toBeVisible();
   // Existing per-line checklist plus physical parcel confirmation are both mandatory.
 
@@ -350,17 +350,20 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
   await page
     .getByRole("button", { name: "تأیید آمادگی ارسال", exact: true })
     .click();
+  await page.getByRole("radio", { name: /^اسنپ/ }).check();
   await page
     .getByRole("button", { name: "بررسی هزینه پیک", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "درخواست پیک", exact: true }),
+    page.getByRole("button", { name: "درخواست پیک اسنپ", exact: true }),
   ).toBeEnabled();
   await page.screenshot({
     path: testInfo.outputPath("dispatch-review-desktop.png"),
     fullPage: true,
   });
-  await page.getByRole("button", { name: "درخواست پیک", exact: true }).click();
+  await page
+    .getByRole("button", { name: "درخواست پیک اسنپ", exact: true })
+    .click();
   await page
     .getByRole("button", { name: "به‌روزرسانی وضعیت ارسال", exact: true })
     .click();
@@ -393,6 +396,235 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
     path: testInfo.outputPath("customer-delivered-mobile.png"),
     fullPage: true,
   });
+  expect(errors).toEqual([]);
+  await customer.close();
+});
+
+test("Tehran staff courier: role, packing, assignment, history and delivery", async ({
+  browser,
+  page,
+}, testInfo) => {
+  test.setTimeout(150000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const headers = await loginStaffAPI(page.request, origin, "owner");
+  if (!shippingProduct) {
+    const products = (await (
+      await page.request.get("/api/v1/staff/products?pageSize=100")
+    ).json()) as Product[];
+    shippingProduct = products.find(
+      (p) => p.packages[0]?.unit === "g" && p.packages[0]?.amount === 100,
+    )!;
+  }
+  await page.goto("/omnisire/members/new");
+  const form = page
+    .locator("form")
+    .filter({ has: page.getByLabel("نام و نام خانوادگی", { exact: true }) });
+  await form
+    .getByLabel("نام و نام خانوادگی", { exact: true })
+    .fill("پیک تهران آزمایشی");
+  await form
+    .getByLabel("نام کاربری", { exact: true })
+    .fill(`courier-${Date.now()}`);
+  await form.getByLabel("شماره همراه", { exact: true }).fill("09123334455");
+  await form
+    .getByLabel("شماره کارت بانکی", { exact: true })
+    .fill("5022291002696175");
+  await form.getByLabel("گذرواژه اولیه").fill("courier-test-password");
+  await form
+    .getByRole("combobox", { name: "نقش", exact: true })
+    .selectOption("courier");
+  const createdPromise = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/omnisire/members") && r.request().method() === "POST",
+  );
+  await form.getByRole("button", { name: "ایجاد حساب همکار" }).click();
+  const createdResponse = await createdPromise;
+  expect(createdResponse.status()).toBe(201);
+  const created = await createdResponse.json();
+  await checked(
+    page.request,
+    "/omnisire/members",
+    "POST",
+    {
+      fullName: "پیک غیرفعال آزمایشی",
+      username: `courier-inactive-${Date.now()}`,
+      phone: "09123334456",
+      bankCard: "5022291002696175",
+      role: "courier",
+      active: false,
+      password: "courier-test-password",
+      restrictions: [],
+    },
+    headers,
+  );
+
+  const customer = await browser.newContext({ baseURL: origin });
+  const customerPage = await customer.newPage();
+  const session = await (await customer.request.get("/api/v1/session")).json();
+  const ch = { Origin: origin, "X-CSRF-Token": session.csrf };
+  const phone = "09125550129";
+  const otp = await checked(
+    customer.request,
+    "/auth/request",
+    "POST",
+    { phone },
+    ch,
+  );
+  await checked(
+    customer.request,
+    "/auth/verify",
+    "POST",
+    { phone, code: otp.devCode },
+    ch,
+  );
+  await checked(
+    customer.request,
+    `/cart/items/${shippingProduct.id}`,
+    "PUT",
+    { packageId: shippingProduct.packages[0].id, quantity: 1 },
+    ch,
+  );
+  const quote = await checked(
+    customer.request,
+    "/checkout/quote",
+    "POST",
+    { address: { ...address, phone } },
+    ch,
+  );
+  expect(quote.method).toBe("snapp");
+  const checkout = await checked(
+    customer.request,
+    "/checkout",
+    "POST",
+    {
+      address: { ...address, phone },
+      shippingQuoteId: quote.shippingQuoteId,
+      method: "snapp",
+      expectedTotalRials: quote.totalRials,
+      idempotencyKey: crypto.randomUUID(),
+    },
+    ch,
+  );
+  const id = checkout.orderId;
+  await checked(
+    customer.request,
+    `/orders/${id}/simulate`,
+    "POST",
+    { success: true },
+    ch,
+  );
+  await page.goto(`/staff?section=orders&q=${id}`);
+  await page
+    .getByRole("button", { name: new RegExp(`جزئیات سفارش ${id.slice(0, 8)}`) })
+    .click();
+  await expect(page.getByRole("radio", { name: /^پیک بومیش/ })).toHaveCount(0);
+  const itemChecks = page.locator(".staff-packing-item input[type=checkbox]");
+  for (let i = 0; i < (await itemChecks.count()); i++)
+    await itemChecks.nth(i).check();
+  await page
+    .getByRole("checkbox", {
+      name: "محتویات، وزن و بسته‌بندی واقعی این کارتن را تأیید می‌کنم",
+    })
+    .check();
+  await page
+    .getByLabel("دلیل اصلاح / نتیجه بررسی واقعی")
+    .fill("تأیید بسته برای پیک بومیش");
+  await page.getByRole("button", { name: "ذخیره بسته‌بندی واقعی" }).click();
+  await expect(page.getByText("تغییر ثبت شد.", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "تأیید آمادگی ارسال", exact: true })
+    .click();
+  await page.route(
+    "**/api/v1/staff/shipping/couriers",
+    (route) =>
+      route.fulfill({
+        status: 503,
+        json: { error: "خطای آزمایشی دریافت پیک‌ها" },
+      }),
+    { times: 1 },
+  );
+  await page.getByRole("radio", { name: /^پیک بومیش/ }).check();
+  await expect(page.getByText("خطای آزمایشی دریافت پیک‌ها")).toBeVisible();
+  await page.route(
+    "**/api/v1/staff/shipping/couriers",
+    (route) => route.fulfill({ json: [] }),
+    { times: 1 },
+  );
+  await page.getByRole("button", { name: "تازه‌سازی فهرست پیک‌ها" }).click();
+  await expect(page.getByText(/هنوز پیک فعالی ثبت نشده است/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "ثبت تحویل به پیک بومیش" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "تازه‌سازی فهرست پیک‌ها" }).click();
+  const select = page.getByRole("combobox", { name: "همکار پیک", exact: true });
+  await expect(select).toBeEnabled();
+  await expect(select.locator(`option[value="${created.id}"]`)).toHaveCount(1);
+  await expect(
+    select.getByRole("option", { name: /پیک غیرفعال آزمایشی/ }),
+  ).toHaveCount(0);
+  await select.selectOption(created.id);
+  const dispatch = page.getByRole("button", { name: "ثبت تحویل به پیک بومیش" });
+  await expect(dispatch).toBeDisabled();
+  await page
+    .getByRole("checkbox", {
+      name: "همه کارتن‌ها را به پیک تهران آزمایشی تحویل داده‌ام.",
+    })
+    .check();
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await select.scrollIntoViewIfNeeded();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBeTruthy();
+    await page.screenshot({
+      path: testInfo.outputPath(`own-courier-${width}.png`),
+      fullPage: true,
+    });
+  }
+  await dispatch.click();
+  await expect(
+    page.getByRole("heading", { name: "پیک بومیش · پیک تهران آزمایشی" }),
+  ).toBeVisible();
+  await page.reload();
+  await page
+    .getByRole("button", { name: new RegExp(`جزئیات سفارش ${id.slice(0, 8)}`) })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "پیک بومیش · پیک تهران آزمایشی" }),
+  ).toBeVisible();
+  const delivery = await (
+    await page.request.get(`/api/v1/staff/orders/${id}/delivery`)
+  ).json();
+  expect(delivery).toMatchObject({
+    assignedCourier: { id: created.id },
+    status: "picked_up",
+    method: "snapp",
+    attemptId: "",
+    actualCostRials: null,
+  });
+  await page
+    .getByRole("button", { name: "تأیید تحویل به مشتری", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("button", { name: "تأیید", exact: true }),
+  ).toBeDisabled();
+  await dialog.getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "تأیید", exact: true }).click();
+  await expect(
+    page.getByText("تحویل سفارش به مشتری تأیید شده است."),
+  ).toBeVisible();
+  await customerPage.goto(`/account/orders/${id}`);
+  await expect(customerPage.getByText(/پیک بومیش/)).toBeVisible();
+  const result = await (
+    await customer.request.get(`/api/v1/orders/${id}`)
+  ).json();
+  expect(result.order.totalRials).toBe(quote.totalRials);
+  expect(result.order.status).toBe("received");
+  expect(JSON.stringify(result)).not.toContain(created.id);
   expect(errors).toEqual([]);
   await customer.close();
 });

@@ -134,8 +134,13 @@ export function OrderView({
         {o.shipping && (
           <section className="stack delivery-selection">
             <h4>
-              {providerName(o.shipping.method)} ·{" "}
-              {fa(o.shipping.parcels.length)} کارتن ارسال
+              {o.shipping.method === "snapp" &&
+              ["not_requested", "cancelled", "failed"].includes(
+                o.shipping.status,
+              )
+                ? "ارسال با پیک در تهران"
+                : providerName(o.shipping.method)}{" "}
+              · {fa(o.shipping.parcels.length)} کارتن ارسال
             </h4>
             <p>{deliveryStatuses[o.shipping.status] ?? "در حال بررسی ارسال"}</p>
             {o.shipping.simulated && <small>ارسال شبیه‌سازی‌شده</small>}

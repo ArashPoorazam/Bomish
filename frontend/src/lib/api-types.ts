@@ -7216,6 +7216,230 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/omnisire/permission-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Staff permission catalog and role defaults */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffPermissionOptions"];
+                    };
+                };
+                /** @description Access denied */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/own-courier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm handoff to an active staff courier */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                        courierId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/orders/{id}/own-courier/delivered": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm customer receipt from the assigned staff courier */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: int64 */
+                        version: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeliveryRecord"];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/shipping/couriers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active, non-archived staff couriers for order fulfillment */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffCourier"][];
+                    };
+                };
+                /** @description Stale version, quote or state */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Shipping unavailable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7349,7 +7573,7 @@ export interface components {
             csrf: string;
             authenticated: boolean;
             /** @enum {string} */
-            role: "" | "owner" | "manager" | "editor" | "operator" | "salesperson";
+            role: "" | "owner" | "manager" | "editor" | "operator" | "salesperson" | "courier";
             development: boolean;
             permissions: string[];
             staffId: string;
@@ -7429,6 +7653,10 @@ export interface components {
             createdAt?: string;
             restrictions: string[];
             archivedAt?: string | null;
+            /** @description Explicit section/action grants and denials; omitted keys inherit role defaults. An empty object resets overrides. */
+            permissionOverrides: {
+                [key: string]: boolean;
+            };
         };
         Error: {
             error: string;
@@ -7615,10 +7843,14 @@ export interface components {
             phone: string;
             bankCard: string;
             /** @enum {string} */
-            role: "manager" | "editor" | "operator" | "salesperson";
+            role: "manager" | "editor" | "operator" | "salesperson" | "courier";
             active: boolean;
-            restrictions: ("products" | "articles" | "categories" | "pricing" | "orders" | "shipping" | "sales")[];
+            restrictions: ("products" | "articles" | "categories" | "pricing" | "orders" | "shipping" | "sales" | "requests")[];
             password?: string;
+            /** @description Explicit section/action grants and denials; omitted keys inherit role defaults. An empty object resets overrides. */
+            permissionOverrides?: {
+                [key: string]: boolean;
+            };
         };
         MemberCredentials: {
             password?: string;
@@ -7963,6 +8195,7 @@ export interface components {
             orderId: string;
             /** Format: int64 */
             version: number;
+            /** @description Checkout pricing method (snapp or post). assignedCourier identifies internal fulfillment without altering the quote. */
             method: string;
             status: string;
             ready: boolean;
@@ -7976,8 +8209,10 @@ export interface components {
             updatedAt: string;
             driverName?: string;
             driverPhone?: string;
+            assignedCourier?: components["schemas"]["StaffCourier"];
         };
         Delivery: {
+            /** @description snapp, post, or own_courier. Courier member identity is staff-only. */
             method: string;
             service: string;
             status: string;
@@ -8023,6 +8258,21 @@ export interface components {
             /** @enum {string} */
             section: "origin" | "boxes" | "products" | "technical";
             message: string;
+        };
+        StaffPermissionOptions: {
+            sections: {
+                key: string;
+                label: string;
+                actions: string[];
+            }[];
+            defaults: {
+                [key: string]: string[];
+            };
+        };
+        StaffCourier: {
+            id: string;
+            fullName: string;
+            phone: string;
         };
     };
     responses: never;

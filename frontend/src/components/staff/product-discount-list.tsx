@@ -1,4 +1,5 @@
 "use client";
+import { useStaffPermission } from "@/components/staff/permissions";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { fa } from "@/lib/format";
@@ -15,6 +16,7 @@ export function ProductDiscountList({
   onChanged: () => Promise<void>;
 }) {
   const [items, setItems] = useState<ProductDiscount[]>([]);
+  const can = useStaffPermission();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -118,7 +120,7 @@ export function ProductDiscountList({
                 <button
                   type="button"
                   className="button secondary"
-                  disabled={busy}
+                  disabled={busy || !can("pricing.edit")}
                   onClick={() => void change(item, false)}
                 >
                   {item.active ? "غیرفعال کردن" : "فعال کردن"}
@@ -126,7 +128,7 @@ export function ProductDiscountList({
                 <button
                   type="button"
                   className="button secondary"
-                  disabled={busy}
+                  disabled={busy || !can("pricing.delete")}
                   onClick={() => void change(item, true)}
                 >
                   حذف تخفیف

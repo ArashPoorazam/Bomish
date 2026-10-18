@@ -10,20 +10,20 @@ import (
 
 func (a *App) requestRoutes(m *http.ServeMux) {
 	m.HandleFunc("GET /api/v1/requests/{id}/messages/{message}/image", func(w http.ResponseWriter, r *http.Request) { a.messageImage(w, r, false) })
-	m.HandleFunc("GET /api/v1/staff/requests/{id}/messages/{message}/image", a.permit(func(w http.ResponseWriter, r *http.Request) { a.messageImage(w, r, true) }, "requests"))
-	m.HandleFunc("GET /api/v1/staff/requests/{id}/orders", a.permit(a.requestOrders, "requests"))
+	m.HandleFunc("GET /api/v1/staff/requests/{id}/messages/{message}/image", a.permitRequest(func(w http.ResponseWriter, r *http.Request) { a.messageImage(w, r, true) }))
+	m.HandleFunc("GET /api/v1/staff/requests/{id}/orders", a.permitRequest(a.requestOrders))
 	m.HandleFunc("GET /api/v1/requests", a.customerRequests)
 	m.HandleFunc("POST /api/v1/requests", a.createRequest)
 	m.HandleFunc("GET /api/v1/requests/{id}/messages", a.customerMessages)
 	m.HandleFunc("POST /api/v1/requests/{id}/messages", a.customerMessage)
-	m.HandleFunc("GET /api/v1/staff/requests", a.permit(a.staffRequests, "requests"))
-	m.HandleFunc("GET /api/v1/staff/requests/{id}", a.permit(a.staffRequest, "requests"))
-	m.HandleFunc("PATCH /api/v1/staff/requests/{id}", a.permit(a.decideRequest, "requests"))
-	m.HandleFunc("GET /api/v1/staff/requests/{id}/messages", a.permit(a.staffMessages, "requests"))
-	m.HandleFunc("POST /api/v1/staff/requests/{id}/messages", a.permit(a.staffMessage, "requests"))
-	m.HandleFunc("POST /api/v1/staff/requests/{id}/read", a.permit(a.readRequest, "requests"))
+	m.HandleFunc("GET /api/v1/staff/requests", a.permitRequest(a.staffRequests))
+	m.HandleFunc("GET /api/v1/staff/requests/{id}", a.permitRequest(a.staffRequest))
+	m.HandleFunc("PATCH /api/v1/staff/requests/{id}", a.permitRequest(a.decideRequest))
+	m.HandleFunc("GET /api/v1/staff/requests/{id}/messages", a.permitRequest(a.staffMessages))
+	m.HandleFunc("POST /api/v1/staff/requests/{id}/messages", a.permitRequest(a.staffMessage))
+	m.HandleFunc("POST /api/v1/staff/requests/{id}/read", a.permitRequest(a.readRequest))
 	m.HandleFunc("GET /api/v1/staff/notifications", a.permitAny(a.requestNotifications, "requests", "orders"))
-	m.HandleFunc("POST /api/v1/staff/orders/{id}/read", a.permit(a.readOrder, "orders"))
+	m.HandleFunc("POST /api/v1/staff/orders/{id}/read", a.permit(a.readOrder, "orders", "view"))
 }
 
 const requestColumns = `q.id,q.kind,q.description,q.quantity,q.budget_rials AS "budgetRials",q.status,q.response,q.version,q.created_at AS "createdAt",q.updated_at AS "updatedAt"`

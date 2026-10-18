@@ -1908,6 +1908,19 @@ details[open] > summary {
   flex-wrap: wrap;
   gap: 12px;
 }
+.address-map .address-map-location {
+  min-height: 44px;
+  width: auto;
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 22px;
+  white-space: nowrap;
+}
+.address-map-location svg {
+  flex-shrink: 0;
+}
 .analytics {
   display: grid;
   gap: 24px;
@@ -5256,4 +5269,47 @@ details[open] > summary {
     animation: none;
     background: #bb8525;
   }
+}
+
+.permission-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.omni-access > .permission-sections {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+.permission-section {
+  padding-block: 16px;
+  border-top: 1px solid var(--line);
+}
+.permission-section strong {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.permission-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+.permission-options small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.omni-access > .permission-heading {
+  align-items: flex-start;
+  gap: 12px 20px;
+  margin-top: 0;
+}
+.permission-heading p {
+  flex: 1 1 240px;
+}
+.permission-reset {
+  flex-shrink: 0;
+  margin-inline-start: auto;
 }

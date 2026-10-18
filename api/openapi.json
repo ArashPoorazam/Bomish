@@ -6801,6 +6801,205 @@
           }
         }
       }
+    },
+    "/omnisire/permission-options": {
+      "get": {
+        "summary": "Staff permission catalog and role defaults",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffPermissionOptions"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        }
+      }
+    },
+    "/staff/orders/{id}/own-courier": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "courierId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "version",
+                  "courierId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "summary": "Confirm handoff to an active staff courier"
+      }
+    },
+    "/staff/orders/{id}/own-courier/delivered": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRecord"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                },
+                "required": [
+                  "version"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "summary": "Confirm customer receipt from the assigned staff courier"
+      }
+    },
+    "/staff/shipping/couriers": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffCourier"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale version, quote or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Shipping unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List active, non-archived staff couriers for order fulfillment"
+      }
     }
   },
   "components": {
@@ -7274,7 +7473,8 @@
               "manager",
               "editor",
               "operator",
-              "salesperson"
+              "salesperson",
+              "courier"
             ]
           },
           "development": {
@@ -7525,7 +7725,8 @@
           "restrictions",
           "referralCode",
           "balanceRials",
-          "profileIncomplete"
+          "profileIncomplete",
+          "permissionOverrides"
         ],
         "properties": {
           "id": {
@@ -7572,6 +7773,13 @@
               "string",
               "null"
             ]
+          },
+          "permissionOverrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "description": "Explicit section/action grants and denials; omitted keys inherit role defaults. An empty object resets overrides."
           }
         }
       },
@@ -8214,7 +8422,8 @@
               "manager",
               "editor",
               "operator",
-              "salesperson"
+              "salesperson",
+              "courier"
             ]
           },
           "active": {
@@ -8231,12 +8440,20 @@
                 "pricing",
                 "orders",
                 "shipping",
-                "sales"
+                "sales",
+                "requests"
               ]
             }
           },
           "password": {
             "type": "string"
+          },
+          "permissionOverrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "description": "Explicit section/action grants and denials; omitted keys inherit role defaults. An empty object resets overrides."
           }
         },
         "required": [
@@ -9535,7 +9752,8 @@
             "format": "int64"
           },
           "method": {
-            "type": "string"
+            "type": "string",
+            "description": "Checkout pricing method (snapp or post). assignedCourier identifies internal fulfillment without altering the quote."
           },
           "status": {
             "type": "string"
@@ -9591,6 +9809,9 @@
           },
           "driverPhone": {
             "type": "string"
+          },
+          "assignedCourier": {
+            "$ref": "#/components/schemas/StaffCourier"
           }
         },
         "required": [
@@ -9614,7 +9835,8 @@
         "type": "object",
         "properties": {
           "method": {
-            "type": "string"
+            "type": "string",
+            "description": "snapp, post, or own_courier. Courier member identity is staff-only."
           },
           "service": {
             "type": "string"
@@ -9794,6 +10016,68 @@
             ]
           },
           "message": {
+            "type": "string"
+          }
+        }
+      },
+      "StaffPermissionOptions": {
+        "type": "object",
+        "required": [
+          "sections",
+          "defaults"
+        ],
+        "properties": {
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "key",
+                "label",
+                "actions"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "defaults": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "StaffCourier": {
+        "type": "object",
+        "required": [
+          "id",
+          "fullName",
+          "phone"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "phone": {
             "type": "string"
           }
         }

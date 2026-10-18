@@ -1,4 +1,5 @@
 "use client";
+import { Permission } from "@/components/staff/permissions";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { ArrowRight, BookOpen, Pencil, Plus, RotateCcw } from "lucide-react";
@@ -76,12 +77,14 @@ export function ArticleManager({
     <div className="staff-workspace journal-workspace">
       {!selected && (
         <div className="catalog-toolbar-area">
-          <button
-            className="button catalog-add-product"
-            onClick={() => select(newArticle())}
-          >
-            <Plus size={18} aria-hidden="true" /> مقاله جدید
-          </button>
+          <Permission name="articles.create">
+            <button
+              className="button catalog-add-product"
+              onClick={() => select(newArticle())}
+            >
+              <Plus size={18} aria-hidden="true" /> مقاله جدید
+            </button>
+          </Permission>
           <section
             className="catalog-toolbar"
             aria-label="جستجو و فیلتر مقاله‌ها"

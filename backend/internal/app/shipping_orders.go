@@ -22,6 +22,7 @@ type dispatchReview struct {
 	Quote     carrier.Quote `json:"quote"`
 }
 type deliveryRecord struct {
+	AssignedCourier *staffCourier          `json:"assignedCourier,omitempty"`
 	OrderID         string                 `json:"orderId"`
 	Version         int64                  `json:"version"`
 	Method          string                 `json:"method"`
@@ -42,13 +43,19 @@ type deliveryRecord struct {
 func loadDelivery(ctx context.Context, q querier, id string, lock bool) (deliveryRecord, error) {
 	d := deliveryRecord{OrderID: id, AllowedActions: []string{}, Events: []domain.DeliveryEvent{}}
 	var raw, parcels, review []byte
+	var courierID *string
+	var courier staffCourier
 	suffix := ""
 	if lock {
 		suffix = " FOR UPDATE"
 	}
-	e := q.QueryRow(ctx, "SELECT version,method,delivery_status,ready,snapshot,parcels,actual_cost_rials,dispatch_quote,updated_at FROM order_shipping WHERE order_id=$1"+suffix, id).Scan(&d.Version, &d.Method, &d.Status, &d.Ready, &raw, &parcels, &d.ActualCostRials, &review, &d.UpdatedAt)
+	e := q.QueryRow(ctx, "SELECT version,method,delivery_status,ready,snapshot,parcels,actual_cost_rials,dispatch_quote,updated_at,courier_staff_id,courier_name,courier_phone FROM order_shipping WHERE order_id=$1"+suffix, id).Scan(&d.Version, &d.Method, &d.Status, &d.Ready, &raw, &parcels, &d.ActualCostRials, &review, &d.UpdatedAt, &courierID, &courier.FullName, &courier.Phone)
 	if e != nil {
 		return d, e
+	}
+	if courierID != nil {
+		courier.ID = *courierID
+		d.AssignedCourier = &courier
 	}
 	if e = json.Unmarshal(raw, &d.Snapshot); e != nil {
 		return d, e
@@ -86,14 +93,17 @@ func (a *App) staffDelivery(w http.ResponseWriter, r *http.Request) {
 		if d.Ready {
 			d.AllowedActions = append(d.AllowedActions, "dispatch_quote")
 			if d.Method == "snapp" {
-				d.AllowedActions = append(d.AllowedActions, "book")
+				d.AllowedActions = append(d.AllowedActions, "book", "own_courier_dispatch")
 			} else {
 				d.AllowedActions = append(d.AllowedActions, "postal_dispatch")
 			}
 		}
-		if current(r).Role == "owner" || current(r).Role == "manager" {
+		if can(r, "orders.manage") {
 			d.AllowedActions = append(d.AllowedActions, "change_method")
 		}
+	}
+	if d.AssignedCourier != nil && status == "shipped" && d.Status == "picked_up" {
+		d.AllowedActions = append(d.AllowedActions, "own_courier_delivered")
 	}
 	if d.Method == "post" && status == "shipped" {
 		d.AllowedActions = append(d.AllowedActions, "delivered")
@@ -101,14 +111,17 @@ func (a *App) staffDelivery(w http.ResponseWriter, r *http.Request) {
 	if d.Method == "post" && (status == "paid" || status == "packing" || status == "shipped" || status == "received") {
 		d.AllowedActions = append(d.AllowedActions, "postal_details")
 	}
-	if d.Method == "snapp" && d.Status != "not_requested" {
+	if d.Method == "snapp" && d.AssignedCourier == nil && d.Status != "not_requested" {
 		d.AllowedActions = append(d.AllowedActions, "refresh")
 	}
 	if d.Status == "awaiting_courier" || d.Status == "accepted" {
 		d.AllowedActions = append(d.AllowedActions, "cancel")
 	}
-	if d.Status == "unknown" && (current(r).Role == "owner" || current(r).Role == "manager") {
+	if d.Status == "unknown" && (can(r, "orders.manage")) {
 		d.AllowedActions = append(d.AllowedActions, "resolve")
+	}
+	if !can(r, "orders.edit") {
+		d.AllowedActions = []string{}
 	}
 	var response []byte
 	e = a.Pool.QueryRow(r.Context(), "SELECT id,response FROM shipment_attempts WHERE order_id=$1 ORDER BY created_at DESC LIMIT 1", d.OrderID).Scan(&d.AttemptID, &response)
@@ -116,7 +129,7 @@ func (a *App) staffDelivery(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	if len(response) > 0 {
+	if len(response) > 0 && d.AssignedCourier == nil {
 		var booking carrier.Booking
 		if e = json.Unmarshal(response, &booking); e != nil {
 			a.dbError(w, e)
@@ -158,6 +171,9 @@ func attachDelivery(ctx context.Context, q querier, o *domain.Order) error {
 		return e
 	}
 	v := &domain.Delivery{Method: d.Method, Service: d.Snapshot.Service, Status: d.Status, Simulated: d.Snapshot.CarrierQuote.Simulated, Parcels: []domain.CustomerParcel{}}
+	if d.AssignedCourier != nil {
+		v.Method, v.Service = "own_courier", "own_courier"
+	}
 	for _, p := range d.Parcels {
 		url := ""
 		if d.Method == "post" && validTracking(p.Tracking) {
@@ -176,7 +192,13 @@ func saveDelivery(ctx context.Context, tx pgx.Tx, d deliveryRecord) error {
 	if d.Review != nil {
 		review, _ = json.Marshal(d.Review)
 	}
-	_, e := tx.Exec(ctx, "UPDATE order_shipping SET version=version+1,method=$2,delivery_status=$3,ready=$4,snapshot=$5,parcels=$6,actual_cost_rials=$7,dispatch_quote=$8,updated_at=now() WHERE order_id=$1", d.OrderID, d.Method, d.Status, d.Ready, snapshot, parcels, d.ActualCostRials, review)
+	var courierID *string
+	courierName, courierPhone := "", ""
+	if d.AssignedCourier != nil {
+		courierID = &d.AssignedCourier.ID
+		courierName, courierPhone = d.AssignedCourier.FullName, d.AssignedCourier.Phone
+	}
+	_, e := tx.Exec(ctx, "UPDATE order_shipping SET version=version+1,method=$2,delivery_status=$3,ready=$4,snapshot=$5,parcels=$6,actual_cost_rials=$7,dispatch_quote=$8,courier_staff_id=$9,courier_name=$10,courier_phone=$11,updated_at=now() WHERE order_id=$1", d.OrderID, d.Method, d.Status, d.Ready, snapshot, parcels, d.ActualCostRials, review, courierID, courierName, courierPhone)
 	return e
 }
 func (a *App) deliveryMutation(w http.ResponseWriter, r *http.Request, version int64, fn func(pgx.Tx, *deliveryRecord, string) error) {
@@ -357,7 +379,7 @@ func (a *App) dispatchQuote(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "روش نامعتبر است")
 		return
 	}
-	if method != d.Method && current(r).Role != "owner" && current(r).Role != "manager" {
+	if method != d.Method && !can(r, "orders.manage") {
 		fail(w, 403, "تغییر روش فقط برای مدیر مجاز است")
 		return
 	}
@@ -474,7 +496,7 @@ func (a *App) cancelShipment(w http.ResponseWriter, r *http.Request) {
 	})
 }
 func (a *App) changeDeliveryMethod(w http.ResponseWriter, r *http.Request) {
-	if current(r).Role != "owner" && current(r).Role != "manager" {
+	if !can(r, "orders.manage") {
 		fail(w, 403, "تغییر روش فقط برای مدیر مجاز است")
 		return
 	}
@@ -556,7 +578,7 @@ func (a *App) postalParcel(w http.ResponseWriter, r *http.Request) {
 	})
 }
 func (a *App) resolveShipment(w http.ResponseWriter, r *http.Request) {
-	if current(r).Role != "owner" && current(r).Role != "manager" {
+	if !can(r, "orders.manage") {
 		fail(w, 403, "رفع ابهام فقط برای مدیر مجاز است")
 		return
 	}
@@ -587,5 +609,5 @@ func (a *App) resolveShipment(w http.ResponseWriter, r *http.Request) {
 
 // The same predicate is applied to list rows and counts before pagination.
 func deliveryFilterSQL(provider, attention int) string {
-	return fmt.Sprintf(` AND ($%d='' OR coalesce((SELECT method FROM order_shipping ds WHERE ds.order_id=orders.id),'legacy_postal')=$%d) AND ($%d='' OR EXISTS(SELECT 1 FROM order_shipping ds WHERE ds.order_id=orders.id AND (($%d='ready' AND ds.ready AND ds.delivery_status IN ('not_requested','cancelled','failed')) OR ($%d='waiting' AND ds.delivery_status IN ('submitting','awaiting_courier','accepted')) OR ($%d='unknown' AND ds.delivery_status='unknown') OR ($%d='failed' AND ds.delivery_status IN ('failed','returning')) OR ($%d='missing' AND NOT ds.ready AND orders.status IN ('paid','packing')))))`, provider, provider, attention, attention, attention, attention, attention, attention)
+	return fmt.Sprintf(` AND ($%d='' OR coalesce((SELECT CASE WHEN courier_staff_id IS NOT NULL THEN 'own_courier' ELSE method END FROM order_shipping ds WHERE ds.order_id=orders.id),'legacy_postal')=$%d) AND ($%d='' OR EXISTS(SELECT 1 FROM order_shipping ds WHERE ds.order_id=orders.id AND (($%d='ready' AND ds.ready AND ds.delivery_status IN ('not_requested','cancelled','failed')) OR ($%d='waiting' AND ds.delivery_status IN ('submitting','awaiting_courier','accepted')) OR ($%d='unknown' AND ds.delivery_status='unknown') OR ($%d='failed' AND ds.delivery_status IN ('failed','returning')) OR ($%d='missing' AND NOT ds.ready AND orders.status IN ('paid','packing')))))`, provider, provider, attention, attention, attention, attention, attention, attention)
 }

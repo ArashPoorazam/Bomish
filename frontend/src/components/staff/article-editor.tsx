@@ -1,4 +1,5 @@
 "use client";
+import { useStaffPermission } from "@/components/staff/permissions";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Eye, Pencil, Upload, Trash2 } from "lucide-react";
@@ -39,6 +40,7 @@ export function ArticleEditor({
   );
   const [preview, setPreview] = useState(false);
   const [hasSaved, setHasSaved] = useState(!!article.updatedAt);
+  const can = useStaffPermission();
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -147,7 +149,10 @@ export function ArticleEditor({
         </div>
         <span className="badge">{statuses[a.status]}</span>
       </header>
-      <fieldset className="article-composer-fields" disabled={busy}>
+      <fieldset
+        className="article-composer-fields"
+        disabled={busy || !can(hasSaved ? "articles.edit" : "articles.create")}
+      >
         <div className="article-composer-layout">
           <div className="article-writing-column">
             <section
@@ -369,21 +374,22 @@ export function ArticleEditor({
                   </p>
                 )}
               </div>
-              {hasSaved && a.status !== "archived" && (
-                <div className="article-archive">
-                  <button
-                    type="button"
-                    className="text-link"
-                    onClick={() => void save("archived")}
-                  >
-                    بایگانی مقاله
-                  </button>
-                </div>
-              )}
             </section>
           </aside>
         </div>
       </fieldset>
+      {hasSaved && can("articles.delete") && a.status !== "archived" && (
+        <div className="article-archive">
+          <button
+            type="button"
+            className="text-link"
+            disabled={busy}
+            onClick={() => void save("archived")}
+          >
+            بایگانی مقاله
+          </button>
+        </div>
+      )}
     </div>
   );
 }
