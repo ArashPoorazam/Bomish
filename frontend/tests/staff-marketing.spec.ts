@@ -334,6 +334,8 @@ test("staff creates a discount code and customer applies it through a paid order
       .getByRole("button", { name: "اعمال کد", exact: true })
       .click();
     const quote = await (await discounted).json();
+    expect(quote.method).toBe("post");
+    expect(quote.requiresAcceptance).toBe(false);
     expect(quote.discountRials).toBeGreaterThan(0);
     expect(quote.totalRials).toBe(
       quote.subtotalRials - quote.discountRials + quote.shippingRials,
@@ -346,9 +348,10 @@ test("staff creates a discount code and customer applies it through a paid order
       .getByRole("button", { name: "اعمال کد", exact: true })
       .click();
     await expect(customer.locator(".coupon-saving")).toContainText(code);
-    await customer
-      .getByRole("button", { name: /ارسال با پست به مبلغ/ })
-      .click();
+    // Karaj uses postal delivery directly; only a courier fallback asks for acceptance.
+    await expect(
+      customer.getByRole("button", { name: "تأیید سفارش و پرداخت" }),
+    ).toBeEnabled();
     await customer.setViewportSize({ width: 390, height: 844 });
     expect(
       await customer.evaluate(

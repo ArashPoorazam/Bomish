@@ -447,6 +447,8 @@ test("product gallery aligns right on desktop, stacks on mobile, and information
   page,
 }) => {
   await page.goto("/products/turmeric");
+  // Streaming can briefly leave the outgoing and incoming trees in the DOM.
+  await expect(page.locator(".product-gallery")).toHaveCount(1);
   await expect(page.locator(".product-gallery")).toBeVisible();
   await expect(page.getByText("عطری برای آشپزخانه شما")).toHaveCount(0);
   for (const width of [1440, 768, 390]) {
