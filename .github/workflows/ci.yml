@@ -35,7 +35,7 @@ jobs:
       SHIPPING_ACCEPTANCE: ${{ matrix.store-mode == 'simulation' && 'true' || 'false' }}
       STORE_MODE: ${{ matrix.store-mode }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Production container and restore smoke test
         run: bash scripts/verify-production-containers.sh
       - name: Scan API image
