@@ -154,22 +154,30 @@ export function Header() {
             ) : null}
           </form>
           <div className="header-actions">
-            <Link
-              className="account-link"
-              aria-label={user?.authenticated ? "حساب من" : "ورود و ثبت‌نام"}
-              href={user?.authenticated ? "/account" : "/login"}
-            >
-              <UserRound size={21} />
-              <span>{user?.authenticated ? "حساب من" : "ورود / ثبت‌نام"}</span>
-            </Link>
-            <button
-              className="cart-trigger"
-              onClick={() => openCart()}
-              aria-label="باز کردن سبد خرید"
-            >
-              <ShoppingBag size={22} />
-              <span>{fa(cart.items.length)}</span>
-            </button>
+            {user && !user.catalogOnly && (
+              <>
+                <Link
+                  className="account-link"
+                  aria-label={
+                    user?.authenticated ? "حساب من" : "ورود و ثبت‌نام"
+                  }
+                  href={user?.authenticated ? "/account" : "/login"}
+                >
+                  <UserRound size={21} />
+                  <span>
+                    {user?.authenticated ? "حساب من" : "ورود / ثبت‌نام"}
+                  </span>
+                </Link>
+                <button
+                  className="cart-trigger"
+                  onClick={() => openCart()}
+                  aria-label="باز کردن سبد خرید"
+                >
+                  <ShoppingBag size={22} />
+                  <span>{fa(cart.items.length)}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
         <nav className="main-nav container" aria-label="فهرست اصلی">

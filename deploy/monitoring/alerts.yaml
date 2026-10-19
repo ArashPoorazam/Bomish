@@ -1,0 +1,33 @@
+groups:
+  - name: bomish
+    rules:
+      - alert: BomishServiceDown
+        expr: probe_success == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Bomish health probe failed: {{ $labels.instance }}"}
+      - alert: BomishMetricsMissing
+        expr: up == 0
+        for: 3m
+        labels: {severity: warning}
+        annotations: {summary: "Metrics unavailable: {{ $labels.job }}"}
+      - alert: BomishBackupOverdue
+        expr: time() - bomish_backup_last_success_timestamp_seconds > 7200 or absent(bomish_backup_last_success_timestamp_seconds)
+        for: 15m
+        labels: {severity: critical}
+        annotations: {summary: "No successful backup within two hours"}
+      - alert: BomishDiskLow
+        expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes < 0.15
+        for: 10m
+        labels: {severity: critical}
+        annotations: {summary: "Less than 15% disk space remains"}
+      - alert: BomishMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.1
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "Less than 10% RAM available"}
+      - alert: BomishServerErrors
+        expr: sum(rate(traefik_service_requests_total{code=~"5.."}[5m])) / clamp_min(sum(rate(traefik_service_requests_total[5m])), 0.01) > 0.05
+        for: 5m
+        labels: {severity: critical}
+        annotations: {summary: "More than 5% of requests are failing"}

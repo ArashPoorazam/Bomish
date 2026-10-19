@@ -53,7 +53,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     if (current !== generation.current) return;
     setUser(s);
-    if (!workspace) {
+    if (!workspace && !s.catalogOnly) {
       const nextCart = await api<Cart>("/cart");
       if (current === generation.current) setCart(nextCart);
     }
@@ -122,7 +122,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       value={{ cart, user, sessionError, refresh, setItem, openCart }}
     >
       {children}
-      {!workspace && (
+      {!workspace && user && !user.catalogOnly && (
         <dialog
           className="cart-drawer"
           ref={dialog}

@@ -1,0 +1,87 @@
+# Optional monitoring stack. Always combine with compose.production.yaml.
+services:
+  prometheus:
+    image: prom/prometheus:v3.13.4
+    restart: unless-stopped
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.retention.time=15d, --storage.tsdb.retention.size=2GB]
+    volumes:
+      - ./deploy/monitoring/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/monitoring/alerts.yaml:/etc/prometheus/alerts.yml:ro
+      - prometheus:/prometheus
+    networks: [edge, monitoring]
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+    mem_limit: 512m
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    restart: unless-stopped
+    command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager]
+    volumes:
+      - ${SECRETS_DIR}/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager:/alertmanager
+    networks: [monitoring]
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+    mem_limit: 128m
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    restart: unless-stopped
+    command: [--path.rootfs=/host, --collector.textfile.directory=/metrics]
+    volumes:
+      - /:/host:ro,rslave
+      - backup_metrics:/metrics:ro
+    networks: [monitoring]
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+    mem_limit: 128m
+  blackbox:
+    image: prom/blackbox-exporter:v0.27.0
+    restart: unless-stopped
+    volumes: [./deploy/monitoring/blackbox.yaml:/etc/blackbox_exporter/config.yml:ro]
+    networks: [edge, monitoring]
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+    mem_limit: 128m
+  loki:
+    image: grafana/loki:3.7.7
+    restart: unless-stopped
+    command: [-config.file=/etc/loki/config.yaml]
+    volumes:
+      - ./deploy/monitoring/loki.yaml:/etc/loki/config.yaml:ro
+      - loki:/loki
+    networks: [monitoring]
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+    mem_limit: 512m
+  alloy:
+    image: grafana/alloy:v1.20.1
+    restart: unless-stopped
+    user: "0"
+    command: [run, --storage.path=/var/lib/alloy, /etc/alloy/config.alloy]
+    volumes:
+      - ./deploy/monitoring/config.alloy:/etc/alloy/config.alloy:ro
+      - ${DOCKER_LOG_DIR:-/var/lib/docker/containers}:/var/log/docker:ro
+      - alloy:/var/lib/alloy
+    networks: [monitoring]
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+    mem_limit: 256m
+  grafana:
+    image: grafana/grafana:13.2.2
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    secrets: [grafana_password]
+    ports: ["127.0.0.1:3300:3000"]
+    volumes:
+      - grafana:/var/lib/grafana
+      - ./deploy/monitoring/datasources.yaml:/etc/grafana/provisioning/datasources/bomish.yaml:ro
+    networks: [monitoring]
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+    mem_limit: 256m
+networks:
+  monitoring: {}
+volumes:
+  prometheus: {}
+  alertmanager: {}
+  loki: {}
+  alloy: {}
+  grafana: {}
+secrets:
+  grafana_password: {file: "${SECRETS_DIR}/grafana_password"}

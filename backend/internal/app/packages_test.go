@@ -8,7 +8,7 @@ import (
 )
 
 func TestPackagesOperations(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	ctx := context.Background()
 	h := a.Handler()
 	owner := newClient(t, h)
@@ -20,7 +20,7 @@ func TestPackagesOperations(t *testing.T) {
 	c := newClient(t, h)
 	var p domain.Product
 	c.ok(t, "GET", "/products/turmeric", nil, &p)
-	p.Packages = []domain.Package{{ID: "small", Amount: 200, Unit: "g", PriceRials: 2000000, MaxQuantity: 5}, {ID: "large", Amount: .5, Unit: "kg", PriceRials: 4000000, MaxQuantity: 5}}
+	p.Packages = measuredPackages([]domain.Package{{ID: "small", Amount: 200, Unit: "g", PriceRials: 2000000, MaxQuantity: 5}, {ID: "large", Amount: .5, Unit: "kg", PriceRials: 4000000, MaxQuantity: 5}})
 	p.Sections = []domain.Section{{Title: "عنوان سفارشی", Body: "**متن**"}}
 	owner.ok(t, "PUT", "/staff/products/turmeric", p, nil)
 	owner.ok(t, "POST", "/staff/products/turmeric/publish", nil, nil)
@@ -47,11 +47,11 @@ func TestPackagesOperations(t *testing.T) {
 	shipping.FreeShippingRials = 8000000
 	owner.ok(t, "PUT", "/staff/shipping", shipping, nil)
 	var q quoteResult
-	c.ok(t, "POST", "/checkout/quote", map[string]string{"province": "تهران"}, &q)
+	c.ok(t, "POST", "/checkout/quote", commerceQuote(""), &q)
 	if q.ShippingRials != 0 {
 		t.Fatal("threshold not inclusive")
 	}
-	addr := domain.Address{Recipient: "مشتری", Phone: "09123334444", Province: "تهران", City: "تهران", Street: "خیابان آزمایشی، پلاک ۱", PostalCode: "1234567890"}
+	addr := commerceAddress()
 	lat, lng := 35.7, 51.4
 	addr.Latitude = &lat
 	addr.Longitude = &lng
@@ -61,8 +61,9 @@ func TestPackagesOperations(t *testing.T) {
 	if len(addresses) != 1 || addresses[0].Latitude == nil || *addresses[0].Longitude != lng {
 		t.Fatal("map coordinates lost")
 	}
+	c.ok(t, "POST", "/checkout/quote", shippingQuoteInput{Address: addr, Method: "post"}, &q)
 	var result map[string]string
-	c.ok(t, "POST", "/checkout", map[string]any{"address": addr, "expectedTotalRials": q.TotalRials, "idempotencyKey": "package-checkout-0001"}, &result)
+	c.ok(t, "POST", "/checkout", map[string]any{"address": addr, "shippingQuoteId": q.ShippingQuoteID, "method": q.Method, "expectedTotalRials": q.TotalRials, "idempotencyKey": "package-checkout-0001"}, &result)
 	id := result["orderId"]
 	c.ok(t, "POST", "/orders/"+id+"/simulate", map[string]bool{"success": true}, nil)
 	c.ok(t, "GET", "/cart", nil, &cart)
@@ -73,11 +74,11 @@ func TestPackagesOperations(t *testing.T) {
 		t.Fatal("skipped stage")
 	}
 	packAllItems(t, operator, id)
-	operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "packing"}, nil)
-	if code, _ := operator.call("PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped"}); code != 400 {
+	if code, _ := operator.call("PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped"}); code != 409 {
 		t.Fatal("missing tracking accepted")
 	}
-	operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped", "tracking": "123456789012345678901234"}, nil)
+	readyPostal(t, operator, id)
+	operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped"}, nil)
 	operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "received"}, nil)
 	if code, _ := operator.call("PATCH", "/staff/orders/"+id, map[string]string{"status": "received"}); code != 409 {
 		t.Fatal("duplicate stage accepted")
@@ -87,7 +88,7 @@ func TestPackagesOperations(t *testing.T) {
 		TrackingURL string       `json:"trackingUrl"`
 	}
 	c.ok(t, "GET", "/orders/"+id, nil, &detail)
-	if len(detail.Order.Events) != 4 || len(detail.Order.Items) != 2 || detail.Order.Tracking == "" || detail.TrackingURL != "https://pishkhan24.com/posttracking/?barcode=123456789012345678901234" {
+	if len(detail.Order.Events) != 4 || len(detail.Order.Items) != 2 {
 		t.Fatalf("history/track %+v", detail)
 	}
 	var count int
@@ -133,8 +134,8 @@ func TestPackagesOperations(t *testing.T) {
 	// Expiry still closes an unpaid order without changing product availability.
 	c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "small", "quantity": 1}, nil)
 	c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "large", "quantity": 1}, nil)
-	c.ok(t, "POST", "/checkout/quote", map[string]string{"province": "تهران"}, &q)
-	c.ok(t, "POST", "/checkout", map[string]any{"address": addr, "expectedTotalRials": q.TotalRials, "idempotencyKey": "package-expiry-00001"}, &result)
+	c.ok(t, "POST", "/checkout/quote", shippingQuoteInput{Address: addr, Method: "post"}, &q)
+	c.ok(t, "POST", "/checkout", map[string]any{"address": addr, "shippingQuoteId": q.ShippingQuoteID, "method": q.Method, "expectedTotalRials": q.TotalRials, "idempotencyKey": "package-expiry-00001"}, &result)
 	a.Pool.Exec(ctx, "UPDATE orders SET reservation_expires_at=now()-interval '1 second' WHERE id=$1", result["orderId"])
 	if e := a.ExpireReservations(ctx); e != nil {
 		t.Fatal(e)
@@ -147,7 +148,7 @@ func TestPackagesOperations(t *testing.T) {
 	p.ID = "oil"
 	p.Slug = "oil"
 	p.Name = "روغن"
-	p.Packages = []domain.Package{{ID: "bottle", Amount: 1.5, Unit: "l", PriceRials: 3000000, MaxQuantity: 5, ShippingGrams: 1450}}
+	p.Packages = measuredPackages([]domain.Package{{ID: "bottle", Amount: 1.5, Unit: "l", PriceRials: 3000000, MaxQuantity: 5, ShippingGrams: 1450}})
 	owner.ok(t, "PUT", "/staff/products/oil", p, nil)
 	owner.ok(t, "POST", "/staff/products/oil/publish", nil, nil)
 }

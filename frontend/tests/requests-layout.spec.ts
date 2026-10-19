@@ -37,6 +37,7 @@ for (const kind of ["support", "custom"] as const) {
         data = {
           csrf: "test",
           role: "owner",
+          omnisireVerified: true,
           staffId: "owner",
           permissions: ["requests", "products"],
         };

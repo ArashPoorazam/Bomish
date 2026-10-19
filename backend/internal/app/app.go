@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"bomish/internal/db"
 	"bomish/internal/storage"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -25,12 +27,16 @@ type App struct {
 	Pool             *pgxpool.Pool
 	Queries          *db.Queries
 	Dev              bool
+	CatalogOnly      bool
+	TrustedProxies   []netip.Prefix
+	TOTPKey          []byte
 	Origin           string
 	Uploads          storage.Store
 }
 type session struct {
 	Hash, CSRF, UserID, StaffID, Role string
 	Permissions                       []string
+	OmnisireVerified                  bool
 }
 type sessionKey struct{}
 
@@ -89,6 +95,7 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("POST /api/v1/auth/request", a.requestOTP)
 	m.HandleFunc("POST /api/v1/auth/verify", a.verifyOTP)
 	m.HandleFunc("POST /api/v1/staff/login", a.staffLogin)
+	m.HandleFunc("POST /api/v1/omnisire/unlock", a.unlockOmnisire)
 	m.HandleFunc("GET /api/v1/categories", a.categories)
 	m.HandleFunc("GET /api/v1/products", a.products)
 	m.HandleFunc("GET /api/v1/products/{slug}", a.product)
@@ -129,7 +136,7 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("GET /api/v1/staff/suggestions", a.permit(a.suggestions, "home"))
 	m.HandleFunc("PUT /api/v1/staff/suggestions", a.permit(a.saveSuggestions, "home"))
 	a.omnisireRoutes(m)
-	return a.middleware(m)
+	return a.observe(a.middleware(m), m)
 }
 func (a *App) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -137,10 +144,14 @@ func (a *App) middleware(next http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		defer func() {
 			if e := recover(); e != nil {
-				slog.Error("request panic", "error", e)
+				slog.Error("request panic", "request_id", r.Context().Value(requestIDKey{}))
 				fail(w, 500, "خطایی رخ داد؛ دوباره تلاش کنید")
 			}
 		}()
+		if a.CatalogOnly && catalogBlocked(r) {
+			fail(w, 503, "فروش آنلاین هنوز آغاز نشده است؛ در حال حاضر می‌توانید محصولات را مشاهده کنید.")
+			return
+		}
 		if r.URL.Path == "/api/v1/webhooks/snapp" {
 			next.ServeHTTP(w, r)
 			return
@@ -165,7 +176,7 @@ func (a *App) middleware(next http.Handler) http.Handler {
 		var overrides map[string]bool
 		if c, e := r.Cookie(sessionCookieName(r)); e == nil {
 			s.Hash = hash(c.Value)
-			e = a.Pool.QueryRow(ctx, `SELECT s.csrf,coalesce(s.user_id,''),coalesce(s.staff_id,''),coalesce(t.role,''),coalesce(t.restrictions,'{}'),coalesce(t.permission_overrides,'{}'::jsonb) FROM sessions s LEFT JOIN staff t ON t.id=s.staff_id AND t.active AND t.archived_at IS NULL WHERE s.token_hash=$1 AND s.expires_at>now()`, s.Hash).Scan(&s.CSRF, &s.UserID, &s.StaffID, &s.Role, &restrictions, &overrides)
+			e = a.Pool.QueryRow(ctx, `SELECT s.csrf,coalesce(s.user_id,''),coalesce(s.staff_id,''),coalesce(t.role,''),coalesce(t.restrictions,'{}'),coalesce(t.permission_overrides,'{}'::jsonb),s.omnisire_verified FROM sessions s LEFT JOIN staff t ON t.id=s.staff_id AND t.active AND t.archived_at IS NULL WHERE s.token_hash=$1 AND s.expires_at>now()`, s.Hash).Scan(&s.CSRF, &s.UserID, &s.StaffID, &s.Role, &restrictions, &overrides, &s.OmnisireVerified)
 			if e == pgx.ErrNoRows {
 				// Never replace a cookie on an ordinary in-flight request: it may
 				// carry the token just rotated by a concurrent login.
@@ -205,6 +216,16 @@ func (a *App) middleware(next http.Handler) http.Handler {
 			}
 		}
 		s.Permissions = effectivePermissions(s.Role, restrictions, overrides)
+		if strings.HasPrefix(r.URL.Path, "/api/v1/omnisire/") {
+			if s.Role != "owner" {
+				fail(w, 403, "این بخش فقط برای مالک است")
+				return
+			}
+			if r.URL.Path != "/api/v1/omnisire/unlock" && !s.OmnisireVerified {
+				fail(w, 428, "برای ورود به امنی‌سایر کد برنامه رمزساز را وارد کنید")
+				return
+			}
+		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(ctx, sessionKey{}, s)))
 	})
 }
@@ -220,11 +241,11 @@ func (a *App) cookie(w http.ResponseWriter, r *http.Request, value string) {
 }
 func (a *App) sessionInfo(w http.ResponseWriter, r *http.Request) {
 	s := current(r)
-	write(w, 200, map[string]any{"csrf": s.CSRF, "authenticated": s.UserID != "", "role": s.Role, "staffId": s.StaffID, "permissions": s.Permissions, "development": a.Dev})
+	write(w, 200, map[string]any{"csrf": s.CSRF, "authenticated": s.UserID != "", "role": s.Role, "staffId": s.StaffID, "permissions": s.Permissions, "development": a.Dev, "omnisireVerified": s.Role == "owner" && s.OmnisireVerified, "catalogOnly": a.CatalogOnly})
 }
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	a.logEvent(r.Context(), current(r).StaffID, "auth.logout", current(r).StaffID, map[string]string{})
-	_, e := a.Pool.Exec(r.Context(), "UPDATE sessions SET user_id=NULL,staff_id=NULL WHERE token_hash=$1", current(r).Hash)
+	_, e := a.Pool.Exec(r.Context(), "UPDATE sessions SET user_id=NULL,staff_id=NULL,omnisire_verified=false WHERE token_hash=$1", current(r).Hash)
 	if e != nil {
 		a.dbError(w, e)
 		return
@@ -232,7 +253,13 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, map[string]bool{"ok": true})
 }
 func (a *App) dbError(w http.ResponseWriter, e error) {
-	slog.Error("database operation failed", "error", e)
+	// PostgreSQL error messages can contain input values. Log only the SQLSTATE.
+	code := "unavailable"
+	var pgErr *pgconn.PgError
+	if errors.As(e, &pgErr) {
+		code = pgErr.Code
+	}
+	slog.Error("database operation failed", "sqlstate", code)
 	fail(w, 500, "ذخیره یا دریافت اطلاعات انجام نشد")
 }
 func requireCustomer(w http.ResponseWriter, r *http.Request) bool {

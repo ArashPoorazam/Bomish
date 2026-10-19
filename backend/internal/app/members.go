@@ -98,7 +98,7 @@ func (a *App) createMember(w http.ResponseWriter, r *http.Request) {
 	if v.PermissionOverrides == nil {
 		v.PermissionOverrides = map[string]bool{}
 	}
-	id, secret := token(), newTOTP()
+	id, secret := token(), ""
 	tx, e := a.Pool.Begin(r.Context())
 	if e != nil {
 		a.dbError(w, e)
@@ -117,7 +117,7 @@ func (a *App) createMember(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	write(w, 201, map[string]string{"id": id, "totpSecret": secret})
+	write(w, 201, map[string]string{"id": id})
 }
 func lockManagedMember(r *http.Request, tx pgx.Tx, id string) error {
 	var role string
@@ -201,13 +201,12 @@ func (a *App) archiveMember(w http.ResponseWriter, r *http.Request) {
 }
 func (a *App) resetMemberCredentials(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Password  string `json:"password"`
-		ResetTOTP bool   `json:"resetTotp"`
+		Password string `json:"password"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	if (in.Password == "" && !in.ResetTOTP) || (in.Password != "" && (len(in.Password) < 12 || len(in.Password) > 256)) {
+	if len(in.Password) < 12 || len(in.Password) > 256 {
 		fail(w, 400, "گذرواژه باید حداقل ۱۲ نویسه باشد")
 		return
 	}
@@ -222,19 +221,14 @@ func (a *App) resetMemberCredentials(w http.ResponseWriter, r *http.Request) {
 		fail(w, 403, "این حساب قابل تغییر نیست")
 		return
 	}
-	secret := ""
 	if in.Password != "" {
 		_, e = tx.Exec(r.Context(), "UPDATE staff SET password_hash=$2 WHERE id=$1", id, PasswordHash(in.Password))
-	}
-	if e == nil && in.ResetTOTP {
-		secret = newTOTP()
-		_, e = tx.Exec(r.Context(), "UPDATE staff SET totp_secret=$2,last_totp_step=0 WHERE id=$1", id, secret)
 	}
 	if e == nil {
 		_, e = tx.Exec(r.Context(), "DELETE FROM sessions WHERE staff_id=$1", id)
 	}
 	if e == nil {
-		e = auditDetail(r.Context(), tx, current(r).StaffID, "staff.credentials", id, map[string]bool{"password": in.Password != "", "totp": in.ResetTOTP})
+		e = auditDetail(r.Context(), tx, current(r).StaffID, "staff.credentials", id, map[string]bool{"password": in.Password != ""})
 	}
 	if e == nil {
 		e = tx.Commit(r.Context())
@@ -243,5 +237,5 @@ func (a *App) resetMemberCredentials(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	write(w, 200, map[string]string{"totpSecret": secret})
+	write(w, 200, map[string]bool{"ok": true})
 }

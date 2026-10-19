@@ -89,7 +89,10 @@ func (c *client) staff(t *testing.T, role string) {
 	}
 	c.ok(t, "GET", "/session?workspace=staff", nil, &s)
 	c.csrf = s.CSRF
-	c.ok(t, "POST", "/staff/login", map[string]string{"username": role, "password": "Bomish-demo-2026!", "code": TOTP(DemoTOTP, time.Now().Unix()/30)}, nil)
+	c.ok(t, "POST", "/staff/login", map[string]string{"username": role, "password": "Bomish-demo-2026!"}, nil)
+	if role == "owner" {
+		c.ok(t, "POST", "/omnisire/unlock", map[string]string{"code": TOTP(DemoTOTP, time.Now().Unix()/30)}, nil)
+	}
 }
 func packAllItems(t *testing.T, staff *client, id string) {
 	t.Helper()
@@ -160,15 +163,43 @@ func setupCatalog(t *testing.T, legacy bool) *App {
 	}
 	var p domain.Product
 	_ = json.Unmarshal(raw, &p)
-	p.Packages = []domain.Package{{ID: "test500", Amount: 500, Unit: "g", PriceRials: domain.Total(p.PriceRials, 500), MaxQuantity: 5}}
+	p.Packages = measuredPackages([]domain.Package{{ID: "test500", Amount: 500, Unit: "g", PriceRials: domain.Total(p.PriceRials, 500), MaxQuantity: 5}})
 	raw, _ = json.Marshal(p)
 	if _, e = a.Pool.Exec(ctx, "UPDATE products SET content=$1 WHERE id='turmeric'", raw); e != nil {
 		t.Fatal(e)
 	}
+	var all []byte
+	rows, err := a.Pool.Query(ctx, "SELECT id,content FROM products")
+	if err != nil {
+		t.Fatal(err)
+	}
+	products := map[string][]byte{}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id, &all); err != nil {
+			t.Fatal(err)
+		}
+		products[id] = append([]byte(nil), all...)
+	}
+	rows.Close()
+	if rows.Err() != nil {
+		t.Fatal(rows.Err())
+	}
+	for id, raw := range products {
+		var product domain.Product
+		if err = json.Unmarshal(raw, &product); err != nil {
+			t.Fatal(err)
+		}
+		product.Packages = measuredPackages(product.Packages)
+		raw, _ = json.Marshal(product)
+		if _, err = a.Pool.Exec(ctx, "UPDATE products SET content=$1 WHERE id=$2", raw, id); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return a
 }
 func TestStoreIntegration(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	h := a.Handler()
 	ctx := context.Background()
 	owner := newClient(t, h)
@@ -204,7 +235,7 @@ func TestStoreIntegration(t *testing.T) {
 			t.Fatal("draft exposed", code)
 		}
 		p.PriceRials = 1200000
-		p.Packages = []domain.Package{{ID: "small", Amount: 100, Unit: "g", PriceRials: 120000, MaxQuantity: 5}}
+		p.Packages = measuredPackages([]domain.Package{{ID: "small", Amount: 100, Unit: "g", PriceRials: 120000, MaxQuantity: 5}})
 		if code, _ := editor.call("PUT", "/staff/products/test-spice", p); code != 200 {
 			t.Fatal("editor could not set price", code)
 		}
@@ -260,13 +291,13 @@ func TestStoreIntegration(t *testing.T) {
 			t.Fatal("code reused")
 		}
 	})
-	address := domain.Address{Recipient: "تست", Phone: "09120000004", Province: "تهران", City: "تهران", Street: "خیابان نمونه پلاک ۱۲ واحد ۱", PostalCode: "1234567890"}
+	address := commerceAddress()
 	create := func(c *client, g int, id string) string {
 		c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "test500", "quantity": g / 500}, nil)
 		var q quoteResult
-		c.ok(t, "POST", "/checkout/quote", map[string]string{"province": "تهران"}, &q)
+		c.ok(t, "POST", "/checkout/quote", commerceQuote(""), &q)
 		var result map[string]string
-		c.ok(t, "POST", "/checkout", map[string]any{"address": address, "expectedTotalRials": q.TotalRials, "idempotencyKey": id}, &result)
+		c.ok(t, "POST", "/checkout", map[string]any{"address": address, "shippingQuoteId": q.ShippingQuoteID, "method": q.Method, "expectedTotalRials": q.TotalRials, "idempotencyKey": id}, &result)
 		return result["orderId"]
 	}
 	t.Run("cart survives auth and payment is idempotent", func(t *testing.T) {
@@ -279,16 +310,16 @@ func TestStoreIntegration(t *testing.T) {
 			t.Fatal("cart lost")
 		}
 		var q quoteResult
-		c.ok(t, "POST", "/checkout/quote", map[string]string{"province": "تهران"}, &q)
-		if q.ShippingRials != 650000 {
+		c.ok(t, "POST", "/checkout/quote", commerceQuote(""), &q)
+		if q.ShippingRials <= 0 {
 			t.Fatal(q)
 		}
-		if code, _ := c.call("POST", "/checkout/quote", map[string]string{"province": "نامعتبر"}); code != 400 {
+		if code, _ := c.call("POST", "/checkout/quote", shippingQuoteInput{Address: domain.Address{}}); code != 422 {
 			t.Fatal("unsupported shipping accepted")
 		}
 		id := create(c, 1500, "idempotency-check-0001")
 		var retry map[string]string
-		c.ok(t, "POST", "/checkout", map[string]any{"address": address, "expectedTotalRials": q.TotalRials, "idempotencyKey": "idempotency-check-0001"}, &retry)
+		c.ok(t, "POST", "/checkout", map[string]any{"address": address, "shippingQuoteId": q.ShippingQuoteID, "method": q.Method, "expectedTotalRials": q.TotalRials, "idempotencyKey": "idempotency-check-0001"}, &retry)
 		if retry["orderId"] != id {
 			t.Fatal("duplicate order")
 		}
@@ -310,8 +341,8 @@ func TestStoreIntegration(t *testing.T) {
 			t.Fatal("other customer's payment accessible")
 		}
 		packAllItems(t, operator, id)
-		operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "packing", "tracking": ""}, nil)
-		operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped", "tracking": "123456789012345678901234"}, nil)
+		readyPostal(t, operator, id)
+		operator.ok(t, "PATCH", "/staff/orders/"+id, map[string]string{"status": "shipped"}, nil)
 	})
 	t.Run("failure expiry and late settlement", func(t *testing.T) {
 		c := newClient(t, h)
@@ -350,8 +381,8 @@ func TestStoreIntegration(t *testing.T) {
 			c.login(t, fmt.Sprintf("0912000001%d", i))
 			c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "test500", "quantity": 2}, nil)
 			var q quoteResult
-			c.ok(t, "POST", "/checkout/quote", map[string]string{"province": "تهران"}, &q)
-			bodies[i] = map[string]any{"address": address, "expectedTotalRials": q.TotalRials, "idempotencyKey": fmt.Sprintf("concurrent-key-%016d", i)}
+			c.ok(t, "POST", "/checkout/quote", commerceQuote(""), &q)
+			bodies[i] = map[string]any{"address": address, "shippingQuoteId": q.ShippingQuoteID, "method": q.Method, "expectedTotalRials": q.TotalRials, "idempotencyKey": fmt.Sprintf("concurrent-key-%016d", i)}
 		}
 		codes := make([]int, 2)
 		var wg sync.WaitGroup

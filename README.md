@@ -1,6 +1,6 @@
 # Bomish · بومیش
 
-Persian, right-to-left food store built with **Go + Next.js/TypeScript + PostgreSQL**. This is a working **development release**, with configurable Kavenegar SMS and simulated payments. Production startup is deliberately disabled until real payments and production providers are verified.
+Persian, right-to-left food store built with **Go + Next.js/TypeScript + PostgreSQL**. The production deployment serves a **public catalog**, with staff content management and an owner workspace. Customer purchasing remains disabled in production until real payments and providers are verified. Local development retains simulated commerce. See the [production runbook](docs/production.md).
 
 ## Run locally
 
@@ -60,7 +60,7 @@ Development fixtures create five separate test accounts:
 
 Owners can also create managers (all staff tools) and salespersons (personal sales only) in Omnisire, with individual section restrictions or account suspension. Members receive referral links, a permanent commission/payment ledger and audited activity.
 
-All five use the development password `Bomish-demo-2026!` and authenticator setup key `JBSWY3DPEHPK3PXP`. Add that key to a TOTP authenticator, or print the current local development code with the same environment as the API:
+All five use the development password `Bomish-demo-2026!`. Staff login requires only a password. The owner additionally uses authenticator setup key `JBSWY3DPEHPK3PXP` to unlock `/omnisire`. Add that key to a TOTP authenticator, or print the current local development code with the same environment as the API:
 
 ```sh
 cd backend
@@ -93,7 +93,7 @@ The old five-product fixture is retained only in backend test files for historic
 - Product-specific gram/kilogram/milliliter/liter packages, per-package prices and purchase limits, separate cart lines, and price ranges. Discounted package prices round upward to 1,000 toman, capped at the original package price; undiscounted prices and coupon rules remain unchanged.
 - Kavenegar-ready SMS account verification, a customer overview, order history, map-assisted address creation/editing/deletion, and five-stage order tracking with automatic and manual refresh and four milestone SMS templates. Saved-address changes never alter existing order snapshots.
 - Regional/weight-based delivery, server-authoritative checkout, 15-minute reservations, repeat-safe simulated payments and late-payment review.
-- Separate password/TOTP staff login, backend-enforced roles, draft preview, uploads, editor publication, manual availability and delivery editing.
+- Password-only staff login, separate owner TOTP verification, backend-enforced roles, draft preview, uploads, editor publication, manual availability and delivery editing.
 - Owner-only Omnisire with member management, referral commission accounting, searchable event history, paginated analytics, cross-page comparison and background Excel exports.
 - Referral commissions: 7% of discounted merchandise within 30 days of signup, rounded upward to 1,000 toman per paid order; external payout recording, reversals and partial-refund corrections.
 - OpenAPI contract, generated TypeScript types, sqlc queries, migrations, containers, CI, and backup/restore helpers.
@@ -131,7 +131,7 @@ Chat opens the latest 100 messages, supports loading older history without losin
 
 Customer and staff cookies remain independent; only genuine session expiry invokes sign-in. Notification badges track unread counts, while optional sound detects new event markers even when counts stay unchanged.
 
-Suggestion loading and product search have separate retries that preserve edits. Migrations 009–011 apply automatically at startup; migration 011 preserves the original homepage picture as the initial slide. See [architecture and behavior](docs/architecture.md) for permissions, polling, session isolation, and collection rules.
+Suggestion loading and product search have separate retries that preserve edits. In development, migrations apply automatically at startup; production uses the explicit migration command. migration 011 preserves the original homepage picture as the initial slide. See [architecture and behavior](docs/architecture.md) for permissions, polling, session isolation, and collection rules.
 
 The staff panel includes searchable products, flexible package and Markdown section editors, category and fulfillment workflows, owner price/discount controls, free-shipping settings, and a dedicated business analytics page.
 
@@ -139,7 +139,7 @@ Fill private service keys and support details in the root `.env`; see [integrati
 
 ## Deployment and operations
 
-See [architecture and behavior](docs/architecture.md), [launch requirements](docs/launch.md), and [asset provenance](docs/assets.md). No public deployment has been made.
+Start with the [production deployment and recovery runbook](docs/production.md), then [live-sales requirements](docs/launch.md). Docker/Traefik, database roles, owner bootstrap, scheduled encrypted backups, monitoring and CI image releases are configured in the repository. No VPS or Cloudflare changes have been made.
 
 Shipping always uses calculated delivery: Tehran city uses Snapp pricing when serviceable; after packing, staff choose Snapp dispatch or assign an active staff member with the «پیک» role. Other destinations use post. There is no legacy tariff mode. Complete the pickup address, cartons, package measurements, locality mappings and provider setup before checkout can quote delivery. Technical settings live in `config/shipping.json`; development simulation uses `SHIPPING_SIMULATED=true`. Live carriers still require verified merchant contracts; see [shipping integration](docs/integrations.md#shipping-provider-integration-and-simulation).
 

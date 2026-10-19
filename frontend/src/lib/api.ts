@@ -50,8 +50,9 @@ export async function api<T>(
     body: body === undefined ? undefined : form ? body : JSON.stringify(body),
   });
   if (
-    r.status === 401 &&
+    (r.status === 401 || r.status === 428) &&
     !path.includes("/login") &&
+    path !== "/omnisire/unlock" &&
     !path.startsWith("/auth/")
   ) {
     window.dispatchEvent(

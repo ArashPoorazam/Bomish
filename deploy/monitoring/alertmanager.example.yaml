@@ -1,0 +1,12 @@
+# Copy outside Git to SECRETS_DIR/alertmanager.yaml and configure your receiver.
+route:
+  receiver: operator
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+receivers:
+  - name: operator
+    webhook_configs:
+      - url: https://YOUR-ALERT-RECEIVER.example/webhook
+        send_resolved: true

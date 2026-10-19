@@ -1,3 +1,4 @@
+import { prepareCommerce, payCart, completePostal } from "./commerce-fixture";
 import { test, expect, type Page } from "@playwright/test";
 
 async function loginAtLink(page: Page, phone: string) {
@@ -39,47 +40,17 @@ test("SMS order URL survives login and never exposes another customer's order", 
       })
     ).ok(),
   ).toBeTruthy();
+  await prepareCommerce(baseURL!, "turmeric");
   const product = await (await request.get("/api/v1/products/turmeric")).json();
   expect(
     (
-      await request.put("/api/v1/cart/items/turmeric", {
+      await request.put(`/api/v1/cart/items/${product.id}`, {
         headers,
         data: { packageId: product.packages[0].id, quantity: 1 },
       })
     ).ok(),
   ).toBeTruthy();
-  const quote = await (
-    await request.post("/api/v1/checkout/quote", {
-      headers,
-      data: { province: "تهران" },
-    })
-  ).json();
-  const order = await (
-    await request.post("/api/v1/checkout", {
-      headers,
-      data: {
-        address: {
-          recipient: "مشتری پیامک",
-          phone,
-          province: "تهران",
-          city: "تهران",
-          street: "خیابان آزمایشی پلاک ۱۲",
-          postalCode: "1234567890",
-        },
-        expectedTotalRials: quote.totalRials,
-        idempotencyKey: crypto.randomUUID(),
-      },
-    })
-  ).json();
-  expect(order.orderId).toBeTruthy();
-  expect(
-    (
-      await request.post(`/api/v1/orders/${order.orderId}/simulate`, {
-        headers,
-        data: { success: true },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  const order = { orderId: await payCart(request, baseURL!) };
   const path = `/account/orders/${order.orderId}`;
   await page.goto(path);
   await expect(page.locator(".order-detail-content")).toBeVisible();

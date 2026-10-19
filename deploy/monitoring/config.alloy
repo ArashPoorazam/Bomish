@@ -1,0 +1,28 @@
+local.file_match "docker" {
+  path_targets = [{"__path__" = "/var/log/docker/*/*-json.log", "job" = "docker"}]
+}
+loki.source.file "docker" {
+  targets    = local.file_match.docker.targets
+  forward_to = [loki.process.docker.receiver]
+}
+loki.process "docker" {
+  stage.json {
+    expressions = {"message" = "log", "timestamp" = "time", "service" = "attrs.\"com.docker.compose.service\"", "project" = "attrs.\"com.docker.compose.project\""}
+  }
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339Nano"
+  }
+  stage.labels {
+    values = {"service" = "", "project" = ""}
+  }
+  stage.output {
+    source = "message"
+  }
+  forward_to = [loki.write.local.receiver]
+}
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

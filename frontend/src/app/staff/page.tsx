@@ -10,6 +10,6 @@ export default async function Page({
   searchParams: Promise<{ section?: string; q?: string }>;
 }) {
   const query = await searchParams;
-  if (query.section === "shipping") redirect("/omnisire/shipping");
+  if (query.section === "shipping") redirect("/staff/shipping");
   return <Dashboard initialSection={query.section} initialQuery={query.q} />;
 }

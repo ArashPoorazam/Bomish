@@ -1,14 +1,14 @@
 # Live-sales gate and operating guide
 
-The current release is intentionally development-only. `APP_ENV` must be `development`; any other value fails closed on startup. Do not remove this check just to deploy the simulator. The local Compose deployment includes publicly documented development accounts and is bound to loopback.
+The production release supports catalog browsing and staff content management only. Follow [production.md](production.md) for Docker/Traefik deployment, owner bootstrap, database migrations, monitoring and backup/recovery. `APP_ENV=production` requires `STORE_MODE=catalog`; simulation is restricted to development.
 
 Before live sales:
 
 1. Configure and verify the implemented Kavenegar adapter (see integrations.md), choose the payment provider and obtain merchant credentials. Implement the payment adapter, callback signature/reference/amount verification, pending-result reconciliation, durable retries and provider timeouts. Verify real sandbox and live transactions. Remove all simulation UI and endpoints in production. Preserve the tested idempotency, availability checks and package purchase limits.
-2. Configure a real domain and HTTPS reverse proxy. Set the exact `APP_ORIGIN`, keep the API and PostgreSQL private, restrict proxy forwarding headers, and set trusted proxy handling for per-client rate limiting. Current IP limits see the connecting proxy address; tune this when configuring the actual ingress. Use TLS to remote PostgreSQL and an application database role separate from the migration role.
-3. Provision fresh owner credentials and individual staff authenticators. Encrypt TOTP secrets using a managed key before production; current development secrets are database-protected only. Add the owner's staff recovery/reset process and backup recovery procedure. Remove development staff, products, articles and orders by starting with a clean production database.
+2. Configure a real domain and HTTPS reverse proxy. Set the exact `APP_ORIGIN`, keep the API and PostgreSQL private, restrict proxy forwarding headers, and set trusted proxy handling for per-client rate limiting. Configure the trusted proxy chain so per-client rate limits use the correct address. Use TLS to remote PostgreSQL and an application database role separate from the migration role.
+3. Bootstrap fresh owner credentials with the interactive command. Staff use passwords; only the owner workspace requires 2FA. Preserve the external TOTP encryption key and verify owner recovery. Remove development staff, products, articles and orders by starting with a clean production database.
 4. Configure real delivery regions and tariffs, packaging weights, dispatch estimates, contact information, return policy and business content. Upload actual product photos and confirm ingredients/allergen details. Nutrition fields must have a reliable source; no invented values are seeded.
-5. Configure durable uploads or implement an S3-compatible `storage.Store`, image proxy and backup policy. Back up both database and uploads. Set an off-host schedule, retention, encryption and alerts; the repository provides manual helpers, not a running backup schedule.
+5. Configure durable uploads or implement an S3-compatible `storage.Store`, image proxy and backup policy. Back up both database and uploads. Set an off-host schedule, retention, encryption and alerts; the production backup container provides hourly encrypted snapshots and daily retention checks; configure its off-host destination and verify alerts.
 6. Run a restore drill, concurrent purchase tests, mobile/keyboard checks, provider outage tests, payment replay tests and an actual end-to-end purchase. Enable search engine indexing only after launch content is ready (`SITE_INDEXABLE=true` and `SITE_URL`).
 
 ## Backup and restore drill
@@ -43,6 +43,6 @@ Calculated shipping is available for development simulation. Live activation rem
 - Verify Snapp credentials, current booking/lookup/cancel wire contract, wallet behavior, monetary unit, rate limits, cancellation fees, driver state semantics and callback authentication. Implement/install the verified `SnappContract`; fixture verification is not live certification.
 - Verify Tapin merchant shop quotation authentication, service IDs, locality and exterior-box mappings, parcel limits, request/response currency and inclusive tariff total against actual dispatch.
 - Configure HTTPS callback delivery and a monitored worker. Unauthenticated callbacks remain lookup hints; they must never mutate an order from their payload alone. Test provider timeouts after booking, restarts, missed callbacks and cancellation ambiguity in an authorized provider test account.
-- Verify existing production payment/SMS requirements independently. Nothing in shipping bypasses the current production startup restriction.
+- Verify existing production payment/SMS requirements independently. Nothing in shipping bypasses the production catalog-only restriction.
 
 Shipping uses calculated quotes only. Setup can be saved incrementally, but checkout requires valid origin, destinations, measurements, cartons and available providers. Configuration changes invalidate unconsumed quotes by version; existing orders retain their agreed invoice and shipping snapshot. Fixed-tariff rollback is no longer supported.

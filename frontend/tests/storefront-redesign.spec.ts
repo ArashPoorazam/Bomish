@@ -73,6 +73,7 @@ test("account views, all order states, address CRUD and recoverable errors", asy
     if (path === "/cart")
       return route.fulfill({ json: { items: [], subtotalRials: 0 } });
     if (path === "/settings") return route.fulfill({ json: {} });
+    if (path === "/shipping/localities") return route.fulfill({ json: [] });
     if (path === "/orders") {
       if (failOrders) {
         failOrders = false;
@@ -301,7 +302,11 @@ test("discounted package rounds to 1000 toman in listing, purchase, cart, and ch
         unit: "g",
         priceRials: 470000,
         maxQuantity: 5,
-        shippingGrams: 100,
+        shippingGrams: 150,
+        lengthMm: 80,
+        widthMm: 80,
+        heightMm: 100,
+        shippingVerified: true,
       },
     ],
   };

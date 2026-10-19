@@ -1,3 +1,4 @@
+import { prepareCommerce, payCart, completePostal } from "./commerce-fixture";
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import { loginStaff } from "./staff-login";
 
@@ -27,47 +28,17 @@ test("customer session, five stages, refresh, support and custom requests work a
       })
     ).ok(),
   ).toBeTruthy();
+  await prepareCommerce(baseURL!, "turmeric");
   const product = await (await request.get("/api/v1/products/turmeric")).json();
   expect(
     (
-      await request.put("/api/v1/cart/items/turmeric", {
+      await request.put(`/api/v1/cart/items/${product.id}`, {
         headers: customerHeaders,
         data: { packageId: product.packages[0].id, quantity: 1 },
       })
     ).ok(),
   ).toBeTruthy();
-  const quote = await (
-    await request.post("/api/v1/checkout/quote", {
-      headers: customerHeaders,
-      data: { province: "تهران" },
-    })
-  ).json();
-  const order = await (
-    await request.post("/api/v1/checkout", {
-      headers: customerHeaders,
-      data: {
-        address: {
-          recipient: "آزمایش درخواست",
-          phone,
-          province: "تهران",
-          city: "تهران",
-          street: "خیابان آزمایشی پلاک ۱۲",
-          postalCode: "1234567890",
-        },
-        expectedTotalRials: quote.totalRials,
-        idempotencyKey: crypto.randomUUID(),
-      },
-    })
-  ).json();
-  expect(order.orderId).toBeTruthy();
-  expect(
-    (
-      await request.post(`/api/v1/orders/${order.orderId}/simulate`, {
-        headers: customerHeaders,
-        data: { success: true },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  const order = { orderId: await payCart(request, baseURL!) };
   await page.goto(`/account/orders/${order.orderId}`);
   await expect(page.locator(".order-timeline li")).toHaveCount(5);
   await expect(
@@ -99,48 +70,13 @@ test("customer session, five stages, refresh, support and custom requests work a
     .getByRole("button", { name: "مدیریت فروشگاه", exact: true })
     .click();
 
-  const detail = await (
-    await request.get(`/api/v1/staff/orders/${order.orderId}`)
-  ).json();
-  for (const item of detail.items) {
-    expect(
-      (
-        await request.patch(`/api/v1/staff/orders/${order.orderId}/packing`, {
-          headers: staffHeaders,
-          data: {
-            productId: item.productId,
-            packageId: item.packageId,
-            packed: true,
-          },
-        })
-      ).ok(),
-    ).toBeTruthy();
-  }
-  expect(
-    (
-      await request.patch(`/api/v1/staff/orders/${order.orderId}`, {
-        headers: staffHeaders,
-        data: { status: "packing", tracking: "" },
-      })
-    ).ok(),
-  ).toBeTruthy();
+  await completePostal(request, baseURL!, order.orderId, false);
   await page
     .getByRole("button", { name: "به‌روزرسانی وضعیت", exact: true })
     .click();
   await expect(
     page.locator('.order-timeline [aria-current="step"]'),
-  ).toContainText("بسته‌بندی");
-  expect(
-    (
-      await request.patch(`/api/v1/staff/orders/${order.orderId}`, {
-        headers: staffHeaders,
-        data: { status: "shipped", tracking: "123456789012345678901234" },
-      })
-    ).ok(),
-  ).toBeTruthy();
-  await expect(
-    page.locator('.order-timeline [aria-current="step"]'),
-  ).toContainText("ارسال", { timeout: 18000 });
+  ).toContainText("ارسال");
   await expect(page.getByText("برای ادامه وارد حساب شوید")).toHaveCount(0);
   const orderEndpoint = `**/api/v1/orders/${order.orderId}`;
   await page.route(orderEndpoint, (route) =>

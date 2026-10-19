@@ -54,3 +54,24 @@ Manual review remains required for real packing trials, live account wire contra
 - Four browser journeys passed: customer/staff order progress and refresh, packing checklist controls, logged-in/logged-out/other-customer access through the same SMS order URL, and the existing owner/referral/fulfillment journey.
 - Frontend type checks, formatting checks and production build passed. Test-generated preview configuration was removed; the merchant database and private integration settings were not changed.
 - No live Kavenegar call or real SMS was issued. Account funding, template approval for the actual HTTPS domain, and merchant test-phone delivery remain activation prerequisites. Production payments and live Snapp activation remain separate work.
+
+
+## Production catalog verification (2026-10-19)
+
+Verification used a temporary PostgreSQL 18 cluster at port 55439, with separate test, catalog, restore and production-mode databases. No VPS, Cloudflare configuration or working merchant database was changed.
+
+- All 148 backend tests passed with the race detector, including owner bootstrap/recovery, TOTP encryption and replay checks, password-only staff access, catalog restrictions, proxy handling and fresh/idempotent migrations. Compilation and vet also passed after the final log-redaction change.
+- Frontend type checking, formatting, generated OpenAPI types and the optimized build passed. Catalog browser acceptance verified category navigation, hidden purchase controls, blocked transaction endpoints, staff password login and separate owner TOTP unlock/logout.
+- Native production-mode migrations succeeded as the restricted migration role; API health, settings, base categories and checkout blocking succeeded as the runtime role. Interactive owner bootstrap succeeded in the verified temporary database.
+- A custom-format database dump restored into an empty verification database with 30 products and zero orders. The final build also honored runtime noindex settings when built with indexing enabled.
+- Production and monitoring Compose files validate structurally; shell scripts pass syntax checks. Docker daemon access is unavailable on this workstation. Image builds, actual Traefik routing, restic/container restore, monitoring runtime and vulnerability scans therefore remain required CI/VPS checks, not locally verified claims.
+
+For repeatable catalog acceptance, use `STORE_MODE=catalog`, `SEED_DEMO=true`, `APP_ENV=development` on a disposable backend, then run `STORE_MODE=catalog BASE_URL=http://localhost:PORT npm run test:production` in frontend. Simulation regressions require a disposable `DATABASE_URL`, `STORE_MODE=simulation`, and a backend with `SHIPPING_SIMULATED=true`. The commerce helper applies shipping configuration only to that disposable database. `SHIPPING_ACCEPTANCE=true` enables the full shipping journeys. Never run these fixtures against production.
+
+### Remaining acceptance work
+
+The full browser suite is not yet green. The latest focused simulation rerun passed 14 of 18 journeys, including customer support/orders, SMS order-link authorization, staff permissions, publication, storefront checkout and price rounding. Three shipping cases failed after encountering incomplete draft fixtures; the fixture now limits publication to already published products. The discount-code journey encountered an outdated field label, which has also been corrected. Those last fixture corrections still need a fresh-database rerun. The custom-order conflict/refresh test also remains unresolved.
+
+Further browser execution was blocked by automatic approval review reporting exhausted workspace credits. Do not deploy on the strength of these partial results: complete the browser regressions, then require both CI jobs and published-image scans to pass. Docker runtime verification remains outstanding as described above.
+
+For repeated simulation suites, explicitly set `E2E_ISOLATED_DATABASE=true` with a local database named `bomish_browser` (or a name beginning with it). The test login helper clears only staff/owner authentication rate counters in that disposable database so independent journeys sharing one IP do not exhaust each other's quotas. Production rate limiting is unchanged. The suite requires the `psql` client. Use a fresh seeded database for a complete acceptance run.

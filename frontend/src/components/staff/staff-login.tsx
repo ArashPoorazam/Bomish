@@ -2,17 +2,16 @@
 import { AuthLayout } from "../auth-layout";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { api, session } from "@/lib/api";
-import { digits } from "@/lib/format";
 import { useStore } from "@/components/store-provider";
 export function StaffLogin() {
   const { refresh } = useStore();
   const router = useRouter();
+  const pathname = usePathname();
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState(""),
     [password, setPassword] = useState(""),
-    [code, setCode] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   return (
@@ -23,7 +22,7 @@ export function StaffLogin() {
         </span>
         <span className="login-eyebrow">فضای کار بومیش</span>
         <h1>ورود همکاران</h1>
-        <p>نام کاربری، گذرواژه و کد برنامه رمزساز را وارد کنید.</p>
+        <p>نام کاربری و گذرواژه را وارد کنید.</p>
         <form
           className="stack"
           onSubmit={async (e) => {
@@ -35,13 +34,12 @@ export function StaffLogin() {
               await api("/staff/login", "POST", {
                 username,
                 password,
-                code: digits(code),
               });
               await refresh();
               const next = await session();
               router.replace(
-                next.role === "owner"
-                  ? "/omnisire"
+                next.role === "owner" && pathname.startsWith("/omnisire")
+                  ? pathname
                   : next.permissions?.[0] === "sales"
                     ? "/staff/sales"
                     : "/staff",
@@ -88,19 +86,6 @@ export function StaffLogin() {
               </button>
             </span>
           </label>
-          <label>
-            کد برنامه رمزساز
-            <input
-              disabled={busy}
-              autoComplete="one-time-code"
-              inputMode="numeric"
-              maxLength={6}
-              required
-              dir="ltr"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-          </label>
           <button className="button" disabled={busy}>
             {busy ? "در حال ورود…" : "ورود به فضای کار"}
           </button>
@@ -111,7 +96,8 @@ export function StaffLogin() {
           ) : null}
         </form>
         <p className="login-footnote">
-          <ShieldCheck size={15} /> ورود محافظت‌شده با تأیید دومرحله‌ای
+          <ShieldCheck size={15} /> تأیید دومرحله‌ای فقط برای ورود به امنی‌سایر
+          است
         </p>
       </div>
     </AuthLayout>

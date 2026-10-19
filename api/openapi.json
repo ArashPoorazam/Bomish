@@ -340,15 +340,11 @@
                   },
                   "password": {
                     "type": "string"
-                  },
-                  "code": {
-                    "type": "string"
                   }
                 },
                 "required": [
                   "username",
-                  "password",
-                  "code"
+                  "password"
                 ],
                 "additionalProperties": false
               }
@@ -7000,6 +6996,46 @@
         },
         "summary": "List active, non-archived staff couriers for order fulfillment"
       }
+    },
+    "/omnisire/unlock": {
+      "post": {
+        "summary": "Unlock owner workspace for the current staff session",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6
+                  }
+                },
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session rotated and elevated until its original expiry"
+          },
+          "401": {
+            "description": "Invalid or replayed authenticator code"
+          },
+          "403": {
+            "description": "Owner account required"
+          },
+          "429": {
+            "description": "Too many attempts"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7488,6 +7524,12 @@
           },
           "staffId": {
             "type": "string"
+          },
+          "omnisireVerified": {
+            "type": "boolean"
+          },
+          "catalogOnly": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -7496,7 +7538,9 @@
           "role",
           "development",
           "permissions",
-          "staffId"
+          "staffId",
+          "omnisireVerified",
+          "catalogOnly"
         ],
         "additionalProperties": false
       },
@@ -7916,12 +7960,16 @@
           },
           "mapEnabled": {
             "type": "boolean"
+          },
+          "catalogOnly": {
+            "type": "boolean"
           }
         },
         "required": [
           "freeShippingRials",
           "supportUrl",
-          "mapEnabled"
+          "mapEnabled",
+          "catalogOnly"
         ],
         "additionalProperties": false
       },
@@ -8471,13 +8519,13 @@
         "type": "object",
         "properties": {
           "password": {
-            "type": "string"
-          },
-          "resetTotp": {
-            "type": "boolean"
+            "type": "string",
+            "minLength": 12
           }
         },
-        "required": [],
+        "required": [
+          "password"
+        ],
         "additionalProperties": false
       },
       "MemberCreated": {
@@ -8485,14 +8533,10 @@
         "properties": {
           "id": {
             "type": "string"
-          },
-          "totpSecret": {
-            "type": "string"
           }
         },
         "required": [
-          "id",
-          "totpSecret"
+          "id"
         ],
         "additionalProperties": false
       },

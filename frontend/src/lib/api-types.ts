@@ -347,7 +347,6 @@ export interface paths {
                     "application/json": {
                         username: string;
                         password: string;
-                        code: string;
                     };
                 };
             };
@@ -7440,6 +7439,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/omnisire/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unlock owner workspace for the current staff session */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        code: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Session rotated and elevated until its original expiry */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid or replayed authenticator code */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Owner account required */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too many attempts */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7577,6 +7637,8 @@ export interface components {
             development: boolean;
             permissions: string[];
             staffId: string;
+            omnisireVerified: boolean;
+            catalogOnly: boolean;
         };
         Quote: {
             /** Format: int64 */
@@ -7697,6 +7759,7 @@ export interface components {
             freeShippingRials: number;
             supportUrl: string;
             mapEnabled: boolean;
+            catalogOnly: boolean;
         };
         Analytics: {
             summary: {
@@ -7853,12 +7916,10 @@ export interface components {
             };
         };
         MemberCredentials: {
-            password?: string;
-            resetTotp?: boolean;
+            password: string;
         };
         MemberCreated: {
             id: string;
-            totpSecret: string;
         };
         MemberPayment: {
             amountRials: number;

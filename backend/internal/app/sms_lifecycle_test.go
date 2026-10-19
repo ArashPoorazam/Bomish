@@ -74,8 +74,7 @@ func TestSMSMultiplePostalParcels(t *testing.T) {
 	ctx := context.Background()
 	var cfg shippingConfig
 	staff.ok(t, "GET", "/staff/shipping", nil, &cfg)
-	cfg.Boxes[0].Inside = packing.Size{Length: 90, Width: 90, Height: 110}
-	cfg.Boxes[0].Outside = packing.Size{Length: 100, Width: 100, Height: 120}
+	cfg.Boxes[0].Outside = packing.Size{Length: 122, Width: 122, Height: 142}
 	staff.ok(t, "PUT", "/staff/shipping", cfg, nil)
 	id, _, _ := quoteAndCheckout(t, c, addr, "post")
 	d := prepareShipping(t, c, staff, id)

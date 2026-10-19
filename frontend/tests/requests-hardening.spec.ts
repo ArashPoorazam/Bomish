@@ -237,6 +237,7 @@ test("suggestion retries preserve edits and event sound ignores unchanged pollin
         json: {
           csrf: "test",
           role: "owner",
+          omnisireVerified: true,
           staffId: "owner",
           permissions: ["products", "orders", "requests"],
           authenticated: false,
@@ -352,7 +353,7 @@ test("switching staff conversations ignores an older delayed response", async ({
           csrf: "test",
           role: "operator",
           staffId: "operator",
-          permissions: ["requests"],
+          permissions: ["support", "support.edit", "custom", "custom.edit"],
         },
       });
     if (path === "/staff/notifications")

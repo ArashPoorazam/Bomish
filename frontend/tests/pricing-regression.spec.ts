@@ -197,6 +197,7 @@ test("plain-text missing pricing route shows a readable error and can retry", as
       "/session": {
         csrf: "test",
         role: "owner",
+        omnisireVerified: true,
         staffId: "owner",
         permissions: ["pricing"],
       },

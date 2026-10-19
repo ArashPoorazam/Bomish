@@ -9,6 +9,6 @@ RUN apk add --no-cache ca-certificates && addgroup -S bomish && adduser -S bomis
 USER bomish
 WORKDIR /app
 COPY --from=build /server /app/server
-ENV LISTEN_ADDR=0.0.0.0:8080 UPLOAD_DIR=/data/uploads
+ENV GOMEMLIMIT=400MiB LISTEN_ADDR=0.0.0.0:8080 UPLOAD_DIR=/data/uploads
 EXPOSE 8080
 ENTRYPOINT ["/app/server"]

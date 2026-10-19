@@ -96,9 +96,9 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
     await page.goto("/");
     const region = page.getByRole("region", { name: "تصاویر بومیش" });
     const dots = region.locator(".hero-slide-dots button");
-    await expect(page.locator(".hero-slide-caption h2")).toHaveText(
-      "عطر سبزی در آشپزخانه",
-    );
+    await expect(
+      page.locator(".hero-caption-text:not([aria-hidden]) h2:visible"),
+    ).toHaveText("عطر سبزی در آشپزخانه");
     await expect(page.locator(".hero-slide-caption a")).toHaveCount(0);
     await expect(region.getByRole("img")).toHaveAttribute(
       "alt",
@@ -111,13 +111,14 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
     await page.clock.runFor(4100);
     await expect(dots.nth(1)).toHaveAttribute("aria-pressed", "true");
     const keyframes = await region
-      .locator(".is-incoming")
+      .locator(".hero-slide.is-incoming")
       .evaluate((el) =>
         (el.getAnimations()[0]?.effect as KeyframeEffect | null)
           ?.getKeyframes()
           .map((k) => k.transform),
       );
-    expect(keyframes).toEqual(["translateX(-100%)", "translateX(0px)"]);
+    expect(keyframes?.[0]).toBe("translateX(-100%)");
+    expect(keyframes?.[1]).toMatch(/^translate(?:X)?\(0px\)$/);
     await page.clock.runFor(4100);
     await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
     await region.hover();
@@ -153,7 +154,7 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
     await expect(region.locator(".hero-slide-playback")).toBeDisabled();
     await dots.nth(0).click();
     await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
-    await expect(region.locator(".is-incoming")).toHaveCSS(
+    await expect(region.locator(".hero-slide.is-incoming")).toHaveCSS(
       "animation-name",
       "none",
     );
@@ -262,7 +263,7 @@ test("homepage image editor retains successful uploads, retries failures, and pr
           csrf: "test",
           role: "editor",
           staffId: "editor",
-          permissions: ["products"],
+          permissions: ["home", "home.edit"],
           authenticated: false,
         },
       });
@@ -498,7 +499,7 @@ test("home product selection limits the showcase to twelve and persists display 
           csrf: "test",
           role: "editor",
           staffId: "editor",
-          permissions: ["products"],
+          permissions: ["home", "home.edit"],
           authenticated: false,
         },
       });

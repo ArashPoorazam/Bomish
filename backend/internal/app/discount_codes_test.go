@@ -32,14 +32,14 @@ func createCode(t *testing.T, owner *client, code, kind string, value, limit int
 func couponQuote(t *testing.T, c *client, code string) quoteResult {
 	t.Helper()
 	var q quoteResult
-	c.ok(t, "POST", "/checkout/quote", map[string]string{"province": "تهران", "discountCode": code}, &q)
+	c.ok(t, "POST", "/checkout/quote", commerceQuote(code), &q)
 	return q
 }
 func couponOrderBody(code, key string, q quoteResult) map[string]any {
-	return map[string]any{"address": domain.Address{Recipient: "مشتری آزمایش", Phone: "09123334444", Province: "تهران", City: "تهران", Street: "خیابان آزمایشی پلاک ۱۲", PostalCode: "1234567890"}, "expectedTotalRials": q.TotalRials, "idempotencyKey": key, "discountCode": code}
+	return map[string]any{"address": commerceAddress(), "shippingQuoteId": q.ShippingQuoteID, "method": q.Method, "expectedTotalRials": q.TotalRials, "idempotencyKey": key, "discountCode": code}
 }
 func TestDiscountCodeValidationAndQuote(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	owner := couponOwner(t, a)
 	c := couponCustomer(t, a, "09120000101", "turmeric")
 	editor := newClient(t, a.Handler())
@@ -75,23 +75,23 @@ func TestDiscountCodeValidationAndQuote(t *testing.T) {
 	}
 	owner.ok(t, "POST", "/staff/discount-codes", map[string]any{"code": "MINIMUM", "kind": "percent", "value": 10, "minSubtotalRials": 1000000000}, nil)
 	for _, code := range []string{"MISSING", "MINIMUM"} {
-		if status, _ := c.call("POST", "/checkout/quote", map[string]string{"province": "تهران", "discountCode": code}); status != 400 {
+		if status, _ := c.call("POST", "/checkout/quote", commerceQuote(code)); status != 422 {
 			t.Fatal("invalid code accepted", code)
 		}
 	}
 	owner.ok(t, "PATCH", "/staff/discount-codes/WELCOME10", map[string]bool{"active": false}, nil)
-	if status, _ := c.call("POST", "/checkout/quote", map[string]string{"province": "تهران", "discountCode": "WELCOME10"}); status != 400 {
+	if status, _ := c.call("POST", "/checkout/quote", commerceQuote("WELCOME10")); status != 422 {
 		t.Fatal("disabled accepted")
 	}
 	if _, e := a.Pool.Exec(context.Background(), "UPDATE discount_codes SET expires_at=now()-interval '1 second' WHERE code='FIXED'"); e != nil {
 		t.Fatal(e)
 	}
-	if status, _ := c.call("POST", "/checkout/quote", map[string]string{"province": "تهران", "discountCode": "FIXED"}); status != 400 {
+	if status, _ := c.call("POST", "/checkout/quote", commerceQuote("FIXED")); status != 422 {
 		t.Fatal("expired accepted")
 	}
 }
 func TestDiscountOrderSnapshotsAndCapacity(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	owner := couponOwner(t, a)
 	createCode(t, owner, "ONEUSE", "percent", 15, 1)
 	c := couponCustomer(t, a, "09120000102", "turmeric")
@@ -108,7 +108,7 @@ func TestDiscountOrderSnapshotsAndCapacity(t *testing.T) {
 	if first["orderId"] != repeat["orderId"] {
 		t.Fatal("retry made another order")
 	}
-	if status, _ := c.call("POST", "/checkout/quote", map[string]string{"province": "تهران", "discountCode": "ONEUSE"}); status != 400 {
+	if status, _ := c.call("POST", "/checkout/quote", commerceQuote("ONEUSE")); status != 422 {
 		t.Fatal("pending order didn't reserve capacity")
 	}
 	var codes []discountCode
@@ -142,7 +142,7 @@ func TestDiscountOrderSnapshotsAndCapacity(t *testing.T) {
 	}
 }
 func TestDiscountConcurrentLimitAndLatePayment(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	owner := couponOwner(t, a)
 	createCode(t, owner, "LASTONE", "fixed", 100, 1)
 	customers := []*client{couponCustomer(t, a, "09120000103", "turmeric"), couponCustomer(t, a, "09120000104", "cumin")}
@@ -188,7 +188,7 @@ func TestDiscountConcurrentLimitAndLatePayment(t *testing.T) {
 }
 
 func TestDiscountPerCustomerLimits(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	owner := couponOwner(t, a)
 	for _, limit := range []int64{-1, 1000000001} {
 		if status, _ := owner.call("POST", "/staff/discount-codes", map[string]any{"code": "BADLIMIT", "kind": "percent", "value": 10, "maxUsesPerCustomer": limit}); status != 400 {
@@ -216,7 +216,7 @@ func TestDiscountPerCustomerLimits(t *testing.T) {
 	if order["orderId"] != retry["orderId"] {
 		t.Fatal("retry used another allowance")
 	}
-	if status, raw := otherSession.call("POST", "/checkout/quote", map[string]string{"province": "تهران", "discountCode": "ONCE-EACH"}); status != 400 {
+	if status, raw := otherSession.call("POST", "/checkout/quote", commerceQuote("ONCE-EACH")); status != 422 {
 		t.Fatalf("same customer in new session bypassed limit: %d %s", status, raw)
 	}
 	couponQuote(t, otherCustomer, "ONCE-EACH")
@@ -224,14 +224,14 @@ func TestDiscountPerCustomerLimits(t *testing.T) {
 	q = couponQuote(t, c, "ONCE-EACH")
 	c.ok(t, "POST", "/checkout", couponOrderBody("ONCE-EACH", "per-customer-second", q), &order)
 	c.ok(t, "POST", "/orders/"+order["orderId"]+"/simulate", map[string]bool{"success": true}, nil)
-	if status, _ := otherSession.call("POST", "/checkout/quote", map[string]string{"province": "تهران", "discountCode": "ONCE-EACH"}); status != 400 {
+	if status, _ := otherSession.call("POST", "/checkout/quote", commerceQuote("ONCE-EACH")); status != 422 {
 		t.Fatal("paid use did not consume allowance")
 	}
 	couponQuote(t, otherCustomer, "ONCE-EACH")
 }
 
 func TestDiscountPerCustomerConcurrentAndLatePayment(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	owner := couponOwner(t, a)
 	owner.ok(t, "POST", "/staff/discount-codes", map[string]any{"code": "PER-TWO", "kind": "fixed", "value": 100, "maxUsesPerCustomer": 2}, nil)
 	// Separate sessions and carts for the same account must share one allowance.
@@ -239,6 +239,7 @@ func TestDiscountPerCustomerConcurrentAndLatePayment(t *testing.T) {
 	q := []quoteResult{couponQuote(t, customers[0], "PER-TWO"), couponQuote(t, customers[1], "PER-TWO")}
 	var initial map[string]string
 	customers[0].ok(t, "POST", "/checkout", couponOrderBody("PER-TWO", "per-two-initial-0001", q[0]), &initial)
+	q[0] = couponQuote(t, customers[0], "PER-TWO")
 	statuses := make([]int, 2)
 	var wg sync.WaitGroup
 	for i := range customers {

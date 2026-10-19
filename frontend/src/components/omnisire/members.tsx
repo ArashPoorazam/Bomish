@@ -68,7 +68,7 @@ export function MemberForm({
   onCancel,
 }: {
   initial?: Member;
-  onSave: (id?: string, secret?: string) => void;
+  onSave: (id?: string) => void;
   creating?: boolean;
   onCancel?: () => void;
 }) {
@@ -111,12 +111,12 @@ export function MemberForm({
             permissionOverrides: v.permissionOverrides,
             password: creating ? v.password : "",
           };
-          const res = await api<{ id?: string; totpSecret?: string }>(
+          const res = await api<{ id?: string }>(
             initial ? `/omnisire/members/${initial.id}` : "/omnisire/members",
             initial ? "PATCH" : "POST",
             body,
           );
-          onSave(res.id, res.totpSecret);
+          onSave(res.id);
         } catch (e) {
           setError((e as Error).message);
         } finally {
@@ -490,8 +490,6 @@ export function MemberPage({ id }: { id: string }) {
     [message, setMessage] = useState(""),
     [failure, setFailure] = useState(""),
     [password, setPassword] = useState(""),
-    [resetTotp, setResetTotp] = useState(false),
-    [secret, setSecret] = useState(""),
     [busy, setBusy] = useState(false);
   const router = useRouter();
   return (
@@ -587,14 +585,12 @@ export function MemberPage({ id }: { id: string }) {
                           setBusy(true);
                           setFailure("");
                           try {
-                            const res = await api<{ totpSecret: string }>(
+                            await api<{ ok: boolean }>(
                               `/omnisire/members/${id}/credentials`,
                               "POST",
-                              { password, resetTotp },
+                              { password },
                             );
-                            setSecret(res.totpSecret);
                             setPassword("");
-                            setResetTotp(false);
                             setMessage(
                               "اطلاعات ورود تغییر کرد و نشست‌های قبلی بسته شدند.",
                             );
@@ -606,36 +602,21 @@ export function MemberPage({ id }: { id: string }) {
                         }}
                       >
                         <label>
-                          گذرواژه جدید (اختیاری)
+                          گذرواژه جدید
                           <input
                             type="password"
                             minLength={12}
+                            required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                           />
                         </label>
-                        <label className="check-label">
-                          <input
-                            type="checkbox"
-                            checked={resetTotp}
-                            onChange={(e) => setResetTotp(e.target.checked)}
-                          />
-                          ساخت کلید جدید رمزساز
-                        </label>
                         <button
                           className="button secondary"
-                          disabled={busy || (!password && !resetTotp)}
+                          disabled={busy || !password}
                         >
                           بازیابی ورود
                         </button>
-                        {secret && (
-                          <p className="notice">
-                            کلید رمزساز جدید — فقط همین‌بار نمایش داده می‌شود:
-                            <code className="omni-secret" dir="ltr">
-                              {secret}
-                            </code>
-                          </p>
-                        )}
                       </form>
                     </Panel>
                   </Permission>

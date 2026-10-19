@@ -78,7 +78,15 @@ export function WorkspaceNavigation({
   const path = usePathname();
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   const can = (key: string) => hasStaffPermission({ role, permissions }, key);
-  const management = managementLinks.filter((item) => can(item.id));
+  const management = managementLinks
+    .filter(
+      (item) => can(item.id) && (role === "owner" || item.id === "shipping"),
+    )
+    .map((item) =>
+      item.id === "shipping" && !owner
+        ? { ...item, href: "/staff/shipping" }
+        : item,
+    );
   const groups = owner
     ? management
     : [

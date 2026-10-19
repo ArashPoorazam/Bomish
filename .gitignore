@@ -10,3 +10,11 @@ test-results/
 playwright-report/
 backend/bin/
 *.tsbuildinfo
+
+# Production secrets and release state
+.env.production
+.env.staging
+deploy/secrets/
+deploy/*.env
+deploy/current-images.env
+deploy/previous-images.env

@@ -22,7 +22,7 @@ Checkout locks the customer, cart session and product rows, checks availability,
 
 ## Identity and permissions
 
-Anonymous and authenticated carts live in PostgreSQL and are associated with an opaque cookie; login rotates the session token and moves the cart. Session tokens are hashed in storage. Codes are hashed, expire after five minutes, are consumed atomically, and stop accepting attempts after five failures. Resend cooldown is 60 seconds, with phone/IP limits. Staff log in with PBKDF2-SHA256 passwords and RFC 6238 TOTP, with replay protection and an eight-hour database session.
+Anonymous and authenticated carts live in PostgreSQL and are associated with an opaque cookie; login rotates the session token and moves the cart. Session tokens are hashed in storage. Codes are hashed, expire after five minutes, are consumed atomically, and stop accepting attempts after five failures. Resend cooldown is 60 seconds, with phone/IP limits. Staff log in with PBKDF2-SHA256 passwords and an eight-hour database session. Only owners use RFC 6238 TOTP to unlock `/omnisire`; API access requires owner role and a verified session. Unlock rotates the token without extending expiry. Production TOTP secrets use AES-256-GCM with a key mounted separately from PostgreSQL.
 
 HTTP-only, SameSite cookies and exact Origin plus per-session CSRF checks protect mutations. HTTPS origins receive Secure cookies even in development. The API determines permissions; hiding dashboard tabs is only a usability aid. Owners administer the business in `/omnisire`. Managers have all staff tools; editors can publish, archive, change availability and edit prices in their content sections; operators handle orders; salespersons have personal sales only. Every member has a personal sales page. Individual section restrictions only remove role permissions. Backend checks cover alternate editing paths, including prices inside product drafts. Role, restriction, suspension, archival and credential changes revoke sessions. Staff accounts do not grant shell, container or database access.
 
@@ -66,7 +66,7 @@ Staff request badges are persistent per staff member. Opening a custom request m
 
 The suggestion editor has separate saved-selection and product-search retry actions. Saved selections initialize the editor only once; search retries and background responses cannot overwrite unsaved choices.
 
-Migration `010_notification_event_indexes.sql` adds indexed newest-event lookups for messages, custom requests, and orders. Migration `009_requests_and_suggestions.sql` adds the persisted conversations, messages, read markers, suggestions, restock timestamps, and supporting indexes. The application applies it at startup. Legacy staff browser sessions need one staff sign-in after switching to the separate cookie. These changes retain the existing development-only payment/provider restrictions.
+Migration `010_notification_event_indexes.sql` adds indexed newest-event lookups for messages, custom requests, and orders. Migration `009_requests_and_suggestions.sql` adds the persisted conversations, messages, read markers, suggestions, restock timestamps, and supporting indexes. Development applies migrations at startup; production checks the schema and requires an explicit migration job. Legacy staff browser sessions need one staff sign-in after switching to the separate cookie. These changes retain the existing development-only payment/provider restrictions.
 
 ## Calculated shipping
 

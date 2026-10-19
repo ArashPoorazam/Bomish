@@ -11,7 +11,7 @@ func (a *App) seedLegacyTestData(ctx context.Context) error {
 		return nil
 	}
 	var exists bool
-	if e := a.Pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM categories)").Scan(&exists); e != nil {
+	if e := a.Pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM products)").Scan(&exists); e != nil {
 		return e
 	}
 	if exists {
@@ -23,7 +23,7 @@ func (a *App) seedLegacyTestData(ctx context.Context) error {
 	}
 	defer tx.Rollback(ctx)
 	for _, c := range [][2]string{{"spices", "ادویه‌ها"}, {"herbs", "سبزی‌های خشک"}, {"seeds", "دانه‌های خوراکی"}} {
-		if _, e = tx.Exec(ctx, "INSERT INTO categories(id,name) VALUES($1,$2)", c[0], c[1]); e != nil {
+		if _, e = tx.Exec(ctx, "INSERT INTO categories(id,name) VALUES($1,$2) ON CONFLICT(id) DO NOTHING", c[0], c[1]); e != nil {
 			return e
 		}
 	}

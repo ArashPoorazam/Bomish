@@ -52,6 +52,7 @@ async function workspace(page: Page) {
       "/session": {
         csrf: "test",
         role: "owner",
+        omnisireVerified: true,
         staffId: "owner",
         permissions: [
           "products",
@@ -236,6 +237,14 @@ test("publication failure reports the saved draft and preserves edits", async ({
     route.fulfill({ status: 500, json: { error: "انتشار ناموفق" } }),
   );
   await page.getByRole("button", { name: "ویرایش", exact: true }).click();
+  await step(page, "بسته‌ها");
+  for (const [label, value] of [
+    ["طول (سانتی‌متر)", "8"],
+    ["عرض (سانتی‌متر)", "8"],
+    ["ارتفاع (سانتی‌متر)", "10"],
+    ["وزن بسته آماده ارسال (گرم)", "1500"],
+  ])
+    await page.getByLabel(label, { exact: true }).fill(value);
   await step(page, "بررسی و انتشار");
   await page
     .getByRole("button", { name: "ذخیره و انتشار", exact: true })

@@ -3,6 +3,7 @@ package main
 import (
 	"bomish/internal/app"
 	"bomish/internal/db"
+	"bomish/internal/runtimeconfig"
 	"bomish/internal/storage"
 	"bomish/migrations"
 	"context"
@@ -12,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 )
@@ -20,9 +20,29 @@ import (
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	dev := os.Getenv("APP_ENV") == "development"
-	if !dev {
-		slog.Error("production disabled: connect and verify real SMS/payment providers before enabling live sales")
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+	if err := runtimeconfig.LoadSecrets(); err != nil {
+		slog.Error("configuration invalid", "error", err)
+		os.Exit(1)
+	}
+	cfg, err := runtimeconfig.Read()
+	if err != nil {
+		slog.Error("configuration invalid", "error", err)
+		os.Exit(1)
+	}
+	dev := cfg.Dev
+	command := "serve"
+	if len(os.Args) > 1 {
+		command = os.Args[1]
+	}
+	switch command {
+	case "serve", "migrate", "bootstrap-owner", "recover-owner", "refresh-demo-catalog", "export-shipping-config", "apply-shipping-config", "totp":
+	default:
+		slog.Error("unknown command")
+		os.Exit(1)
+	}
+	if !dev && (command == "refresh-demo-catalog" || command == "totp") {
+		slog.Error("development command forbidden")
 		os.Exit(1)
 	}
 	url := os.Getenv("DATABASE_URL")
@@ -32,56 +52,48 @@ func main() {
 	}
 	pool, e := pgxpool.New(ctx, url)
 	if e != nil {
-		panic(e)
+		slog.Error("invalid database connection configuration")
+		os.Exit(1)
 	}
 	defer pool.Close()
 	if e = pool.Ping(ctx); e != nil {
-		panic(e)
+		slog.Error("database connection failed")
+		os.Exit(1)
 	}
-	tx, e := pool.Begin(ctx)
-	if e != nil {
-		panic(e)
-	}
-	defer tx.Rollback(ctx)
-	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(7234109)"); e != nil {
-		panic(e)
-	}
-	if _, e = tx.Exec(ctx, "CREATE TABLE IF NOT EXISTS schema_migrations(version text PRIMARY KEY)"); e != nil {
-		panic(e)
-	}
-	entries, _ := migrations.Files.ReadDir(".")
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".sql") {
-			continue
+	if dev || command == "migrate" {
+		if e = migrations.Apply(ctx, pool); e != nil {
+			slog.Error("migration failed", "error", e)
+			os.Exit(1)
 		}
-		version := strings.SplitN(entry.Name(), "_", 2)[0]
-		var exists bool
-		if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)", version).Scan(&exists); e != nil {
-			panic(e)
-		}
-		if !exists {
-			sql, _ := migrations.Files.ReadFile(entry.Name())
-			if _, e = tx.Exec(ctx, string(sql)); e != nil {
-				panic(e)
-			}
-			if _, e = tx.Exec(ctx, "INSERT INTO schema_migrations VALUES($1)", version); e != nil {
-				panic(e)
-			}
-		}
+	} else if e = migrations.Check(ctx, pool); e != nil {
+		slog.Error("schema not ready", "error", e)
+		os.Exit(1)
 	}
-	if e = tx.Commit(ctx); e != nil {
-		panic(e)
+	if command == "migrate" {
+		slog.Info("migrations complete")
+		return
 	}
-	origin := os.Getenv("APP_ORIGIN")
-	if origin == "" {
-		origin = "http://localhost:3000"
-	}
+	origin := cfg.Origin
 	root := os.Getenv("UPLOAD_DIR")
 	if root == "" {
 		root = "../.data/uploads"
 		os.Setenv("UPLOAD_DIR", root)
 	}
-	a := &app.App{Pool: pool, Queries: db.New(pool), Dev: dev, Origin: origin, Uploads: storage.Local{Root: root}}
+	a := &app.App{Pool: pool, Queries: db.New(pool), Dev: dev, CatalogOnly: cfg.CatalogOnly, TrustedProxies: cfg.TrustedProxies, TOTPKey: cfg.TOTPKey, Origin: origin, Uploads: storage.Local{Root: root}}
+	if command == "bootstrap-owner" || command == "recover-owner" {
+		if e = setupOwner(ctx, a, command == "recover-owner"); e != nil {
+			slog.Error("owner setup failed", "error", e)
+			os.Exit(1)
+		}
+		return
+	}
+	if !dev {
+		var unsafe int
+		if e = pool.QueryRow(ctx, "SELECT count(*) FROM staff WHERE (role='owner' AND totp_secret NOT LIKE 'v1:%') OR totp_secret=$1", app.DemoTOTP).Scan(&unsafe); e != nil || unsafe > 0 {
+			slog.Error("production requires a clean database and encrypted owner credentials")
+			os.Exit(1)
+		}
+	}
 	if len(os.Args) > 1 && os.Args[1] == "refresh-demo-catalog" {
 		if e = a.RefreshDemoCatalog(ctx); e != nil {
 			panic(e)
@@ -139,6 +151,9 @@ func main() {
 		}
 	}()
 	go func() {
+		if a.CatalogOnly {
+			return
+		}
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -157,6 +172,9 @@ func main() {
 	}()
 	// Carrier requests can be slow; SMS has its own independent worker.
 	go func() {
+		if a.CatalogOnly {
+			return
+		}
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -181,7 +199,7 @@ func main() {
 		defer cancel()
 		srv.Shutdown(c)
 	}()
-	slog.Info("Bomish development API ready", "address", addr)
+	slog.Info("Bomish API ready", "address", addr)
 	if e = srv.ListenAndServe(); e != nil && e != http.ErrServerClosed {
 		panic(e)
 	}

@@ -23,6 +23,19 @@ const blank: Address = {
 };
 
 export function Checkout() {
+  const { user } = useStore();
+  if (!user) return <p className="container section">در حال دریافت اطلاعات…</p>;
+  if (user.catalogOnly)
+    return (
+      <div className="container section">
+        <h1>فروش آنلاین به‌زودی</h1>
+        <p>در حال حاضر می‌توانید محصولات و قیمت‌ها را مشاهده کنید.</p>
+        <Link href="/products">مشاهده محصولات</Link>
+      </div>
+    );
+  return <CommerceCheckout />;
+}
+function CommerceCheckout() {
   const router = useRouter();
   const { cart, user, refresh } = useStore();
   useEffect(() => {

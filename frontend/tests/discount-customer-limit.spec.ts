@@ -25,6 +25,7 @@ test("discount form distinguishes per-customer and total limits on mobile", asyn
       "/session": {
         csrf: "test",
         role: "owner",
+        omnisireVerified: true,
         staffId: "owner",
         permissions: ["pricing", "products"],
       },

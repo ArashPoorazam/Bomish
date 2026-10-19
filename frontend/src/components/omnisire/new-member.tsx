@@ -11,7 +11,6 @@ export function NewMemberPage() {
   const router = useRouter();
   const can = useStaffPermission();
   const [created, setCreated] = useState("");
-  const [secret, setSecret] = useState("");
   return (
     <Workspace
       owner
@@ -28,12 +27,8 @@ export function NewMemberPage() {
           {created ? (
             <div className="notice">
               <p>
-                کلید رمزساز فقط همین‌بار نمایش داده می‌شود. آن را به همکار تحویل
-                دهید.
+                حساب همکار آماده است. ورود با نام کاربری و گذرواژه انجام می‌شود.
               </p>
-              <code className="omni-secret" dir="ltr">
-                {secret}
-              </code>
               <Link className="button" href={`/omnisire/members/${created}`}>
                 مشاهده پرونده همکار
               </Link>
@@ -42,9 +37,8 @@ export function NewMemberPage() {
             <MemberForm
               creating
               onCancel={() => router.push("/omnisire/members")}
-              onSave={(id, key) => {
+              onSave={(id) => {
                 setCreated(id || "");
-                setSecret(key || "");
               }}
             />
           )}

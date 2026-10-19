@@ -9,7 +9,7 @@ import (
 )
 
 func TestStorefrontPublicationAndDiscountOrdering(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	c := newClient(t, a.Handler())
 	owner := newClient(t, a.Handler())
 	owner.staff(t, "owner")
@@ -22,7 +22,7 @@ func TestStorefrontPublicationAndDiscountOrdering(t *testing.T) {
 	p.Slug = p.ID
 	p.Name = "محصول تازه"
 	p.DiscountPercent = 10
-	p.Packages = []domain.Package{{ID: "small", Amount: 100, Unit: "g", PriceRials: 470000, MaxQuantity: 5}}
+	p.Packages = measuredPackages([]domain.Package{{ID: "small", Amount: 100, Unit: "g", PriceRials: 470000, MaxQuantity: 5}})
 	owner.ok(t, "PUT", "/staff/products/"+p.ID, p, nil)
 	owner.ok(t, "POST", "/staff/products/"+p.ID+"/publish", nil, nil)
 	c.ok(t, "GET", "/products/"+p.ID, nil, &p)
@@ -71,20 +71,20 @@ func TestStorefrontPublicationAndDiscountOrdering(t *testing.T) {
 	}
 	c.login(t, "09129991111")
 	var quote quoteResult
-	c.ok(t, "POST", "/checkout/quote", map[string]string{"province": "تهران"}, &quote)
+	c.ok(t, "POST", "/checkout/quote", commerceQuote(""), &quote)
 	if quote.SubtotalRials != cart.SubtotalRials {
 		t.Fatal("checkout differs from cart")
 	}
 }
 
 func TestAddressManagementOwnershipAndOrderSnapshot(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	ctx := context.Background()
 	c := newClient(t, a.Handler())
 	c.login(t, "09123334444")
 	outsider := newClient(t, a.Handler())
 	outsider.login(t, "09125556666")
-	addr := domain.Address{Recipient: "مشتری", Phone: "09123334444", Province: "تهران", City: "تهران", Street: "خیابان آزمایشی، پلاک ۱", PostalCode: "1234567890"}
+	addr := commerceAddress()
 	c.ok(t, "POST", "/addresses", addr, &addr)
 	path := "/addresses/" + addr.ID
 	for _, method := range []string{"PUT", "DELETE"} {
@@ -95,9 +95,9 @@ func TestAddressManagementOwnershipAndOrderSnapshot(t *testing.T) {
 	// Existing orders hold their own address snapshots.
 	c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "test500", "quantity": 1}, nil)
 	var quote quoteResult
-	c.ok(t, "POST", "/checkout/quote", map[string]string{"province": "تهران"}, &quote)
+	c.ok(t, "POST", "/checkout/quote", commerceQuote(""), &quote)
 	var order map[string]string
-	c.ok(t, "POST", "/checkout", map[string]any{"address": addr, "expectedTotalRials": quote.TotalRials, "idempotencyKey": "redesign-address-snapshot"}, &order)
+	c.ok(t, "POST", "/checkout", map[string]any{"address": addr, "shippingQuoteId": quote.ShippingQuoteID, "method": quote.Method, "expectedTotalRials": quote.TotalRials, "idempotencyKey": "redesign-address-snapshot"}, &order)
 	addr.Street = "خیابان تازه، پلاک ۲"
 	addr.Phone = "۰۹۱۲۳۳۳۴۴۴۴"
 	addr.PostalCode = "۱۲۳۴۵۶۷۸۹۰"
@@ -141,7 +141,7 @@ func TestAddressManagementOwnershipAndOrderSnapshot(t *testing.T) {
 }
 
 func TestPublicationMigrationBackfillsOnlyRecordedHistory(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	ctx := context.Background()
 	_, e := a.Pool.Exec(ctx, `ALTER TABLE products DROP COLUMN first_published_at; INSERT INTO audit_events(action,entity_id,created_at) VALUES ('product.publish','turmeric','2025-01-02'),('product.publish','turmeric','2025-02-03')`)
 	if e != nil {

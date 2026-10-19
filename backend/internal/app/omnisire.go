@@ -125,8 +125,22 @@ func (a *App) paged(w http.ResponseWriter, r *http.Request, sql string, args []a
 	}
 	write(w, 200, pageResult{items, total, p, n})
 }
+func auditJSON(ctx context.Context, detail any) ([]byte, error) {
+	b, err := json.Marshal(detail)
+	if err != nil {
+		return nil, err
+	}
+	if requestID, ok := ctx.Value(requestIDKey{}).(string); ok {
+		var fields map[string]any
+		if json.Unmarshal(b, &fields) == nil && fields != nil {
+			fields["requestId"] = requestID
+			return json.Marshal(fields)
+		}
+	}
+	return b, nil
+}
 func auditDetail(ctx context.Context, tx pgx.Tx, actor, action, id string, detail any) error {
-	b, e := json.Marshal(detail)
+	b, e := auditJSON(ctx, detail)
 	if e != nil {
 		return e
 	}
@@ -134,7 +148,7 @@ func auditDetail(ctx context.Context, tx pgx.Tx, actor, action, id string, detai
 	return e
 }
 func (a *App) logEvent(ctx context.Context, actor, action, id string, detail any) {
-	b, _ := json.Marshal(detail)
+	b, _ := auditJSON(ctx, detail)
 	_, _ = a.Pool.Exec(ctx, "INSERT INTO audit_events(staff_id,action,entity_id,detail) VALUES(nullif($1,''),$2,$3,$4)", actor, action, id, b)
 }
 func reportDates(r *http.Request) (time.Time, time.Time) {

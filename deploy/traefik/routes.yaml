@@ -1,0 +1,37 @@
+http:
+  routers:
+    api:
+      rule: 'Host(`{{ env "SITE_HOST" }}`) && (PathPrefix(`/api/`) || PathPrefix(`/uploads/`))'
+      entryPoints: [websecure]
+      service: api
+      middlewares: [security]
+      tls: {}
+    web:
+      rule: 'Host(`{{ env "SITE_HOST" }}`)'
+      entryPoints: [websecure]
+      service: web
+      middlewares: [security]
+      tls: {}
+  services:
+    api:
+      loadBalancer:
+        servers: [{url: "http://api:8080"}]
+    web:
+      loadBalancer:
+        servers: [{url: "http://web:3000"}]
+  middlewares:
+    security:
+      headers:
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: strict-origin-when-cross-origin
+        stsSeconds: 86400
+        customResponseHeaders:
+          Permissions-Policy: "camera=(), microphone=(), geolocation=(self)"
+tls:
+  certificates:
+    - certFile: /certs/origin.crt
+      keyFile: /certs/origin.key
+  options:
+    default:
+      minVersion: VersionTLS12

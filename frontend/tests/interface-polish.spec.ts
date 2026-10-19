@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 const session = {
   csrf: "test",
   role: "owner",
+  omnisireVerified: true,
   staffId: "owner",
   permissions: [
     "products",
@@ -196,6 +197,8 @@ test("staff navigation, category editing page, and member cancellation", async (
       });
     if (path.endsWith("/category-counts"))
       return route.fulfill({ json: { spices: 1 } });
+    if (path.endsWith("/permission-options"))
+      return route.fulfill({ json: { defaults: {}, sections: [] } });
     if (path.endsWith("/product-options")) return route.fulfill({ json: [] });
     return route.fulfill({
       json: { items: [], total: 0, page: 1, pageSize: 25 },
@@ -221,10 +224,12 @@ test("staff navigation, category editing page, and member cancellation", async (
   await expect(
     page.getByLabel("شماره کارت بانکی", { exact: true }),
   ).toHaveAttribute("placeholder", "1111 - 2222 - 3333 - 4444");
-  await page.getByRole("button", { name: "انصراف", exact: true }).click();
+  await page
+    .getByRole("link", { name: "بازگشت به همکاران", exact: true })
+    .click();
   await expect(
     page.getByLabel("نام و نام خانوادگی", { exact: true }),
-  ).toHaveCount(0);
+  ).not.toBeVisible();
 });
 
 test("analytics recovers failed requests and applies only valid date ranges", async ({

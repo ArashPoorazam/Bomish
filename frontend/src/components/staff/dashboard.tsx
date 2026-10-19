@@ -59,7 +59,7 @@ export function Dashboard({
   }, []);
   useEffect(() => {
     if (!user?.role) return;
-    if (!can(sectionPermission(tab)))
+    if (!Object.hasOwn(sectionLabels, tab) || !can(sectionPermission(tab)))
       setTab(
         Object.keys(sectionLabels).find((key) => can(sectionPermission(key))) ||
           "",

@@ -54,7 +54,7 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
   ).json()) as Product[];
   // This suite is opt-in and requires a disposable seeded database with SHIPPING_SIMULATED=true.
   for (const product of products) {
-    if (product.status === "archived") continue;
+    if (product.status !== "published") continue;
     product.packages = product.packages.map((p) => ({
       ...p,
       lengthMm: 80,
@@ -81,7 +81,10 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
     );
   }
   const product = products.find(
-    (p) => p.packages[0]?.unit === "g" && p.packages[0]?.amount === 100,
+    (p) =>
+      p.status === "published" &&
+      p.packages[0]?.unit === "g" &&
+      p.packages[0]?.amount === 100,
   )!;
   shippingProduct = product;
   await page.goto(`/staff?section=products&q=${product.id}&step=shipping`);
@@ -413,7 +416,10 @@ test("Tehran staff courier: role, packing, assignment, history and delivery", as
       await page.request.get("/api/v1/staff/products?pageSize=100")
     ).json()) as Product[];
     shippingProduct = products.find(
-      (p) => p.packages[0]?.unit === "g" && p.packages[0]?.amount === 100,
+      (p) =>
+        p.status === "published" &&
+        p.packages[0]?.unit === "g" &&
+        p.packages[0]?.amount === 100,
     )!;
   }
   await page.goto("/omnisire/members/new");
@@ -638,7 +644,13 @@ test("missing pin explicitly accepts post, postal tracking and zero cost stay di
   const cfg = (await (
     await page.request.get("/api/v1/staff/shipping")
   ).json()) as ShippingConfig;
-  cfg.boxes[0].maxGrams = 350;
+  // The derived usable space holds one 125 × 80 × 100 mm package.
+  cfg.boxes = [
+    {
+      ...cfg.boxes[0],
+      outside: { lengthMm: 157, widthMm: 112, heightMm: 132 },
+    },
+  ];
   await checked(page.request, "/staff/shipping", "PUT", cfg, headers);
   const context = await browser.newContext({
     baseURL: origin,

@@ -24,7 +24,7 @@ func (a *App) recordEvent(w http.ResponseWriter, r *http.Request) {
 		write(w, 200, map[string]bool{"ok": true})
 		return
 	}
-	if !a.limit(r, "analytics-ip:"+ip(r), 300, time.Hour) || !a.limit(r, "analytics:"+current(r).Hash+":"+in.Kind+":"+in.ProductID+in.Query, 1, 30*time.Minute) {
+	if !a.limit(r, "analytics-ip:"+a.clientIP(r), 300, time.Hour) || !a.limit(r, "analytics:"+current(r).Hash+":"+in.Kind+":"+in.ProductID+in.Query, 1, 30*time.Minute) {
 		write(w, 200, map[string]bool{"ok": true})
 		return
 	}
@@ -46,6 +46,12 @@ func (a *App) recordEvent(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, map[string]bool{"ok": true})
 }
 func (a *App) deleteCategory(w http.ResponseWriter, r *http.Request) {
+	switch r.PathValue("id") {
+	case "spices", "herbs", "seeds":
+		fail(w, 409, "دسته‌های اصلی صفحه نخست قابل حذف نیستند")
+		return
+	}
+
 	tx, e := a.Pool.Begin(r.Context())
 	if e != nil {
 		a.dbError(w, e)

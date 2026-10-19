@@ -34,7 +34,7 @@ func testStaff(t *testing.T, a *App, role string, restricted []string) (*client,
 	}
 	c := newClient(t, a.Handler())
 	c.cookies[0].Name = "bomish_staff_session"
-	_, e = a.Pool.Exec(context.Background(), "UPDATE sessions SET staff_id=$1 WHERE token_hash=$2", id, hash(c.cookies[0].Value))
+	_, e = a.Pool.Exec(context.Background(), "UPDATE sessions SET staff_id=$1,omnisire_verified=true WHERE token_hash=$2", id, hash(c.cookies[0].Value))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -73,8 +73,8 @@ func TestOmnisirePermissionsAndProfiles(t *testing.T) {
 	var created map[string]string
 	body := map[string]any{"fullName": "آزمایش فروشنده", "username": "new-sales", "phone": "۰۹۱۲۳۴۵۶۷۸۹", "bankCard": "۵۰۲۲ - ۲۹۱۰ - ۰۲۶۹ - ۶۱۷۵", "role": "salesperson", "active": true, "password": "test-password-123", "restrictions": []string{}}
 	owner.ok(t, "POST", "/omnisire/members", body, &created)
-	if created["totpSecret"] == "" {
-		t.Fatal("missing TOTP")
+	if created["totpSecret"] != "" {
+		t.Fatal("staff must not receive TOTP")
 	}
 	var member map[string]any
 	owner.ok(t, "GET", "/omnisire/members/"+created["id"], nil, &member)
@@ -112,7 +112,7 @@ func TestOmnisirePermissionsAndProfiles(t *testing.T) {
 	}
 }
 func TestReferralSettlementLedgerAndExport(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	ctx := context.Background()
 	owner := couponOwner(t, a)
 	sales, id := testStaff(t, a, "salesperson", nil)
@@ -465,7 +465,7 @@ func TestPartialPaymentsRefundsAndSessionRevocation(t *testing.T) {
 	if code, _ := owner.call("POST", "/omnisire/members/"+id+"/refunds", map[string]any{"orderId": order, "amountRials": 500010, "reason": "بیشتر از مانده", "idempotencyKey": "excess-refund"}); code != 409 {
 		t.Fatal("excess cumulative refund", code)
 	}
-	owner.ok(t, "POST", "/omnisire/members/"+id+"/credentials", map[string]any{"password": "a-new-safe-password-123", "resetTotp": true}, nil)
+	owner.ok(t, "POST", "/omnisire/members/"+id+"/credentials", map[string]any{"password": "a-new-safe-password-123"}, nil)
 	if code, _ := sales.call("GET", "/staff/sales", nil); code != 401 {
 		t.Fatal("credential reset retained session", code)
 	}

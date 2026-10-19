@@ -15,7 +15,7 @@ export function ProductPurchase({ product: p }: { product: Product }) {
     [quantity, setQuantity] = useState(1),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const { cart, setItem, openCart } = useStore();
+  const { cart, user, setItem, openCart } = useStore();
   const pack = p.packages?.find((x) => x.id === id);
   const existing =
     cart.items.find((x) => x.product.id === p.id && x.package.id === id)
@@ -71,7 +71,7 @@ export function ProductPurchase({ product: p }: { product: Product }) {
           ))}
         </div>
       </fieldset>
-      {pack && (
+      {pack && user && !user.catalogOnly && (
         <>
           <div className="between">
             <label htmlFor="package-count">تعداد بسته</label>
@@ -130,6 +130,12 @@ export function ProductPurchase({ product: p }: { product: Product }) {
             </p>
           )}
         </>
+      )}
+      {user?.catalogOnly && (
+        <p className="notice">
+          فروش آنلاین به‌زودی آغاز می‌شود. فعلاً محصولات و قیمت‌ها را مشاهده
+          کنید.
+        </p>
       )}
       {error && (
         <p role="alert" className="error">

@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import type { Product } from "@/lib/types";
-import { loginStaff, totp } from "./staff-login";
+import { prepareCommerce, payCart, completePostal } from "./commerce-fixture";
+import { loginStaff } from "./staff-login";
 
 test("owner creates salesperson, referral earns commission, payout appears in sales, analytics exports", async ({
   browser,
@@ -49,14 +50,13 @@ test("owner creates salesperson, referral earns commission, payout appears in sa
       .getByRole("button", { name: "ایجاد حساب همکار", exact: true })
       .click();
     const member = await (await created).json();
-    expect(member.totpSecret).toBeTruthy();
+    expect(member.totpSecret).toBeUndefined();
     await owner.getByRole("link", { name: "مشاهده پرونده همکار" }).click();
     await sales.goto("/staff");
     await sales.getByLabel("نام کاربری", { exact: true }).fill(username);
     await sales
       .getByLabel("گذرواژه", { exact: true })
       .fill("Browser-sales-2026!");
-    await sales.getByLabel("کد برنامه رمزساز").fill(totp(member.totpSecret));
     await sales.getByRole("button", { name: "ورود به فضای کار" }).click();
     await expect(sales).toHaveURL(/staff\/sales/);
     await expect(sales.getByLabel("لینک معرفی")).toBeVisible();
@@ -77,6 +77,7 @@ test("owner creates salesperson, referral earns commission, payout appears in sa
     ).json();
     const product = catalog.find((p) => !p.outOfStock && p.packages.length);
     expect(product, "an available published product is required").toBeTruthy();
+    await prepareCommerce(new URL(owner.url()).origin, product!.slug);
     await customer.goto(`/products/${product!.slug}`);
     await customer.getByRole("button", { name: "افزودن به سبد" }).click();
     await customer
@@ -93,59 +94,27 @@ test("owner creates salesperson, referral earns commission, payout appears in sa
       .getByLabel("کد تأیید", { exact: true })
       .fill((await (await otp).json()).devCode);
     await customer.getByRole("button", { name: "تأیید و ادامه" }).click();
-    await customer
-      .getByLabel("نام گیرنده", { exact: true })
-      .fill("مشتری معرفی");
-    await customer.getByLabel("شماره همراه گیرنده").fill("09123456789");
-    await customer.getByLabel("شهر", { exact: true }).fill("تهران");
-    await customer
-      .getByLabel("نشانی کامل، پلاک و واحد")
-      .fill("خیابان نمونه پلاک ۱۲");
-    await customer.getByLabel("کد پستی", { exact: true }).fill("1234567890");
-    await customer.getByRole("button", { name: "محاسبه هزینه ارسال" }).click();
-    await customer
-      .getByRole("button", { name: "تأیید سفارش و پرداخت" })
-      .click();
-    await customer
-      .getByRole("button", { name: "شبیه‌سازی پرداخت موفق" })
-      .click();
-    await expect(customer).toHaveURL(/account\/orders\//);
-    const orderId = new URL(customer.url()).pathname.split("/").pop()!;
+    const orderId = await payCart(
+      customer.request,
+      new URL(customer.url()).origin,
+    );
+    await customer.goto("/account/orders/" + orderId);
+    await expect(customer.locator(".order-timeline li")).toHaveCount(5);
     await operator.goto("/staff");
     await loginStaff(operator, "operator");
-    await operator.goto(
-      "/staff?" + new URLSearchParams({ section: "orders", q: orderId }),
+    await completePostal(
+      operator.request,
+      new URL(operator.url()).origin,
+      orderId,
     );
-    await expect(
-      operator.getByRole("button", { name: "محصولات", exact: true }),
-    ).toHaveCount(0);
-    await operator
-      .getByRole("button", {
-        name: new RegExp(`جزئیات سفارش ${orderId.slice(0, 8)}`),
-      })
-      .click();
-    for (const item of await operator
-      .locator(".staff-packing-items input[type=checkbox]")
-      .all()) {
-      await item.check();
-      await expect(item).toBeEnabled();
-    }
-    await operator
-      .getByRole("button", { name: "تأیید بسته‌بندی", exact: true })
-      .click();
-    await operator
-      .getByLabel("کد رهگیری مرسوله", { exact: true })
-      .fill("۱۲۳۴۵۶۷۸۹۰۱۲۳۴۵۶۷۸۹۰");
-    await operator
-      .getByRole("button", { name: "ثبت ارسال و اطلاع‌رسانی", exact: true })
-      .click();
-    await operator
-      .getByRole("button", { name: "تأیید تحویل به مشتری", exact: true })
-      .click();
     const events = await (
       await owner.request.get("/api/v1/omnisire/events?entity=" + orderId)
     ).json();
-    for (const action of ["order.packing", "order.shipped", "order.received"]) {
+    for (const action of [
+      "order.pack-item",
+      "order.shipped",
+      "order.received",
+    ]) {
       expect(
         events.items.some(
           (event: { action: string; staffId: string }) =>

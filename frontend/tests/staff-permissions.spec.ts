@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginStaff, totp } from "./staff-login";
+import { loginStaff } from "./staff-login";
 
 test("staff overrides survive role changes, enforce read-only access, and reset", async ({
   page,
@@ -89,9 +89,6 @@ test("staff overrides survive role changes, enforce read-only access, and reset"
   await staff
     .getByLabel("گذرواژه", { exact: true })
     .fill("test-permissions-123");
-  await staff
-    .getByLabel("کد برنامه رمزساز", { exact: true })
-    .fill(totp(created.totpSecret));
   await staff.getByRole("button", { name: "ورود به فضای کار" }).click();
   await expect(
     staff.getByRole("heading", { name: "محصولات", exact: true }),

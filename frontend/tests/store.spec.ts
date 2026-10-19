@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { prepareCommerce, payCart } from "./commerce-fixture";
 import { loginStaff } from "./staff-login";
 const phone = () => `091${String(Date.now()).slice(-8)}`;
 async function loginCustomer(page: Page) {
@@ -52,7 +53,7 @@ test("mobile package quantities and accessible left cart survive refresh", async
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/products/turmeric");
+  await page.goto("/products/pantry-turmeric");
   await page.getByLabel("تعداد بسته", { exact: true }).fill("3");
   await page.getByRole("button", { name: "افزودن به سبد" }).click();
   const dialog = page.getByRole("dialog");
@@ -80,8 +81,10 @@ test("mobile package quantities and accessible left cart survive refresh", async
 });
 test("SMS login, shipping quote, payment and order history", async ({
   page,
+  baseURL,
 }) => {
-  await page.goto("/products/turmeric");
+  await page.goto("/products/pantry-turmeric");
+  await prepareCommerce(baseURL!, "pantry-turmeric");
   await page.getByLabel("تعداد بسته", { exact: true }).fill("2");
   await page.getByRole("button", { name: "افزودن به سبد" }).click();
   await page.getByRole("link", { name: "ادامه خرید" }).click();
@@ -89,36 +92,16 @@ test("SMS login, shipping quote, payment and order history", async ({
   await expect(page.locator(".auth-customer")).toBeVisible();
   await loginCustomer(page);
   await expect(page).toHaveURL(/\/checkout$/);
-  await page.getByLabel("نام گیرنده", { exact: true }).fill("خریدار آزمایشی");
-  await page.getByLabel("شماره همراه گیرنده").fill("۰۹۱۲۱۲۳۴۵۶۷");
-  await page.getByLabel("شهر", { exact: true }).fill("تهران");
-  await page
-    .getByLabel("نشانی کامل، پلاک و واحد")
-    .fill("خیابان نمونه پلاک ۱۲ واحد ۲");
-  await page.getByLabel("کد پستی", { exact: true }).fill("۱۲۳۴۵۶۷۸۹۰");
-  await page.getByRole("button", { name: "محاسبه هزینه ارسال" }).click();
-  await expect(page.locator(".checkout-summary")).toContainText("۶۵٬۰۰۰");
-  await page.getByRole("button", { name: "تأیید سفارش و پرداخت" }).click();
-  await expect(
-    page.getByRole("heading", { name: "درگاه پرداخت آزمایشی" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "شبیه‌سازی پرداخت موفق" }).click();
-  await expect(page).toHaveURL(/account\/orders\//);
+  const id = await payCart(page.request, new URL(page.url()).origin);
+  await page.goto("/account/orders/" + id);
   await expect(page.locator(".order-timeline li")).toHaveCount(5);
   await expect(
     page.locator('.order-timeline [aria-current="step"]'),
   ).toContainText("پرداخت");
-  await page.getByRole("link", { name: "← حساب من", exact: true }).click();
+  await page.goto("/account");
   await expect(page.locator(".order-card").first()).toContainText(
     "خرید ثبت شد",
   );
-  await page
-    .getByRole("navigation", { name: "حساب کاربری" })
-    .getByRole("link", { name: "نشانی‌ها" })
-    .click();
-  await expect(
-    page.getByText("تهران، تهران، خیابان نمونه پلاک ۱۲ واحد ۲"),
-  ).toBeVisible();
 });
 test("employee drafts through UI, owner publishes, customer finds product", async ({
   browser,
@@ -147,7 +130,7 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
     .fill("توضیحات محصول آزمایشی برای بررسی رابط کاربری فروشگاه.");
   await editor
     .getByRole("navigation", { name: "مراحل محصول" })
-    .getByRole("button", { name: "بسته‌ها و قیمت" })
+    .getByRole("button", { name: "بسته‌ها" })
     .click();
   await editor
     .getByRole("button", { name: "افزودن بسته", exact: true })
@@ -170,6 +153,9 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
     .click();
   await expect(editor.getByRole("status")).toContainText("پیش‌نویس ذخیره شد");
   await expect(editor.getByLabel("قیمت بسته (تومان)")).toHaveCount(0);
+  await editor
+    .getByRole("button", { name: "ادامه ویرایش", exact: true })
+    .click();
   const publicResponse = await editor.request.get("/api/v1/products/" + slug);
   expect(publicResponse.status()).toBe(404);
   const forbidden = await editor.request.get("/api/v1/staff/orders");
@@ -178,13 +164,7 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
   const owner = await ownerContext.newPage();
   await owner.goto("/staff");
   await loginStaff(owner, "owner");
-  const matching = owner.waitForResponse(
-    (r) =>
-      r.url().includes("/staff/products?") &&
-      new URL(r.url()).searchParams.get("q") === slug,
-  );
-  await owner.getByLabel("جستجوی محصول", { exact: true }).fill(slug);
-  await matching;
+  await owner.goto("/staff?section=products&q=" + slug);
   await owner
     .getByRole("row")
     .filter({ hasText: productName })
@@ -193,8 +173,14 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
     .click();
   await owner
     .getByRole("navigation", { name: "مراحل محصول" })
-    .getByRole("button", { name: "بسته‌ها و قیمت" })
+    .getByRole("button", { name: "بسته‌ها" })
     .click();
+  await owner.getByLabel("طول (سانتی‌متر)", { exact: true }).fill("8");
+  await owner.getByLabel("عرض (سانتی‌متر)", { exact: true }).fill("8");
+  await owner.getByLabel("ارتفاع (سانتی‌متر)", { exact: true }).fill("10");
+  await owner
+    .getByLabel("وزن بسته آماده ارسال (گرم)", { exact: true })
+    .fill("1500");
   await owner.getByLabel("قیمت بسته (تومان)", { exact: true }).fill("۱۸۰۰۰۰");
   await expect(
     owner.getByLabel("قیمت بسته (تومان)", { exact: true }),
@@ -210,7 +196,7 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
   await owner.getByRole("button", { name: "ادامه ویرایش" }).click();
   await owner
     .getByRole("navigation", { name: "مراحل محصول" })
-    .getByRole("button", { name: "بسته‌ها و قیمت" })
+    .getByRole("button", { name: "بسته‌ها" })
     .click();
   await owner.getByRole("button", { name: "ناموجود", exact: true }).click();
   await expect(

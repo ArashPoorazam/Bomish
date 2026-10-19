@@ -1,5 +1,42 @@
 import type { Page, APIRequestContext } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import { createHmac } from "node:crypto";
+// Many independent browser journeys authenticate from the same IP. Reset only
+// their authentication counters in an explicitly opted-in disposable database.
+// Rate-limit enforcement itself is covered by backend integration tests.
+export function resetBrowserAuthLimits() {
+  if (process.env.E2E_ISOLATED_DATABASE !== "true") return;
+  const database = new URL(process.env.DATABASE_URL || "");
+  if (
+    !["localhost", "127.0.0.1"].includes(database.hostname) ||
+    !database.pathname.startsWith("/bomish_browser")
+  )
+    throw new Error(
+      "Browser auth reset requires a local bomish_browser database",
+    );
+  execFileSync(
+    "psql",
+    [
+      "-X",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "DELETE FROM rate_limits WHERE key LIKE 'staff-%' OR key LIKE 'owner-totp%'",
+    ],
+    {
+      env: {
+        ...process.env,
+        PGHOST: database.hostname,
+        PGPORT: database.port || "5432",
+        PGUSER: decodeURIComponent(database.username),
+        PGPASSWORD: decodeURIComponent(database.password),
+        PGDATABASE: database.pathname.slice(1),
+        PGSSLMODE: "disable",
+      },
+      stdio: "pipe",
+    },
+  );
+}
 export function totp(secret = "JBSWY3DPEHPK3PXP") {
   let bits = "";
   for (const c of secret)
@@ -19,32 +56,39 @@ export async function loginStaff(
   page: Page,
   role: "owner" | "editor" | "operator",
 ) {
+  resetBrowserAuthLimits();
   await page.getByLabel("نام کاربری", { exact: true }).fill(role);
   await page.getByLabel("گذرواژه", { exact: true }).fill("Bomish-demo-2026!");
-  for (let attempt = 0; attempt < 2; attempt++) {
-    await page.getByLabel("کد برنامه رمزساز", { exact: true }).fill(totp());
-    const response = page.waitForResponse(
-      (r) =>
-        r.url().endsWith("/staff/login") && r.request().method() === "POST",
-    );
-    await page.getByRole("button", { name: "ورود به فضای کار" }).click();
-    const result = await response;
-    if (result.ok()) {
-      await page.waitForURL(role === "owner" ? "**/omnisire" : "**/staff");
-      if (role === "owner") await page.goto("/staff");
-      return;
+  const signedIn = page.waitForResponse(
+    (r) => r.url().endsWith("/staff/login") && r.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "ورود به فضای کار" }).click();
+  const login = await signedIn;
+  if (!login.ok()) throw new Error(await login.text());
+  await page.waitForURL("**/staff");
+  if (role === "owner") {
+    await page.goto("/omnisire");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await page.getByLabel("کد برنامه رمزساز", { exact: true }).fill(totp());
+      const response = page.waitForResponse(
+        (r) =>
+          r.url().endsWith("/omnisire/unlock") &&
+          r.request().method() === "POST",
+      );
+      await page
+        .getByRole("button", { name: "ورود به امنی‌سایر", exact: true })
+        .click();
+      const result = await response;
+      if (result.ok()) {
+        await page.goto("/staff");
+        return;
+      }
+      if (result.status() !== 401 || attempt > 0)
+        throw new Error(await result.text());
+      await new Promise((resolve) =>
+        setTimeout(resolve, 30100 - (Date.now() % 30000)),
+      );
     }
-    const body = await result.json();
-    if (
-      result.status() !== 401 ||
-      !String(body.error).includes("قبلاً") ||
-      attempt > 0
-    )
-      throw new Error(body.error || "Staff login failed");
-    // Fixture accounts reject reuse of a TOTP across tests. Wait for a fresh code.
-    await new Promise((resolve) =>
-      setTimeout(resolve, 30100 - (Date.now() % 30000)),
-    );
   }
 }
 
@@ -53,26 +97,28 @@ export async function loginStaffAPI(
   origin: string,
   role: "owner" | "editor" | "operator",
 ) {
+  resetBrowserAuthLimits();
   const session = await (
     await request.get("/api/v1/session?workspace=staff")
   ).json();
   const headers = { Origin: origin, "X-CSRF-Token": session.csrf };
+  const login = await request.post("/api/v1/staff/login", {
+    headers,
+    data: { username: role, password: "Bomish-demo-2026!" },
+  });
+  if (!login.ok()) throw new Error(await login.text());
+  if (role !== "owner") return headers;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const result = await request.post("/api/v1/staff/login", {
+    const result = await request.post("/api/v1/omnisire/unlock", {
       headers,
-      data: { username: role, password: "Bomish-demo-2026!", code: totp() },
+      data: { code: totp() },
     });
     if (result.ok()) return headers;
-    const body = await result.json();
-    if (
-      result.status() !== 401 ||
-      !String(body.error).includes("قبلاً") ||
-      attempt > 0
-    )
-      throw new Error(body.error || "Staff login failed");
+    if (result.status() !== 401 || attempt > 0)
+      throw new Error(await result.text());
     await new Promise((resolve) =>
       setTimeout(resolve, 30100 - (Date.now() % 30000)),
     );
   }
-  throw new Error("Staff login failed");
+  throw new Error("Owner unlock failed");
 }

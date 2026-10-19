@@ -1,0 +1,205 @@
+name: ${COMPOSE_PROJECT_NAME:-bomish-production}
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+    labels: "com.docker.compose.service,com.docker.compose.project"
+x-app: &app
+  image: ${API_IMAGE:?Set API_IMAGE to the published image digest}
+  restart: unless-stopped
+  init: true
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  logging: *logging
+  environment: &api-env
+    APP_ENV: production
+    STORE_MODE: catalog
+    APP_ORIGIN: https://${SITE_HOST:?Set SITE_HOST}
+    DATABASE_URL_FILE: /run/secrets/app_database_url
+    TOTP_ENCRYPTION_KEY_FILE: /run/secrets/totp_key
+    TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:?Set explicit trusted proxy CIDRs}
+    SEED_DEMO: "false"
+    SHIPPING_SIMULATED: "false"
+    SMS_ENABLED: "false"
+    LISTEN_ADDR: 0.0.0.0:8080
+    UPLOAD_DIR: /data/uploads
+  secrets: [app_database_url, totp_key]
+  networks: [edge, database]
+  mem_limit: 512m
+  pids_limit: 128
+services:
+  db:
+    image: ${POSTGRES_IMAGE:-postgres:18-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bomish
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password, app_db_password, migration_db_password]
+    volumes:
+      - postgres:/var/lib/postgresql
+      - ./deploy/postgres/init.sh:/docker-entrypoint-initdb.d/10-bomish.sh:ro
+    networks: [database]
+    shm_size: 256m
+    mem_limit: 1g
+    pids_limit: 256
+    logging: *logging
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d bomish"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    <<: *app
+    restart: "no"
+    profiles: [tools]
+    command: [migrate]
+    environment:
+      <<: *api-env
+      DATABASE_URL_FILE: /run/secrets/migration_database_url
+    secrets: [migration_database_url, totp_key]
+    networks: [database]
+    depends_on:
+      db: {condition: service_healthy}
+  owner-tools:
+    <<: *app
+    restart: "no"
+    profiles: [tools]
+    command: [bootstrap-owner]
+    stdin_open: true
+    tty: true
+    logging: {driver: none}
+    networks: [database]
+    depends_on:
+      db: {condition: service_healthy}
+  api:
+    <<: *app
+    volumes: [uploads:/data/uploads]
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8080/api/v1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+  web:
+    image: ${WEB_IMAGE:?Set WEB_IMAGE to the published image digest}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs: [/tmp, /app/.next/cache]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    environment:
+      API_URL: http://api:8080
+      SITE_URL: https://${SITE_HOST}
+      SITE_INDEXABLE: ${SITE_INDEXABLE:-false}
+    networks: [edge]
+    mem_limit: 768m
+    pids_limit: 128
+    logging: *logging
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+  traefik:
+    image: ${TRAEFIK_IMAGE:-traefik:v3.6}
+    restart: unless-stopped
+    command:
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.forwardedheaders.trustedips=${CLOUDFLARE_CIDRS:?Set current Cloudflare proxy CIDRs}
+      - --entrypoints.metrics.address=:8082
+      - --metrics.prometheus=true
+      - --metrics.prometheus.entrypoint=metrics
+      - --ping=true
+      - --ping.entrypoint=metrics
+      - --providers.file.filename=/etc/traefik/routes.yaml
+      - --log.format=json
+      - --accesslog=true
+      - --accesslog.format=json
+      - --accesslog.fields.defaultmode=drop
+      - --accesslog.fields.names.StartUTC=keep
+      - --accesslog.fields.names.RequestMethod=keep
+      - --accesslog.fields.names.RouterName=keep
+      - --accesslog.fields.names.DownstreamStatus=keep
+      - --accesslog.fields.names.Duration=keep
+      - --accesslog.fields.headers.defaultmode=drop
+      - --accesslog.fields.headers.names.X-Request-ID=keep
+    environment:
+      SITE_HOST: ${SITE_HOST}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/traefik/routes.yaml:/etc/traefik/routes.yaml:ro
+      - ${SECRETS_DIR:?Set SECRETS_DIR}/tls:/certs:ro
+    networks: [edge]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    logging: *logging
+    mem_limit: 256m
+    depends_on:
+      web: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, traefik, healthcheck, --ping, --ping.entrypoint=metrics, --entrypoints.metrics.address=:8082]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+  backup:
+    image: ${BACKUP_IMAGE:?Set BACKUP_IMAGE to the published image digest}
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: postgres
+      PGDATABASE: bomish
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:?Set an off-server restic repository}
+      RESTIC_PASSWORD_FILE: /run/secrets/restic_password
+      AWS_SHARED_CREDENTIALS_FILE: /run/secrets/backup_credentials
+      BACKUP_HOST: ${COMPOSE_PROJECT_NAME:-bomish-production}
+    secrets: [postgres_password, restic_password, backup_credentials]
+    volumes:
+      - uploads:/uploads:ro
+      - backup_work:/backup
+      - backup_metrics:/metrics
+    networks: [database, backup_egress]
+    logging: *logging
+    mem_limit: 512m
+    pids_limit: 64
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, /usr/local/bin/backup, health]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 15m
+networks:
+  edge:
+    ipam:
+      config: [{subnet: "${EDGE_SUBNET:-172.30.10.0/24}"}]
+  database:
+    internal: true
+  backup_egress: {}
+volumes:
+  postgres: {}
+  uploads: {}
+  backup_work: {}
+  backup_metrics: {}
+secrets:
+  postgres_password: {file: "${SECRETS_DIR}/postgres_password"}
+  app_db_password: {file: "${SECRETS_DIR}/app_db_password"}
+  migration_db_password: {file: "${SECRETS_DIR}/migration_db_password"}
+  app_database_url: {file: "${SECRETS_DIR}/app_database_url"}
+  migration_database_url: {file: "${SECRETS_DIR}/migration_database_url"}
+  totp_key: {file: "${SECRETS_DIR}/totp_key"}
+  restic_password: {file: "${SECRETS_DIR}/restic_password"}
+  backup_credentials: {file: "${SECRETS_DIR}/backup_credentials"}

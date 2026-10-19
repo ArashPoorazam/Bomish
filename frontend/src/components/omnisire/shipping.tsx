@@ -8,7 +8,7 @@ import { ShippingEditor } from "@/components/staff/operations";
 import { PermissionFields } from "../staff/permissions";
 import { Workspace, Feedback } from "./shared";
 
-export function ShippingPage() {
+export function ShippingPage({ owner = true }: { owner?: boolean }) {
   const { user } = useStore();
   const [config, setConfig] = useState<ShippingConfig | null>(null);
   const [error, setError] = useState("");
@@ -36,7 +36,7 @@ export function ShippingPage() {
   }, [user?.role, user?.staffId, user?.permissions, revision]);
   return (
     <Workspace
-      owner
+      owner={owner}
       title="ارسال"
       activeSection="shipping"
       navigationLocked={editor.busy}

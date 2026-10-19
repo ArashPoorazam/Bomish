@@ -75,6 +75,7 @@ test("shipping setup keeps technical details out of the interface and saves a so
       return route.fulfill({
         json: {
           role: "owner",
+          omnisireVerified: true,
           staffId: "owner",
           csrf: "test",
           permissions: ["shipping", "products"],
@@ -94,7 +95,7 @@ test("shipping setup keeps technical details out of the interface and saves a so
     return route.fulfill({ json: [] });
   });
   await page.goto("/staff?section=shipping");
-  await expect(page).toHaveURL(/\/omnisire\/shipping$/);
+  await expect(page).toHaveURL(/\/staff\/shipping$/);
   await expect(
     page
       .getByRole("navigation", { name: "ناوبری فضای کار" })

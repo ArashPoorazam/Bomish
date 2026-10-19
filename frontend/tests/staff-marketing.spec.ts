@@ -1,3 +1,4 @@
+import { prepareCommerce } from "./commerce-fixture";
 import { test, expect, type Page } from "@playwright/test";
 import { loginStaff } from "./staff-login";
 import type { Product } from "../src/lib/types";
@@ -66,6 +67,7 @@ async function mockedStaff(page: Page) {
       "/session": {
         csrf: "test",
         role: "owner",
+        omnisireVerified: true,
         staffId: "owner",
         permissions: [
           "products",
@@ -242,6 +244,7 @@ test("pricing shows before/after values, validates reductions, and preserves uni
 });
 test("staff creates a discount code and customer applies it through a paid order", async ({
   browser,
+  baseURL,
 }) => {
   test.setTimeout(75000);
   const ownerContext = await browser.newContext();
@@ -263,7 +266,7 @@ test("staff creates a discount code and customer applies it through a paid order
     await dialog.getByLabel("کد تخفیف", { exact: true }).fill(code);
     await dialog.getByLabel("درصد تخفیف", { exact: true }).fill("15");
     await dialog.getByText("شرایط استفاده · اختیاری").click();
-    await dialog.getByLabel("حداکثر تعداد استفاده", { exact: true }).fill("1");
+    await dialog.getByLabel("سقف استفاده کل کد", { exact: true }).fill("1");
     await dialog.getByRole("button", { name: "ساخت کد تخفیف" }).click();
     await expect(dialog).not.toBeVisible();
     await expect(
@@ -282,6 +285,7 @@ test("staff creates a discount code and customer applies it through a paid order
       inStock,
       "a published, in-stock demo product is available",
     ).toBeTruthy();
+    await prepareCommerce(baseURL!, inStock!.slug);
     await customer.goto("/products/" + inStock!.slug);
     await customer.getByRole("button", { name: "افزودن به سبد" }).click();
     await customer
@@ -303,7 +307,8 @@ test("staff creates a discount code and customer applies it through a paid order
       .getByLabel("نام گیرنده", { exact: true })
       .fill("مشتری کد تخفیف");
     await customer.getByLabel("شماره همراه گیرنده").fill("09121234567");
-    await customer.getByLabel("شهر", { exact: true }).fill("تهران");
+    await customer.getByLabel("استان", { exact: true }).fill("البرز");
+    await customer.getByLabel("شهر", { exact: true }).fill("کرج");
     await customer
       .getByLabel("نشانی کامل، پلاک و واحد")
       .fill("خیابان آزمایشی پلاک ۱۲ واحد ۲");
@@ -341,6 +346,9 @@ test("staff creates a discount code and customer applies it through a paid order
       .getByRole("button", { name: "اعمال کد", exact: true })
       .click();
     await expect(customer.locator(".coupon-saving")).toContainText(code);
+    await customer
+      .getByRole("button", { name: /ارسال با پست به مبلغ/ })
+      .click();
     await customer.setViewportSize({ width: 390, height: 844 });
     expect(
       await customer.evaluate(

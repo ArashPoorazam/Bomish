@@ -71,7 +71,9 @@ test("support keeps the draft through navigation and minimization, and clears it
     "پیش‌نویس من",
   );
   await expect.poll(() => messageReads).toBeGreaterThan(before);
+  await panel.getByRole("button", { name: "بستن گفتگو" }).click();
   await page.getByRole("button", { name: "خروج از حساب", exact: true }).click();
+  await launcher.click();
   await expect(
     panel.getByText("برای حفظ گفتگو و دریافت پاسخ، وارد حساب شوید."),
   ).toBeVisible();
@@ -152,7 +154,7 @@ test("staff retains drafts when switching conversations", async ({ page }) => {
           authenticated: false,
           role: "operator",
           staffId: "operator",
-          permissions: ["requests"],
+          permissions: ["support", "support.edit", "custom", "custom.edit"],
         },
       });
     if (path === "/staff/notifications")
@@ -216,7 +218,7 @@ test("custom order conflicts preserve drafts and allow a reviewed retry", async 
           authenticated: false,
           role: "operator",
           staffId: "operator",
-          permissions: ["requests"],
+          permissions: ["support", "support.edit", "custom", "custom.edit"],
         },
       });
     if (path === "/staff/notifications")

@@ -14,7 +14,7 @@ type chartResponse struct {
 }
 
 func TestDailyChartsAndManualAvailability(t *testing.T) {
-	a := setup(t)
+	a := setupCommerce(t)
 	ctx := context.Background()
 	owner := couponOwner(t, a)
 	exec := func(sql string, args ...any) {
@@ -103,7 +103,7 @@ func TestDailyChartsAndManualAvailability(t *testing.T) {
 	editor.ok(t, "POST", "/staff/products/turmeric/availability", map[string]bool{"outOfStock": false}, nil)
 	guest.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "test500", "quantity": 1}, nil)
 	editor.ok(t, "POST", "/staff/products/turmeric/availability", map[string]bool{"outOfStock": true}, nil)
-	if code, _ := guest.call("POST", "/checkout/quote", map[string]string{"province": "تهران"}); code != 409 && code != 400 {
+	if code, _ := guest.call("POST", "/checkout/quote", commerceQuote("")); code != 422 {
 		t.Fatal("stale cart accepted", code)
 	}
 	if code, _ := editor.call("POST", "/staff/products/missing/availability", map[string]bool{}); code != 404 {

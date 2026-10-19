@@ -10,7 +10,8 @@
     "api:generate": "openapi-typescript ../api/openapi.json -o src/lib/api-types.ts",
     "test:e2e": "playwright test",
     "format": "prettier --write src tests *.ts *.json",
-    "format:check": "prettier --check src tests *.ts *.json"
+    "format:check": "prettier --check src tests *.ts *.json",
+    "test:production": "playwright test production-readiness.spec.ts"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

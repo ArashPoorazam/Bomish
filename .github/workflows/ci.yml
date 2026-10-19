@@ -2,25 +2,38 @@ name: Verify Bomish
 on: [push, pull_request]
 permissions:
   contents: read
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        store-mode: [catalog, simulation]
     services:
       postgres:
         image: postgres:18
         env:
-          POSTGRES_DB: bomish
+          POSTGRES_DB: bomish_browser
           POSTGRES_USER: bomish
           POSTGRES_PASSWORD: test-only
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U bomish" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      DATABASE_URL: postgres://bomish:test-only@localhost:5432/bomish?sslmode=disable
-      TEST_DATABASE_URL: postgres://bomish:test-only@localhost:5432/bomish?sslmode=disable
+      DATABASE_URL: postgres://bomish:test-only@localhost:5432/bomish_browser?sslmode=disable
+      TEST_DATABASE_URL: postgres://bomish:test-only@localhost:5432/bomish_browser?sslmode=disable
+      E2E_ISOLATED_DATABASE: "true"
       APP_ENV: development
       APP_ORIGIN: http://localhost:3000
       SEED_DEMO: "true"
+      SHIPPING_SIMULATED: "true"
+      SMS_ENABLED: "false"
+      SHIPPING_ACCEPTANCE: ${{ matrix.store-mode == 'simulation' && 'true' || 'false' }}
+      STORE_MODE: ${{ matrix.store-mode }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -44,19 +57,71 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+      - name: Validate production deployment files
+        env:
+          API_IMAGE: ghcr.io/example/api:test
+          WEB_IMAGE: ghcr.io/example/web:test
+          BACKUP_IMAGE: ghcr.io/example/backup:test
+          SITE_HOST: bomish.test
+          SECRETS_DIR: /tmp/unused-secrets
+          CLOUDFLARE_CIDRS: 203.0.113.0/24
+          TRUSTED_PROXY_CIDRS: 172.30.10.0/24
+          RESTIC_REPOSITORY: s3:https://example.invalid/bucket
+        run: |
+          docker compose -f compose.production.yaml -f compose.observability.yaml config --quiet
+          bash -n scripts/deploy.sh scripts/backup.sh scripts/restore-check.sh
+          sh -n deploy/backup/backup.sh deploy/postgres/init.sh
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
       - run: |
           (cd backend && go run ./cmd/server > /tmp/bomish-api.log 2>&1) &
           (cd frontend && npm run start > /tmp/bomish-web.log 2>&1) &
+          ready=false
           for i in $(seq 1 60); do
-            if curl -fsS http://localhost:3000/api/v1/health; then break; fi
+            if curl -fsS http://localhost:3000/api/v1/health; then ready=true; break; fi
             sleep 1
           done
+          test "$ready" = true
+      - run: npm run test:production
+        if: matrix.store-mode == 'catalog'
+        working-directory: frontend
       - run: npm run test:e2e
+        if: matrix.store-mode == 'simulation'
         working-directory: frontend
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: browser-test-results
-          path: frontend/test-results
+          name: browser-test-results-${{ matrix.store-mode }}
+          path: |
+            frontend/test-results
+            /tmp/bomish-api.log
+            /tmp/bomish-web.log
+
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Production container and restore smoke test
+        run: bash scripts/verify-production-containers.sh
+      - name: Scan API image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: bomish-ci-api:local
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: bomish-ci-web:local
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Scan backup image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: bomish-ci-backup:local
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'

@@ -11,6 +11,7 @@ import {
   NotificationSound,
 } from "../requests/notifications";
 import { useStore } from "@/components/store-provider";
+import { OmnisireUnlock } from "./unlock";
 import { StaffLogin } from "@/components/staff/staff-login";
 import { api } from "@/lib/api";
 import { money, fa, statuses } from "@/lib/format";
@@ -42,7 +43,12 @@ export const stamp = (v: unknown) =>
     : "—";
 export function useLoad<T>(url: string | null, revision = 0) {
   const { user } = useStore();
-  const identity = user?.staffId + ":" + user?.role;
+  const identity =
+    user?.staffId + ":" + user?.role + ":" + user?.omnisireVerified;
+  const allowed =
+    !!user?.role &&
+    (!url?.startsWith("/omnisire/") ||
+      (user.role === "owner" && user.omnisireVerified));
   const key = `${identity}:${revision}:${url}`;
   const [state, setState] = useState<{
     key: string;
@@ -52,7 +58,7 @@ export function useLoad<T>(url: string | null, revision = 0) {
   }>({ key: "", data: null, error: "", loading: true });
   useEffect(() => {
     const controller = new AbortController();
-    if (!user?.role || !url) return;
+    if (!allowed || !url) return;
     setState({ key, data: null, error: "", loading: true });
     api<T>(url, "GET", undefined, controller.signal)
       .then((data) => {
@@ -64,9 +70,9 @@ export function useLoad<T>(url: string | null, revision = 0) {
           setState({ key, data: null, error: e.message, loading: false });
       });
     return () => controller.abort();
-  }, [url, revision, identity, key, user?.role]);
+  }, [url, revision, identity, key, allowed]);
   if (!url) return { data: null, error: "", loading: false };
-  if (state.key !== key || !user?.role)
+  if (state.key !== key || !allowed)
     return { data: null, error: "", loading: !user || !!user.role };
   return state;
 }
@@ -141,7 +147,10 @@ export function Workspace({
       </p>
     );
   if (!user.role) return <StaffLogin />;
-  if (requiredPermission && !hasStaffPermission(user, requiredPermission))
+  if (
+    (owner && user.role !== "owner") ||
+    (requiredPermission && !hasStaffPermission(user, requiredPermission))
+  )
     return (
       <div className="auth-layout">
         <div className="form-card">
@@ -153,6 +162,7 @@ export function Workspace({
         </div>
       </div>
     );
+  if (owner && !user.omnisireVerified) return <OmnisireUnlock />;
   return (
     <div
       className={`omni-shell ${activeSection === "support" || activeSection === "custom" ? "omni-requests" : ""}`}

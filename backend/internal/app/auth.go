@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"github.com/jackc/pgx/v5"
 	"math/big"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -26,7 +25,6 @@ func (a *App) limit(r *http.Request, key string, max int, window time.Duration) 
 	e := a.Pool.QueryRow(r.Context(), `INSERT INTO rate_limits(key,hits,expires_at) VALUES($1,1,now()+$2::interval) ON CONFLICT(key) DO UPDATE SET hits=CASE WHEN rate_limits.expires_at<now() THEN 1 ELSE rate_limits.hits+1 END, expires_at=CASE WHEN rate_limits.expires_at<now() THEN excluded.expires_at ELSE rate_limits.expires_at END RETURNING hits`, key, fmt.Sprintf("%d seconds", int(window.Seconds()))).Scan(&n)
 	return e == nil && n <= max
 }
-func ip(r *http.Request) string { v, _, _ := net.SplitHostPort(r.RemoteAddr); return v }
 func (a *App) requestOTP(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Phone string `json:"phone"`
@@ -43,7 +41,7 @@ func (a *App) requestOTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503, "سرویس پیامک هنوز فعال نشده است")
 		return
 	}
-	if !a.limit(r, "sms-ip:"+ip(r), 20, time.Hour) || !a.limit(r, "sms-phone:"+in.Phone, 5, time.Hour) {
+	if !a.limit(r, "sms-ip:"+a.clientIP(r), 20, time.Hour) || !a.limit(r, "sms-phone:"+in.Phone, 5, time.Hour) {
 		fail(w, 429, "درخواست‌ها زیاد است؛ بعداً تلاش کنید")
 		return
 	}
@@ -85,7 +83,7 @@ func (a *App) verifyOTP(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Phone = domain.Phone(in.Phone)
 	in.Code = domain.Normalize(in.Code)
-	if !a.limit(r, "verify:"+ip(r), 40, time.Hour) {
+	if !a.limit(r, "verify:"+a.clientIP(r), 40, time.Hour) {
 		fail(w, 429, "تعداد تلاش‌ها بیش از حد مجاز است")
 		return
 	}
@@ -191,33 +189,19 @@ func (a *App) staffLogin(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
-		Code     string `json:"code"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	if !a.limit(r, "staff-ip:"+ip(r), 15, 15*time.Minute) || !a.limit(r, "staff-user:"+in.Username, 10, 15*time.Minute) {
+	if !a.limit(r, "staff-ip:"+a.clientIP(r), 15, 15*time.Minute) || !a.limit(r, "staff-user:"+in.Username, 10, 15*time.Minute) {
 		fail(w, 429, "تلاش‌های ورود زیاد است")
 		return
 	}
-	var id, pw, secret string
-	var last int64
-	e := a.Pool.QueryRow(r.Context(), "SELECT id,password_hash,totp_secret,last_totp_step FROM staff WHERE username=$1 AND active AND archived_at IS NULL", in.Username).Scan(&id, &pw, &secret, &last)
+	var id, pw string
+	e := a.Pool.QueryRow(r.Context(), "SELECT id,password_hash FROM staff WHERE username=$1 AND active AND archived_at IS NULL", in.Username).Scan(&id, &pw)
 	if e != nil || !checkPassword(pw, in.Password) {
 		a.logEvent(r.Context(), "", "auth.failed", "staff", map[string]string{})
 		fail(w, 401, "اطلاعات ورود معتبر نیست")
-		return
-	}
-	step := time.Now().Unix() / 30
-	valid := int64(0)
-	for _, s := range []int64{step - 1, step, step + 1} {
-		if s > last && subtle.ConstantTimeCompare([]byte(TOTP(secret, s)), []byte(domain.Normalize(in.Code))) == 1 {
-			valid = s
-		}
-	}
-	if valid == 0 {
-		a.logEvent(r.Context(), id, "auth.failed", id, map[string]string{"stage": "totp"})
-		fail(w, 401, "کد ورود معتبر نیست یا قبلاً استفاده شده است")
 		return
 	}
 	tx, e := a.Pool.Begin(r.Context())
@@ -226,9 +210,10 @@ func (a *App) staffLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	tag, e := tx.Exec(r.Context(), "UPDATE staff SET last_totp_step=$1 WHERE id=$2 AND last_totp_step<$1 AND active AND archived_at IS NULL AND password_hash=$3 AND totp_secret=$4", valid, id, pw, secret)
-	if e != nil || tag.RowsAffected() == 0 {
-		fail(w, 401, "کد ورود قبلاً استفاده شده است")
+	// Serialize with suspension/credential changes before creating the session.
+	var lockedID string
+	if e = tx.QueryRow(r.Context(), "SELECT id FROM staff WHERE id=$1 AND password_hash=$2 AND active AND archived_at IS NULL FOR UPDATE", id, pw).Scan(&lockedID); e != nil {
+		fail(w, 401, "اطلاعات ورود معتبر نیست")
 		return
 	}
 	raw := token()
