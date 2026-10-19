@@ -32,7 +32,7 @@ jobs:
         run: |
           echo "repository=${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
           echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         id: api
         with:
           context: backend
@@ -40,7 +40,7 @@ jobs:
           tags: ghcr.io/${{ steps.names.outputs.repository }}/api:${{ steps.names.outputs.commit }}
           provenance: true
           sbom: true
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         id: web
         with:
           context: frontend
@@ -48,7 +48,7 @@ jobs:
           tags: ghcr.io/${{ steps.names.outputs.repository }}/web:${{ steps.names.outputs.commit }}
           provenance: true
           sbom: true
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         id: backup
         with:
           context: deploy/backup
