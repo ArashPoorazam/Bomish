@@ -94,7 +94,7 @@ jobs:
           BACKUP_DIGEST: ${{ steps.backup.outputs.digest }}
         run: |
           printf 'API_IMAGE=ghcr.io/%s/api@%s\nWEB_IMAGE=ghcr.io/%s/web@%s\nBACKUP_IMAGE=ghcr.io/%s/backup@%s\n' "$REPOSITORY" "$API_DIGEST" "$REPOSITORY" "$WEB_DIGEST" "$REPOSITORY" "$BACKUP_DIGEST" > images.env
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: images-${{ steps.names.outputs.commit }}
           path: images.env
