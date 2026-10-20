@@ -77,6 +77,17 @@ Automatic deployments reuse `scripts/deploy.sh` for preflight, the deployment lo
 
 Deployment jobs are serialized and are not cancelled mid-migration. Configurable environment approval rules may deliberately require a human approval; leave required reviewers unset if fully automatic operation is desired. Keep the source directories named in `release-state/current.source` and `previous.source` for rollback. Older release directories and unused Docker images can be pruned during reviewed maintenance; never prune volumes as part of a release.
 
+If delivery fails with `ssh: connect to host ... Connection timed out`, run the **Diagnose VPS SSH connectivity** workflow manually. Supply the VPS IPv4 reported by `ip -br -4 address`. It checks that the effective `production` environment's `DEPLOY_HOST` matches that address, reports the runner's public IPv4 as observed over HTTPS, and attempts three TCP/SSH-banner connections with UTC timestamps. It uses no SSH private key and does not authenticate, upload files or deploy. The diagnostic expects a literal IPv4 in `DEPLOY_HOST`; the deployment script also supports DNS hostnames.
+
+For a matching capture, start this on the VPS before running the diagnostic, replacing `YOUR_VPS_IPV4` with its address, and stop with Ctrl+C afterward:
+
+```sh
+sudo tcpdump -pni any -nn -tttt \
+  'host YOUR_VPS_IPV4 and tcp port 22 and (tcp[tcpflags] & tcp-syn != 0)'
+```
+
+Use the configured SSH port if it differs from 22. Correlate timestamps and addresses before attributing unrelated Internet probes to Actions. If the destination matches but no matching SYN packets arrive, investigate filtering/routing before the VPS with the provider. Incoming SYNs without replies require inspecting the host firewall/routing; outgoing SYN-ACKs without a completed connection require investigating the return path. An HTTPS public-IP lookup can differ from the SSH egress address on networks using destination-dependent NAT.
+
 ## First installation
 
 The manual examples assume the checkout is `/srv/bomish/app`, with configuration and secrets outside it. For Actions preparation, use `/srv/bomish/prepared` instead. Run as the deployment account with Docker access. Create its parent directory with appropriate ownership first.

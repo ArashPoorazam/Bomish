@@ -1,0 +1,74 @@
+name: Diagnose VPS SSH connectivity
+on:
+  workflow_dispatch:
+    inputs:
+      expected_ipv4:
+        description: VPS IPv4 shown by ip -br -4 address (not a hostname)
+        required: true
+        type: string
+permissions: {}
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment: production
+    steps:
+      - name: Check destination and TCP connectivity without authentication
+        env:
+          EXPECTED_IPV4: ${{ inputs.expected_ipv4 }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+        run: |
+          python3 - <<'PY'
+          import datetime
+          import ipaddress
+          import os
+          import socket
+          import sys
+          import time
+          import urllib.request
+
+          def report(message):
+              now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+              print(f"{now} {message}", flush=True)
+
+          expected = str(ipaddress.IPv4Address(os.environ["EXPECTED_IPV4"]))
+          port = int(os.environ["DEPLOY_PORT"])
+          if not 1 <= port <= 65535:
+              sys.exit("DEPLOY_PORT must be between 1 and 65535.")
+          # Compare without printing or transforming a masked secret into logs.
+          if os.environ["DEPLOY_HOST"] != expected:
+              sys.exit("The effective production DEPLOY_HOST does not exactly match the supplied VPS IPv4.")
+          report(f"Effective DEPLOY_HOST matches the supplied VPS IPv4; SSH port is {port}.")
+
+          for endpoint in ("https://api4.ipify.org", "https://checkip.amazonaws.com"):
+              try:
+                  with urllib.request.urlopen(endpoint, timeout=8) as response:
+                      public_ip = str(ipaddress.IPv4Address(response.read(128).decode().strip()))
+                  report(f"Runner public IPv4 observed over HTTPS: {public_ip}")
+                  break
+              except (OSError, ValueError):
+                  report("Public IP lookup unavailable; trying the next endpoint if present.")
+
+          for attempt in range(1, 4):
+              report(f"TCP/SSH attempt {attempt}/3 starting.")
+              try:
+                  with socket.create_connection((expected, port), timeout=10) as connection:
+                      report("TCP connection established.")
+                      connection.settimeout(5)
+                      with connection.makefile("rb") as stream:
+                          # SSH may send preliminary lines before its identification.
+                          for _ in range(10):
+                              line = stream.readline(256)
+                              if line.startswith(b"SSH-"):
+                                  report("SSH identification received. No authentication or deployment attempted.")
+                                  sys.exit(0)
+                              if not line:
+                                  break
+                      report("TCP connected but no SSH identification was received.")
+              except OSError as error:
+                  report(f"Connection failed: {type(error).__name__}; errno={error.errno}")
+              if attempt < 3:
+                  time.sleep(2)
+          sys.exit("Connectivity diagnostic failed. Correlate the UTC timestamps with the VPS packet capture.")
+          PY
