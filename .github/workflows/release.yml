@@ -14,6 +14,8 @@ jobs:
   publish:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.names.outputs.commit }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -99,3 +101,63 @@ jobs:
           name: images-${{ steps.names.outputs.commit }}
           path: images.env
           retention-days: 90
+          overwrite: true
+
+  deploy:
+    needs: publish
+    if: vars.DEPLOY_MODE == 'prepare' || vars.DEPLOY_MODE == 'auto'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+    concurrency:
+      group: bomish-production
+      cancel-in-progress: false
+    steps:
+      - name: Skip releases superseded on main
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ needs.publish.outputs.commit }}
+        run: |
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          if [ "$latest" = "$RELEASE_COMMIT" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipped superseded release $RELEASE_COMMIT." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.release.outputs.current == 'true'
+        with:
+          ref: ${{ needs.publish.outputs.commit }}
+          persist-credentials: false
+      - name: Download this run's verified image manifest
+        if: steps.release.outputs.current == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ needs.publish.outputs.commit }}
+        run: |
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "images-$RELEASE_COMMIT" --dir "$RUNNER_TEMP/bomish-images"
+      - name: Deliver release over SSH
+        if: steps.release.outputs.current == 'true'
+        env:
+          RELEASE_COMMIT: ${{ needs.publish.outputs.commit }}
+          DEPLOY_MODE: ${{ vars.DEPLOY_MODE }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+        run: bash scripts/deploy-over-ssh.sh "$RELEASE_COMMIT" "$RUNNER_TEMP/bomish-images/images.env"
+      - name: Verify public HTTPS
+        if: steps.release.outputs.current == 'true' && vars.DEPLOY_MODE == 'auto'
+        env:
+          SITE_URL: ${{ vars.DEPLOY_SITE_URL || 'https://bomish.ir' }}
+        run: |
+          [[ "$SITE_URL" == https://* ]]
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            --retry-delay 3 --connect-timeout 10 --max-time 30 \
+            "${SITE_URL%/}/api/v1/health"

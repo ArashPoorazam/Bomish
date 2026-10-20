@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Generate local deployment secrets without printing credentials. Run on the VPS."""
+
 import argparse
 import os
-from pathlib import Path
 import secrets
+from pathlib import Path
 
 parser = argparse.ArgumentParser()
-parser.add_argument("directory", type=Path, help="Absolute secrets directory, outside the checkout")
+parser.add_argument(
+    "directory", type=Path, help="Absolute secrets directory, outside the checkout"
+)
 args = parser.parse_args()
 root = args.directory
 if not root.is_absolute():
@@ -38,5 +41,7 @@ for name, value in values.items():
     path.chmod(0o444)
 (root / "tls").mkdir(mode=0o700)
 print(f"Secrets written to {root}; no existing files were replaced.")
-print("Configure backup_credentials and tls/origin.crt + tls/origin.key before deployment.")
+print(
+    "Configure backup_credentials and tls/origin.crt + tls/origin.key before deployment."
+)
 print("Store the restic password and TOTP key in an independent password manager.")

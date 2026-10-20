@@ -10,6 +10,7 @@ test-results/
 playwright-report/
 backend/bin/
 *.tsbuildinfo
+__pycache__/
 
 # Production secrets and release state
 .env.production

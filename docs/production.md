@@ -2,7 +2,7 @@
 
 This release supports a public catalog, content management and staff workspaces. It deliberately blocks customer sign-in, cart changes, checkout, simulated payments and carrier callbacks in production. Live selling remains a separate release gate in [launch.md](launch.md). Develop locally, review changes in Git, and promote tested image digests; never edit code inside running production containers.
 
-No VPS or Cloudflare changes are performed by this repository. Complete the steps below on your server after CI passes. Use a fresh production database, not the development volume or demo dump.
+Host provisioning and Cloudflare setup are one-time server/account tasks. GitHub Actions can then prepare and deploy verified releases over SSH using the setup below. Use a fresh production database, not the development volume or demo dump.
 
 ## Owner and categories
 
@@ -15,7 +15,7 @@ Migration 022 creates `seeds` (دانه‌های خوراکی), `herbs` (سبز�
 ## Deployment prerequisites
 
 - Docker Engine with the Compose v2 plugin, Git, Python 3, `flock`, and working time synchronization on the VPS. Maintain host security updates, SSH keys, and disk capacity.
-- A checkout of the exact release commit. GitHub Actions publishes API, web and backup images to GHCR only after the verification workflow succeeds. Download that commit's `images.env` artifact. If packages are private, authenticate the VPS to GHCR with a read-packages credential.
+- Source files for the exact release commit. GitHub Actions publishes API, web and backup images to GHCR only after the verification workflow succeeds. Automatic delivery transfers that commit's source and `images.env` artifact; manual installation can download them from the publishing run. If packages are private, authenticate the VPS deployment account to GHCR with a read-packages credential.
 - Cloudflare DNS for `bomish.ir` pointing at the VPS with proxying enabled. Use **Full (strict)** TLS with an origin certificate/key covering `bomish.ir`. This setup uses your supplied certificate; it does not automatically obtain or renew one. Track its expiry. Add a separate Cloudflare redirect for `www` if wanted; the repository routes only `SITE_HOST`.
 - Restrict origin HTTP/HTTPS ingress to current Cloudflare address ranges; restrict SSH to your administrative access. Account for Docker's firewall chains as well as the host firewall. Database, API, metrics, Loki and the Traefik dashboard are not publicly published. Grafana binds to loopback only.
 - An off-VPS S3-compatible bucket and dedicated credentials scoped to its backup prefix (list/read/write/delete for restic retention). Retain an independently protected copy or bucket version history against compromise of those credentials. Backup success on the VPS alone does not establish disaster recovery.
@@ -23,15 +23,69 @@ Migration 022 creates `seeds` (دانه‌های خوراکی), `herbs` (سبز�
 
 See the official [Cloudflare IP list](https://www.cloudflare.com/ips/), [Origin CA instructions](https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/), and [restic S3 setup](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html#amazon-s3). Do not copy stale IP ranges from an old guide.
 
+## Automatic delivery and deployment over SSH
+
+The flow is: push to `main` → `Verify Bomish` passes → publish and scan all three images → transfer the matching source and digest manifest over SSH → let the VPS pull the images. Image builds run on GitHub-hosted runners, not on the VPS. There is no need to download images or release artifacts by hand.
+
+The deployment job is disabled until the repository variable `DEPLOY_MODE` is set:
+
+| Repository variable | Value |
+| --- | --- |
+| `DEPLOY_MODE` | `prepare` for first installation; `auto` for automatic deployment; unset or `off` to disable delivery |
+| `DEPLOY_PORT` | SSH port, default `22` |
+| `DEPLOY_SITE_URL` | Public HTTPS origin, default `https://bomish.ir` |
+
+Create a GitHub Actions environment named `production`, restrict its deployment branches to `main`, and add these **environment secrets**:
+
+| Secret | Contents |
+| --- | --- |
+| `DEPLOY_HOST` | VPS IPv4 address or a DNS hostname that reaches SSH directly, not a Cloudflare-proxied hostname |
+| `DEPLOY_USER` | Deployment account, e.g. `daedalus`; it must own `/srv/bomish` and have Docker access |
+| `DEPLOY_SSH_KEY` | Dedicated, unencrypted Ed25519 private key for Actions |
+| `DEPLOY_KNOWN_HOSTS` | Verified SSH host-key entry for that host and port |
+
+Generate the dedicated key on your administrative computer with `ssh-keygen -t ed25519 -f ~/.ssh/bomish-actions -C bomish-github-actions`. Leave its passphrase empty for unattended use. Add the public key to the deployment account's `~/.ssh/authorized_keys`, prefixed with `restrict ` to disable forwarding and PTY allocation. Store the private key only in the environment secret. The Docker-enabled account has administrative power on the VPS.
+
+Get the SSH server's public host key through your existing authenticated SSH session or provider console:
+
+```sh
+sudo cat /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+For port 22, `DEPLOY_KNOWN_HOSTS` should contain `YOUR_VPS_IP ssh-ed25519 AAAA...`, using that key's type and key data. For another port, use `[YOUR_VPS_IP]:PORT ssh-ed25519 AAAA...`. The runner enforces this saved host key; it does not blindly trust an `ssh-keyscan` result.
+
+If the images are private, run `docker login ghcr.io -u YOUR_GITHUB_USERNAME` once **as the deployment user**, entering a GitHub personal access token (classic) with `read:packages` and access to the packages. Do not use `sudo docker login` when Actions connects as the nonroot deployment user. Public image pulls do not require this login. The Docker Hub mirror does not proxy GHCR.
+
+Set `DEPLOY_MODE=prepare`, then push the deployment changes to `main`. After verification and publishing pass, Actions uploads the source and manifest into `/srv/bomish/releases/COMMIT-RUN-ATTEMPT`, pulls the three exact image digests, and points `/srv/bomish/prepared` at that release. It starts no application services and does not generate or replace secrets. The VPS does not need GitHub source-repository credentials because Actions sends a source archive without `.git`.
+
+For initial setup, use the prepared release:
+
+```sh
+cd /srv/bomish/prepared
+cp images.env /srv/bomish/images.env
+```
+
+Continue through **First installation** below, using `/srv/bomish/prepared` in place of `/srv/bomish/app`. After configuring certificates, backups, and the owner, and completing a successful first deployment and external checks:
+
+```sh
+touch /srv/bomish/auto-deploy-ready
+```
+
+Then set `DEPLOY_MODE=auto`. Subsequent verified pushes deploy automatically. To deliver the same commit again, use **Re-run all jobs** on its publishing workflow; the artifact is replaced and the attempt gets a new release directory. Releases that no longer match the current `main` head are skipped, preventing a delayed older build from replacing the latest release. Set `DEPLOY_MODE=off` to stop future deliveries; an already-running deployment finishes.
+
+Automatic deployments reuse `scripts/deploy.sh` for the deployment lock, pre-migration backup, migrations, health checks and application-image rollback. After success, `/srv/bomish/current` points to the active source directory and `/srv/bomish/images.env` contains its digests. The Actions runner also probes the public HTTPS health endpoint. A failed public probe fails the Actions job but does not automatically undo an otherwise healthy deployment.
+
+Deployment jobs are serialized and are not cancelled mid-migration. Configurable environment approval rules may deliberately require a human approval; leave required reviewers unset if fully automatic operation is desired. Keep the source directories named in `release-state/current.source` and `previous.source` for rollback. Older release directories and unused Docker images can be pruned during reviewed maintenance; never prune volumes as part of a release.
+
 ## First installation
 
-The examples assume the checkout is `/srv/bomish/app`, with configuration and secrets outside it. Run as the deployment account with Docker access. Create its parent directory with appropriate ownership first.
+The manual examples assume the checkout is `/srv/bomish/app`, with configuration and secrets outside it. For Actions preparation, use `/srv/bomish/prepared` instead. Run as the deployment account with Docker access. Create its parent directory with appropriate ownership first.
 
 ```sh
 cd /srv/bomish/app
 python3 scripts/init-deployment.py /srv/bomish/secrets
 cp deploy/production.env.example /srv/bomish/deployment.env
-# Place the verified release artifact at /srv/bomish/images.env.
+# Actions preparation copies images.env as shown above; manual installs supply it here.
 ```
 
 The generator refuses an existing directory and prints no passwords. The secrets directory is mode 0700; files are readable within their mounted containers. Keep it outside Git. Fill `backup_credentials` with your S3 credentials and install `tls/origin.crt` and `tls/origin.key`. When editing a generated file, temporarily give its owner write permission and restore mode 0444 afterward. TLS files must be readable inside Traefik; their host directory is private. Save a separate encrypted copy of all credentials/configuration, especially **restic_password and totp_key**, in a password manager. They are not included in the data backup. Losing the restic password makes that backup unrecoverable; losing the TOTP encryption key requires owner recovery.
@@ -140,9 +194,9 @@ Enter the existing owner's username, a new password and confirm a new authentica
 
 `Verify Bomish` runs Go integration tests with the race detector, vet, OpenAPI regeneration consistency, TypeScript/format/build checks, existing simulation browser regressions and new catalog acceptance tests. A separate job builds real production containers, exercises TLS routing and migrations without demo seeds, verifies least-privilege schema access, and backs up/restores the database and an upload. Trivy gates fixable high/critical image vulnerabilities; findings without fixes still require review. Dependabot proposes weekly dependency updates.
 
-The publish workflow runs only after successful pushes to `main`, builds images with provenance/SBOM, scans the resulting published digests again, and supplies immutable digest references in `images.env` only after those scans pass. Configure branch protection to require all verification jobs. The workflow does not SSH into the server or deploy automatically. Review scan results and run the first complete workflow before promoting this release. For updates, check out the matching commit, download its artifact, then run `scripts/deploy.sh` with the two absolute file paths.
+The publish workflow runs only after successful verification of pushes to `main`, builds images with provenance/SBOM, scans the resulting published digests again, and supplies immutable digest references in `images.env` only after those scans pass. Configure branch protection to require all verification jobs. With `DEPLOY_MODE=auto` and the production environment configured, its deployment job transfers and deploys that release over SSH. For manual updates, check out the matching commit, download its artifact, then run `scripts/deploy.sh` with the two absolute file paths.
 
-The deployment script serializes releases, pulls images, makes a pre-migration backup after the first recorded deployment, runs migrations once, waits for health checks and checks catalog mode. It records `release-state/current.env` and `previous.env` beside deployment.env. A failed application health check attempts to restart the previous images. Database migrations are **not** automatically reverted. Future schema changes must be backward compatible with the prior image; destructive migrations need a separately reviewed maintenance/recovery plan. This single-VPS Compose setup may have brief downtime during recreation and does not provide high availability.
+The deployment script serializes releases, pulls images, makes a pre-migration backup after the first recorded deployment, runs migrations once, waits for health checks and checks catalog mode. It records `release-state/current.env`, `previous.env`, `current.source` and `previous.source` beside deployment.env. A failed application health check attempts to restart the previous images using their recorded source directory's Compose file when available. Keep that directory intact. Database migrations are **not** automatically reverted. Future schema changes must be backward compatible with the prior image; destructive migrations need a separately reviewed maintenance/recovery plan. This single-VPS Compose setup may have brief downtime during recreation and does not provide high availability.
 
 For a manual application rollback, use `release-state/previous.env` with the checkout/configuration for that release after checking schema compatibility. Restore data only for an explicit database recovery, never as an automatic response to a frontend failure. Review infrastructure image updates and backup-format/PostgreSQL compatibility separately from ordinary application releases.
 

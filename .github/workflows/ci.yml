@@ -71,15 +71,16 @@ jobs:
           RESTIC_REPOSITORY: s3:https://example.invalid/bucket
         run: |
           docker compose -f compose.production.yaml -f compose.observability.yaml config --quiet
-          bash -n scripts/deploy.sh scripts/backup.sh scripts/restore-check.sh
+          bash -n scripts/deploy.sh scripts/deploy-over-ssh.sh scripts/deploy-received.sh scripts/backup.sh scripts/restore-check.sh
           sh -n deploy/backup/backup.sh deploy/postgres/init.sh
+          python3 -m unittest discover -s scripts/tests -v
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
       - run: |
           (cd backend && go run ./cmd/server > /tmp/bomish-api.log 2>&1) &
           (cd frontend && npm run start > /tmp/bomish-web.log 2>&1) &
           ready=false
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             if curl -fsS http://localhost:3000/api/v1/health; then ready=true; break; fi
             sleep 1
           done
