@@ -157,7 +157,4 @@ jobs:
         env:
           SITE_URL: ${{ vars.DEPLOY_SITE_URL || 'https://bomish.ir' }}
         run: |
-          [[ "$SITE_URL" == https://* ]]
-          curl --fail --silent --show-error --retry 5 --retry-all-errors \
-            --retry-delay 3 --connect-timeout 10 --max-time 30 \
-            "${SITE_URL%/}/api/v1/health"
+          python3 scripts/verify-site.py --public-url "$SITE_URL"

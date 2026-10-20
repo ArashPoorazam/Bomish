@@ -6,7 +6,7 @@ Host provisioning and Cloudflare setup are one-time server/account tasks. GitHub
 
 ## Owner and categories
 
-Run the interactive `owner-tools bootstrap-owner` command below after migrations. It asks for the owner's name, username, password twice, and an authenticator confirmation. There is no default production password and no SQL account creation required. Bootstrap refuses to overwrite an existing owner. Keep the authenticator key private; the tool's container logging is disabled to keep it out of Docker/Loki logs. Do not record the terminal or run this command in CI.
+The first-install command invokes interactive `owner-tools bootstrap-owner` after migrations if no owner exists. It asks for the owner's name, username, password twice, and an authenticator confirmation. There is no default production password and no SQL account creation required. Bootstrap refuses to overwrite an existing owner. Keep the authenticator key private; the tool's container logging is disabled to keep it out of Docker/Loki logs. Do not record the terminal or run this command in CI.
 
 Staff sign into `/staff` with username and password only. An owner first signs in with a password, then supplies an authenticator code to unlock `/omnisire`. The API enforces both owner role and verification, rotates the session token on unlock, rejects reused codes, and rate-limits attempts. Verification lasts for the remaining staff session (maximum eight hours); logging out or recovering credentials removes it. Staff members cannot enter Omnisire even if an old permission override named an owner section. Staff shipping is available at `/staff/shipping` without 2FA.
 
@@ -14,7 +14,7 @@ Migration 022 creates `seeds` (دانه‌های خوراکی), `herbs` (سبز�
 
 ## Deployment prerequisites
 
-- Docker Engine with the Compose v2 plugin, Git, Python 3, `flock`, and working time synchronization on the VPS. Maintain host security updates, SSH keys, and disk capacity.
+- Linux amd64 Docker Engine with the modern Compose plugin (`docker compose`, v2 or later), Python 3.10+, OpenSSL, curl, `flock`, `realpath`, and working time synchronization on the VPS. Git is only needed for a manual checkout, not Actions delivery. Maintain host security updates, SSH keys, and disk capacity.
 - Source files for the exact release commit. GitHub Actions publishes API, web and backup images to GHCR only after the verification workflow succeeds. Automatic delivery transfers that commit's source and `images.env` artifact; manual installation can download them from the publishing run. If packages are private, authenticate the VPS deployment account to GHCR with a read-packages credential.
 - Cloudflare DNS for `bomish.ir` pointing at the VPS with proxying enabled. Use **Full (strict)** TLS with an origin certificate/key covering `bomish.ir`. This setup uses your supplied certificate; it does not automatically obtain or renew one. Track its expiry. Add a separate Cloudflare redirect for `www` if wanted; the repository routes only `SITE_HOST`.
 - Restrict origin HTTP/HTTPS ingress to current Cloudflare address ranges; restrict SSH to your administrative access. Account for Docker's firewall chains as well as the host firewall. Database, API, metrics, Loki and the Traefik dashboard are not publicly published. Grafana binds to loopback only.
@@ -73,7 +73,7 @@ touch /srv/bomish/auto-deploy-ready
 
 Then set `DEPLOY_MODE=auto`. Subsequent verified pushes deploy automatically. To deliver the same commit again, use **Re-run all jobs** on its publishing workflow; the artifact is replaced and the attempt gets a new release directory. Releases that no longer match the current `main` head are skipped, preventing a delayed older build from replacing the latest release. Set `DEPLOY_MODE=off` to stop future deliveries; an already-running deployment finishes.
 
-Automatic deployments reuse `scripts/deploy.sh` for the deployment lock, pre-migration backup, migrations, health checks and application-image rollback. After success, `/srv/bomish/current` points to the active source directory and `/srv/bomish/images.env` contains its digests. The Actions runner also probes the public HTTPS health endpoint. A failed public probe fails the Actions job but does not automatically undo an otherwise healthy deployment.
+Automatic deployments reuse `scripts/deploy.sh` for preflight, the deployment lock, pre-migration backup, migrations, website checks and application-image rollback. Once the origin passes, `/srv/bomish/current` points to the active source directory and `/srv/bomish/images.env` contains its digests. The VPS and then the Actions runner check the public Cloudflare website. A failed public probe fails the Actions job but leaves the healthy origin running and recorded; fix DNS/Cloudflare and retry. A failed origin check triggers the existing application rollback when a previous release exists; database migrations are not rolled back.
 
 Deployment jobs are serialized and are not cancelled mid-migration. Configurable environment approval rules may deliberately require a human approval; leave required reviewers unset if fully automatic operation is desired. Keep the source directories named in `release-state/current.source` and `previous.source` for rollback. Older release directories and unused Docker images can be pruned during reviewed maintenance; never prune volumes as part of a release.
 
@@ -98,23 +98,60 @@ Edit `/srv/bomish/deployment.env`:
 - Leave `SITE_INDEXABLE=false` until content is approved. Image assignments come from the second env file (`images.env`) and override the blank placeholders.
 - Review/pin infrastructure image digests before rollout. PostgreSQL major-version upgrades require a separate migration plan, not a tag replacement.
 
-Define this helper in your terminal from the checkout:
+After saving the configuration, secrets, TLS files and verified image manifest, run this **in an interactive SSH session on the VPS**, from the prepared release:
+
+```sh
+bash scripts/first-install.sh /srv/bomish/deployment.env /srv/bomish/images.env
+```
+
+This takes the same deployment lock used for updates and performs:
+
+1. Preflight validation and image pulls, before changing services.
+2. Backup repository detection; initialization only when restic explicitly reports that the repository does not exist.
+3. Database startup and idempotent migrations.
+4. Interactive owner creation only if the database has no owner, then confirmation that an active owner exists.
+5. A first successful database/uploads backup.
+6. Application startup, local Traefik checks and public Cloudflare checks.
+
+If interrupted, fix the reported issue and rerun the same command. It queries actual database and repository state instead of trusting progress files. Existing owner credentials and restic repositories are preserved. It safely repeats migrations and takes another backup; it never deletes volumes. An existing repository requires its original restic password. Network/authentication failures stop installation rather than triggering initialization. Restic 0.17+ is required for its distinct missing-repository exit code (included in the backup image).
+
+Database initialization creates separate application and migration roles only when the PostgreSQL volume is empty. Changing a secret file later does not change an existing database role password; rotate the database password and its mounted files together.
+
+The first-install command does not create `auto-deploy-ready`. Create that marker and switch `DEPLOY_MODE` to `auto` only after the first installation and remaining operator checks below succeed.
+
+For subsequent maintenance commands, define this helper in your terminal from the release directory:
 
 ```sh
 prod() {
   docker compose --env-file /srv/bomish/deployment.env \
     --env-file /srv/bomish/images.env -f compose.production.yaml "$@"
 }
-prod config --quiet
-prod pull db api web migrate backup traefik
-prod up -d --wait db
-prod run --rm migrate
-prod run --rm owner-tools bootstrap-owner
-prod run --rm --no-deps backup init
-bash scripts/deploy.sh /srv/bomish/deployment.env /srv/bomish/images.env
 ```
 
-Initialize restic once for a new repository. For an existing repository use the original password and run `backup check` instead of `init`. Database initialization creates separate application and migration roles only when the PostgreSQL volume is empty. Changing a secret file later does not change an existing database role password; rotate the database password and its mounted files together.
+### Preflight and website checks
+
+You can run preflight separately:
+
+```sh
+python3 scripts/preflight.py /srv/bomish/deployment.env /srv/bomish/images.env --first-install
+```
+
+It validates tools, Docker access and Linux amd64 support, the Compose configuration, exact CI image digests, proxy CIDRs, secret files and database URL/password consistency, S3 configuration, and the TLS certificate's hostname, validity and matching private key. Certificates must have at least seven days remaining. It pulls images to verify registry credentials and blob access, and checks their platform. This writes Docker's image cache but does not start services or modify application data. Omit `--first-install` for routine updates: those pull application images only and require the database/Traefik images to be present already. Preflight does not validate that CIDRs match Cloudflare's latest list or that disk/RAM capacity meets your traffic needs.
+
+Every deployment checks:
+
+- Local Traefik: HTTP redirects to HTTPS with the same path/query, the homepage returns HTML, the API reports healthy, and settings report catalog mode.
+- Public Cloudflare: the same checks, with public certificate validation and a `CF-Ray` response header. The Actions runner repeats this from outside the VPS after automatic deployment.
+
+The origin probe connects to `127.0.0.1` with the real hostname/SNI and pins the public key of the installed certificate. That certificate is first checked for hostname, dates and private-key match. This supports Cloudflare Origin CA without installing it into the host's public trust store. Public probes always use normal CA/hostname validation. Both probes retry briefly; an unresolved error fails the deployment command.
+
+To repeat only the probes without redeploying:
+
+```sh
+python3 scripts/verify-site.py --config /srv/bomish/deployment.env \
+  --images /srv/bomish/images.env --origin
+python3 scripts/verify-site.py --public-url https://bomish.ir
+```
 
 Check `https://bomish.ir/api/v1/health`, homepage/category navigation, password-only staff login and owner unlock from an external browser. Create real merchant content and confirm uploads persist through an API recreation. Confirm checkout returns 503 and no customer checkout controls appear. Verify backup snapshots and receive a test alert before opening traffic. Set `SITE_INDEXABLE=true` and redeploy when the public catalog is ready.
 

@@ -2,6 +2,7 @@
 
 import json
 import os
+import pty
 import shutil
 import subprocess
 import tarfile
@@ -25,12 +26,46 @@ class DeploymentTest(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.source = self.root / "source"
         (self.source / "scripts").mkdir(parents=True)
-        for name in ("deploy.sh", "validate-release.py"):
+        for name in ("deploy.sh", "validate-release.py", "production.py", "preflight.py",
+                     "verify-site.py", "first-install.sh"):
             shutil.copy2(REPO / "scripts" / name, self.source / "scripts" / name)
-        (self.source / "compose.production.yaml").write_text("services: {}\n")
+        shutil.copy2(REPO / "compose.production.yaml", self.source / "compose.production.yaml")
         self.host = self.root / "host"
         self.host.mkdir()
-        (self.host / "deployment.env").write_text("COMPOSE_PROJECT_NAME=test\n")
+        self.secrets = self.host / "secrets"
+        subprocess.run(["python3", str(REPO / "scripts/init-deployment.py"), str(self.secrets)],
+                       check=True, capture_output=True)
+        credentials = self.secrets / "backup_credentials"
+        credentials.chmod(0o600)
+        credentials.write_text("[default]\naws_access_key_id=test\naws_secret_access_key=test\n")
+        credentials.chmod(0o444)
+        subprocess.run([
+            "openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256",
+            "-nodes", "-days", "30", "-subj", "/CN=bomish.test",
+            "-addext", "subjectAltName=DNS:bomish.test",
+            "-keyout", str(self.secrets / "tls/origin.key"),
+            "-out", str(self.secrets / "tls/origin.crt"),
+        ], check=True, capture_output=True)
+        self.config = self.host / "deployment.env"
+        self.config.write_text(
+            f"COMPOSE_PROJECT_NAME=test\nSITE_HOST=bomish.test\nSECRETS_DIR={self.secrets}\n"
+            "CLOUDFLARE_CIDRS=192.0.2.0/24\nTRUSTED_PROXY_CIDRS=172.30.10.0/24,192.0.2.0/24\n"
+            "RESTIC_REPOSITORY=s3:https://s3.example.test/bucket/test\n"
+        )
+        self.images = self.host / "images.env"
+        self.images.write_text(IMAGES)
+        # Compose configuration rendering needs the CLI, but no Docker daemon.
+        clean_env = {k: v for k, v in os.environ.items() if k not in (
+            "API_IMAGE", "WEB_IMAGE", "BACKUP_IMAGE", "SECRETS_DIR", "SITE_HOST",
+            "CLOUDFLARE_CIDRS", "TRUSTED_PROXY_CIDRS", "RESTIC_REPOSITORY",
+            "COMPOSE_PROJECT_NAME", "EDGE_SUBNET", "SITE_INDEXABLE",
+        )}
+        self.model = self.root / "model.json"
+        self.model.write_bytes(subprocess.check_output([
+            "docker", "compose", "--env-file", str(self.config),
+            "--env-file", str(self.images), "-f", str(self.source / "compose.production.yaml"),
+            "--profile", "tools", "config", "--format", "json",
+        ], env=clean_env))
         self.bin = self.root / "bin"
         self.bin.mkdir()
         docker = self.bin / "docker"
@@ -45,6 +80,30 @@ if "-f" in args and "up" in args and "api" in args:
     compose = str(Path(args[args.index("-f") + 1]).resolve())
     if compose == os.environ.get("DOCKER_TEST_FAIL_COMPOSE"):
         sys.exit(1)
+if "config" in args and "--format" in args:
+    model = json.loads(Path(os.environ["DOCKER_TEST_MODEL"]).read_text())
+    # Mimic image manifest interpolation for successive deliveries.
+    if not os.environ.get("DOCKER_TEST_OVERRIDE_IMAGE"):
+        manifest = Path(args[args.index("-f") - 1]).read_text()
+        values = dict(line.split("=", 1) for line in manifest.splitlines())
+        for service in ("api", "web", "backup"):
+            model["services"][service]["image"] = values[service.upper() + "_IMAGE"]
+    print(json.dumps(model))
+elif args[0] == "info":
+    print(json.dumps({"OSType": "linux", "Architecture": os.environ.get("DOCKER_TEST_ARCH", "x86_64")}))
+elif args[:2] == ["image", "inspect"]:
+    print("linux/amd64")
+elif "pull" in args:
+    sys.exit(int(os.environ.get("DOCKER_TEST_PULL_CODE", "0")))
+elif args[-2:] == ["cat", "config"]:
+    sys.exit(0 if Path(os.environ["DOCKER_TEST_RESTIC"]).exists()
+             else int(os.environ.get("DOCKER_TEST_RESTIC_CODE", "10")))
+elif args[-2:] == ["backup", "init"]:
+    Path(os.environ["DOCKER_TEST_RESTIC"]).touch()
+elif args[-2:] == ["owner-tools", "bootstrap-owner"]:
+    Path(os.environ["DOCKER_TEST_OWNER"]).touch()
+elif "psql" in args:
+    print(("t" if "EXISTS" in args[-1] else "1") if Path(os.environ["DOCKER_TEST_OWNER"]).exists() else "0")
 """
         )
         docker.chmod(0o755)
@@ -53,7 +112,40 @@ if "-f" in args and "up" in args and "api" in args:
             **os.environ,
             "PATH": f"{self.bin}:{os.environ['PATH']}",
             "DOCKER_TEST_LOG": str(self.log),
+            "DOCKER_TEST_MODEL": str(self.model),
+            "DOCKER_TEST_RESTIC": str(self.host / "restic-initialized"),
+            "DOCKER_TEST_OWNER": str(self.host / "owner-created"),
+            "CURL_TEST_LOG": str(self.root / "curl.jsonl"),
         }
+        curl = self.bin / "curl"
+        curl.write_text(
+            """#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+args = sys.argv[1:]
+with open(os.environ["CURL_TEST_LOG"], "a") as log:
+    log.write(json.dumps(args) + "\\n")
+if os.environ.get("CURL_TEST_FAIL_PUBLIC") and "--resolve" not in args:
+    sys.exit(60)
+if os.environ.get("CURL_TEST_FAIL_ORIGIN") and "--resolve" in args:
+    sys.exit(90)
+url = args[-1]
+status, headers, body = 200, "CF-Ray: test\\nContent-Type: application/json\\n", ""
+if url.startswith("http:"):
+    status, headers = 301, "Location: " + url.replace("http:", "https:", 1) + "\\n"
+elif url.endswith("/settings"):
+    body = '{"catalogOnly":true}'
+elif url.endswith("/health"):
+    body = '{"status":"ok"}'
+else:
+    headers += "Content-Type: text/html\\n"
+    body = "<html>Bomish</html>"
+Path(args[args.index("--dump-header") + 1]).write_text(f"HTTP/1.1 {status}\\n" + headers)
+Path(args[args.index("--output") + 1]).write_text(body)
+print(status, end="")
+"""
+        )
+        curl.chmod(0o755)
 
     def deliver(self, mode, delivery="10-1", images=IMAGES, check=True):
         incoming = self.host / "incoming" / delivery
@@ -169,6 +261,101 @@ if "-f" in args and "up" in args and "api" in args:
         self.assertEqual((state / "current.env").read_text(), updated)
         self.assertEqual((self.host / "images.env").read_text(), updated)
         self.assertNotEqual((self.host / "current").resolve(), old_release)
+
+    def install(self, *, terminal=False):
+        command = [
+            "bash", str(self.source / "scripts/first-install.sh"),
+            str(self.config), str(self.images),
+        ]
+        if not terminal:
+            return subprocess.run(command, env=self.env, capture_output=True, text=True)
+        master, slave = pty.openpty()
+        try:
+            return subprocess.run(command, env=self.env, stdin=slave, stdout=slave,
+                                  stderr=subprocess.PIPE, timeout=60)
+        finally:
+            os.close(master)
+            os.close(slave)
+
+    def test_first_install_resumes_without_recreating_owner_or_repository(self):
+        # Interruption before owner interaction leaves a migrated DB/repository.
+        failed = self.install()
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertIn("interactive SSH terminal", failed.stderr)
+        self.assertTrue((self.host / "restic-initialized").exists())
+        self.assertFalse((self.host / "release-state/current.env").exists())
+        completed = self.install(terminal=True)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        repeated = self.install()
+        self.assertEqual(repeated.returncode, 0, repeated.stderr)
+        calls = [call["args"] for call in self.calls()]
+        self.assertEqual(sum(a[-2:] == ["backup", "init"] for a in calls), 1)
+        self.assertEqual(sum(a[-2:] == ["owner-tools", "bootstrap-owner"] for a in calls), 1)
+        self.assertTrue((self.host / "current").is_symlink())
+        self.assertFalse((self.host / "auto-deploy-ready").exists())
+
+    def test_repository_auth_failure_does_not_initialize_or_start_database(self):
+        self.env["DOCKER_TEST_RESTIC_CODE"] = "12"
+        result = self.install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("initialization was not attempted", result.stderr)
+        calls = [call["args"] for call in self.calls()]
+        self.assertFalse(any("up" in a or a[-2:] == ["backup", "init"] for a in calls))
+
+    def test_preflight_failure_never_changes_services(self):
+        for variable, value in (("DOCKER_TEST_ARCH", "aarch64"), ("DOCKER_TEST_PULL_CODE", "1")):
+            with self.subTest(variable=variable):
+                self.env[variable] = value
+                result = self.install()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(any("up" in c["args"] or "run" in c["args"] for c in self.calls()))
+                del self.env[variable]
+
+    def test_missing_secrets_and_changed_image_override_fail_before_pull(self):
+        password = self.secrets / "postgres_password"
+        original = password.read_bytes()
+        password.unlink()
+        result = self.install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("postgres_password", result.stderr)
+        self.assertFalse(any("pull" in c["args"] for c in self.calls()))
+        password.write_bytes(original)
+        password.chmod(0o444)
+        model = json.loads(self.model.read_text())
+        model["services"]["api"]["image"] = "ghcr.io/example/unverified:latest"
+        self.model.write_text(json.dumps(model))
+        self.env["DOCKER_TEST_OVERRIDE_IMAGE"] = "1"
+        result = self.install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("overrides the verified", result.stderr)
+        self.assertFalse(any("pull" in c["args"] for c in self.calls()))
+
+    def test_origin_failure_rolls_back_and_preserves_current_release(self):
+        (self.host / "auto-deploy-ready").touch()
+        self.deliver("auto")
+        previous = (self.host / "current").resolve()
+        self.env["CURL_TEST_FAIL_ORIGIN"] = "1"
+        result = self.deliver("auto", "10-2", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Restoring previous application images", result.stderr)
+        self.assertEqual((self.host / "current").resolve(), previous)
+
+    def test_public_failure_records_running_release_but_reports_failure(self):
+        (self.host / "auto-deploy-ready").touch()
+        self.env["CURL_TEST_FAIL_PUBLIC"] = "1"
+        result = self.deliver("auto", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Origin is healthy", result.stderr)
+        self.assertNotIn("Restoring previous", result.stderr)
+        self.assertEqual(
+            (self.host / "release-state/current.source").read_text().strip(),
+            str((self.host / "current").resolve()),
+        )
+        probes = [json.loads(line) for line in (self.root / "curl.jsonl").read_text().splitlines()]
+        for probe in probes:
+            if "--insecure" in probe:
+                self.assertIn("--pinnedpubkey", probe)
+                self.assertIn("--resolve", probe)
 
     def test_ssh_transport_pins_host_and_transfers_only_committed_source(self):
         for name in ("deploy-over-ssh.sh", "deploy-received.sh"):

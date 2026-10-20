@@ -12,7 +12,8 @@ export EDGE_SUBNET=172.30.19.0/24 TRUSTED_PROXY_CIDRS=172.30.19.0/24 CLOUDFLARE_
 python3 scripts/init-deployment.py "$SECRETS_DIR"
 cp deploy/monitoring/alertmanager.example.yaml "$SECRETS_DIR/alertmanager.yaml"
 chmod 644 "$SECRETS_DIR/alertmanager.yaml"
-openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=bomish.test \
+openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj /CN=bomish.test \
+  -addext subjectAltName=DNS:bomish.test \
   -keyout "$SECRETS_DIR/tls/origin.key" -out "$SECRETS_DIR/tls/origin.crt" 2>/dev/null
 cat > "$work/override.yaml" <<'YAML'
 services:
@@ -49,7 +50,20 @@ checks=$(compose exec -T db psql -U postgres -d bomish -At -v ON_ERROR_STOP=1 -c
 test "$checks" = t
 compose run --rm --no-deps backup init
 compose up -d --wait --wait-timeout 240 api web traefik
-fetch() { curl --noproxy '*' -ksS --resolve bomish.test:443:127.0.0.1 "$@"; }
+# Exercise the same origin checks as real deployments against live containers.
+PYTHONPATH=scripts python3 - <<'PY'
+import importlib
+import os
+from pathlib import Path
+from production import certificate_pin
+pin = certificate_pin(Path(os.environ["SECRETS_DIR"]) / "tls", "bomish.test")
+importlib.import_module("verify-site").verify("bomish.test", [
+    "--insecure", "--pinnedpubkey", pin,
+    "--resolve", "bomish.test:80:127.0.0.1",
+    "--resolve", "bomish.test:443:127.0.0.1",
+])
+PY
+fetch() { curl --noproxy '*' --cacert "$SECRETS_DIR/tls/origin.crt" -sS --resolve bomish.test:443:127.0.0.1 "$@"; }
 fetch -f https://bomish.test/api/v1/health >/dev/null
 fetch -f https://bomish.test/ > "$work/home.html"
 python3 - "$work/home.html" <<'PY'
@@ -75,6 +89,8 @@ compose run --rm --no-deps backup once
 compose run --rm --no-deps backup check
 compose run --rm --no-deps backup restore latest --host "$COMPOSE_PROJECT_NAME" --tag bomish --target /restore
 compose exec -T db createdb -U postgres -O bomish_migrator bomish_restore
+# Expansion belongs to the shell inside the backup container.
+# shellcheck disable=SC2016
 compose run --rm --no-deps --entrypoint sh backup -ec '
   export PGPASSWORD="$(cat /run/secrets/postgres_password)"
   pg_restore --exit-on-error --no-owner --no-acl --role=bomish_migrator -d bomish_restore /restore/backup/database.dump

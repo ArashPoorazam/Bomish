@@ -44,10 +44,6 @@ if [ "$mode" = prepare ]; then
   printf 'Release prepared at %s. No application services were started.\n' "$release"
 else
   bash "$release/scripts/deploy.sh" "$root/deployment.env" "$release/images.env"
-  ln -s "$release" "$root/.current-$delivery"
-  mv -Tf "$root/.current-$delivery" "$root/current"
-  cp "$release/images.env" "$root/.images-$delivery.env"
-  mv -f "$root/.images-$delivery.env" "$root/images.env"
   printf 'Deployed source commit %s.\n' "$commit"
 fi
 rm -rf -- "$incoming"
