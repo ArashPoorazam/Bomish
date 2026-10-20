@@ -225,7 +225,7 @@ test("catalog filters preserve query and sorting while clearing pagination", asy
   await expect(page).toHaveURL(/category=spices/);
   await page.getByRole("link", { name: "حذف فیلتر فقط موجود" }).click();
   await expect(
-    page.locator('.catalog-grid a[href="/products/turmeric"]'),
+    page.locator('.catalog-grid:visible a[href="/products/turmeric"]'),
   ).toHaveCount(1);
   await expect(page).not.toHaveURL(/available=/);
   url = new URL(page.url());
@@ -245,7 +245,7 @@ test("homepage copy and conditional bestseller carousel navigation", async ({
   ).json();
   await page.goto("/");
   await expect(page.locator("main")).not.toContainText("انتخاب آزادانه وزن");
-  await expect(page.locator(".principle-card").last()).toContainText(
+  await expect(page.locator(".principle-card:visible").last()).toContainText(
     "درجه‌های مختلف یک محصول را با هم ترکیب نمی‌کنیم",
   );
   await expect(
@@ -260,7 +260,9 @@ test("homepage copy and conditional bestseller carousel navigation", async ({
     return;
   }
   await expect(heading).toBeVisible();
-  const track = page.locator('.rail-track[aria-label="محبوب‌های بومیش"]');
+  const track = page.locator(
+    '.rail-track[aria-label="محبوب‌های بومیش"]:visible',
+  );
   const previous = page.getByRole("button", {
     name: "قبلی در محبوب‌های بومیش",
   });
@@ -348,8 +350,10 @@ test("discounted package rounds to 1000 toman in listing, purchase, cart, and ch
     ).json();
     expect(manual.some((p: Product) => p.id === id)).toBe(false);
     await page.goto(`/products?q=${id}&discounted=true`);
-    await expect(page.locator(".catalog-grid")).toContainText("۴۳٬۰۰۰");
-    const card = page.locator(".catalog-grid .product-card");
+    // Ignore the hidden incoming copy while Next.js streams the route.
+    const grid = page.locator(".catalog-grid:visible");
+    await expect(grid).toContainText("۴۳٬۰۰۰");
+    const card = grid.locator(".product-card");
     await expect(
       card.locator(".product-card-media .product-discount-tag"),
     ).toHaveText("۱۰٪");
@@ -367,9 +371,13 @@ test("discounted package rounds to 1000 toman in listing, purchase, cart, and ch
       fullPage: true,
     });
     await card.click();
-    await expect(page.locator(".product-price")).toContainText("۴۳٬۰۰۰");
+    await expect(page.locator(".product-price:visible")).toContainText(
+      "۴۳٬۰۰۰",
+    );
     await page.getByLabel("تعداد بسته", { exact: true }).fill("2");
-    await expect(page.locator(".purchase-bottom")).toContainText("۸۶٬۰۰۰");
+    await expect(page.locator(".purchase-bottom:visible")).toContainText(
+      "۸۶٬۰۰۰",
+    );
     await page
       .getByRole("button", { name: "افزودن به سبد", exact: true })
       .click();
