@@ -94,6 +94,8 @@ test("owner creates salesperson, referral earns commission, payout appears in sa
       .getByLabel("کد تأیید", { exact: true })
       .fill((await (await otp).json()).devCode);
     await customer.getByRole("button", { name: "تأیید و ادامه" }).click();
+    // Checkout starts only after verification has stored the session cookie.
+    await expect(customer).toHaveURL(/\/checkout$/);
     const orderId = await payCart(
       customer.request,
       new URL(customer.url()).origin,

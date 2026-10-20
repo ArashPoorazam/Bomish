@@ -122,13 +122,26 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
     await page.clock.runFor(4100);
     await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
     await region.hover();
+    await expect(region.locator(".hero-slide-viewport")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
     await page.clock.runFor(10000);
     await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
     await page.mouse.move(0, 0);
     await dots.nth(1).focus();
+    await expect(dots.nth(1)).toBeFocused();
+    await expect(region.locator(".hero-slide-viewport")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
     await page.clock.runFor(10000);
     await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
     await page.locator("h1").click();
+    await expect(region.locator(".hero-slide-viewport")).toHaveAttribute(
+      "aria-live",
+      "off",
+    );
     await page.evaluate(() => {
       Object.defineProperty(document, "visibilityState", {
         configurable: true,
@@ -136,6 +149,11 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
       });
       document.dispatchEvent(new Event("visibilitychange"));
     });
+    // Let React commit the visibility change before advancing its timer.
+    await expect(region.locator(".hero-slide-viewport")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
     await page.clock.runFor(10000);
     await expect(dots.nth(0)).toHaveAttribute("aria-pressed", "true");
     await page.evaluate(() => {
@@ -145,9 +163,14 @@ test("staff homepage images upload, reorder, save, reload, rotate and remove end
       });
       document.dispatchEvent(new Event("visibilitychange"));
     });
+    await expect(region.locator(".hero-slide-viewport")).toHaveAttribute(
+      "aria-live",
+      "off",
+    );
     await page.clock.runFor(4100);
     await expect(dots.nth(1)).toHaveAttribute("aria-pressed", "true");
     await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(region.locator(".hero-slide-playback")).toBeDisabled();
     await page.clock.runFor(15000);
     await expect(dots.nth(1)).toHaveAttribute("aria-pressed", "true");
     await expect(region.getByRole("button")).toHaveCount(3);
@@ -447,16 +470,16 @@ test("product gallery aligns right on desktop, stacks on mobile, and information
   page,
 }) => {
   await page.goto("/products/turmeric");
-  // Streaming can briefly leave the outgoing and incoming trees in the DOM.
-  await expect(page.locator(".product-gallery")).toHaveCount(1);
-  await expect(page.locator(".product-gallery")).toBeVisible();
+  // Streaming can leave a hidden incoming tree alongside the visible page.
+  const detail = page.locator(".shop-detail:visible");
+  await expect(detail.locator(".product-gallery")).toBeVisible();
   await expect(page.getByText("عطری برای آشپزخانه شما")).toHaveCount(0);
   for (const width of [1440, 768, 390]) {
     await page.setViewportSize({ width, height: 1000 });
     await noOverflow(page);
-    const gallery = (await page.locator(".product-gallery").boundingBox())!;
-    const intro = (await page.locator(".product-intro").boundingBox())!;
-    const purchase = (await page.locator(".purchase-panel").boundingBox())!;
+    const gallery = (await detail.locator(".product-gallery").boundingBox())!;
+    const intro = (await detail.locator(".product-intro").boundingBox())!;
+    const purchase = (await detail.locator(".purchase-panel").boundingBox())!;
     if (width > 760) {
       expect(gallery.x).toBeGreaterThan(intro.x);
       expect(Math.abs(gallery.y - intro.y)).toBeLessThan(2);
@@ -464,16 +487,16 @@ test("product gallery aligns right on desktop, stacks on mobile, and information
       expect(gallery.y).toBeGreaterThan(intro.y);
       expect(purchase.y).toBeGreaterThan(gallery.y);
     }
-    await expect(page.locator(".detail-image img")).toHaveCSS(
+    await expect(detail.locator(".detail-image img")).toHaveCSS(
       "object-fit",
       "contain",
     );
-    await expect(page.locator(".product-story > div")).toHaveCSS(
+    await expect(detail.locator(".product-story > div")).toHaveCSS(
       "border-top-width",
       "1px",
     );
     await expect(
-      page.locator(".product-story > div > section").first(),
+      detail.locator(".product-story > div > section").first(),
     ).toHaveCSS("border-top-width", "0px");
     await page.screenshot({
       path: `/tmp/bomish-product-${width}.png`,
