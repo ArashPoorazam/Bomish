@@ -36,6 +36,40 @@ class CertificateTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "hostname"):
             certificate_pin(self.root, "other.test")
 
+    def test_legacy_openssl_zero_exit_on_hostname_mismatch(self):
+        self.certificate()
+        real_run = subprocess.run
+
+        def legacy_run(command, **kwargs):
+            result = real_run(command, **kwargs)
+            if "-checkhost" in command:
+                # OpenSSL 3.0 reports mismatches in stdout but still exits 0.
+                self.assertIn(b"does NOT match certificate", result.stdout)
+                result.returncode = 0
+            return result
+
+        with patch("production.subprocess.run", side_effect=legacy_run):
+            with self.assertRaisesRegex(ValueError, "hostname"):
+                certificate_pin(self.root, "other.test")
+
+    def test_hostname_check_requires_explicit_confirmation(self):
+        self.certificate()
+        for output in (b"", b"unexpected output\n", b"Hostname other.test does match certificate\n"):
+            with self.subTest(output=output):
+                with patch("production.subprocess.run", return_value=subprocess.CompletedProcess(
+                    ["openssl"], 0, output, b""
+                )):
+                    with self.assertRaisesRegex(ValueError, "hostname"):
+                        certificate_pin(self.root, "bomish.test")
+
+    def test_wildcard_certificate_matches_only_one_subdomain_level(self):
+        self.certificate(host="*.bomish.test")
+        self.assertTrue(certificate_pin(self.root, "www.bomish.test").startswith("sha256//"))
+        for host in ("bomish.test", "nested.www.bomish.test"):
+            with self.subTest(host=host):
+                with self.assertRaisesRegex(ValueError, "hostname"):
+                    certificate_pin(self.root, host)
+
     def test_expiring_certificate_and_mismatched_private_key(self):
         self.certificate(days="1")
         with self.assertRaisesRegex(ValueError, "expiry"):

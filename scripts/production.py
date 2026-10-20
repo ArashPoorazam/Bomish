@@ -76,8 +76,14 @@ def certificate_pin(directory, host):
     for path in (cert, key):
         if not path.is_file() or not path.stat().st_size:
             raise ValueError(f"Missing TLS file: {path}")
-    run(["openssl", "x509", "-in", str(cert), "-noout", "-checkhost", host],
-        label="Certificate hostname validation")
+    hostname_check = run(
+        ["openssl", "x509", "-in", str(cert), "-noout", "-checkhost", host],
+        label="Certificate hostname validation",
+    )
+    # OpenSSL 3.0 exits 0 even on a hostname mismatch. Require its affirmative
+    # result for this exact host as well as a successful exit, on all versions.
+    if hostname_check.strip() != f"Hostname {host} does match certificate".encode():
+        raise ValueError("Certificate hostname validation failed")
     run(["openssl", "x509", "-in", str(cert), "-noout", "-checkend", "604800"],
         label="Certificate expiry validation (at least seven days required)")
     dates = run(["openssl", "x509", "-in", str(cert), "-noout", "-startdate"],
