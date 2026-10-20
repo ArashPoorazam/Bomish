@@ -367,7 +367,7 @@ function CodeForm({
             required
             minLength={3}
             maxLength={32}
-            pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,31}"
+            pattern={String.raw`[A-Za-z0-9][A-Za-z0-9_\-]{2,31}`}
             placeholder="WELCOME10"
             dir="ltr"
             autoComplete="off"

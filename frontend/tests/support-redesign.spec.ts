@@ -258,7 +258,9 @@ test("custom order conflicts preserve drafts and allow a reviewed retry", async 
   });
   await page.goto("/staff?section=custom");
   await page.getByRole("button", { name: /09120000001/ }).click();
-  const response = page.getByLabel("پاسخ قابل مشاهده برای مشتری", {
+  const editor = page.getByRole("region", { name: "بررسی سفارش اختصاصی" });
+  const response = editor.getByRole("textbox", {
+    name: "پاسخ قابل مشاهده برای مشتری",
     exact: true,
   });
   await response.fill("پاسخ در حال بررسی من");
@@ -267,14 +269,14 @@ test("custom order conflicts preserve drafts and allow a reviewed retry", async 
     .click();
   await expect(response).toHaveValue("پاسخ در حال بررسی من");
   await page.getByRole("button", { name: "ثبت نتیجه", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("درخواست تغییر کرده");
+  await expect(editor.getByRole("alert")).toContainText("درخواست تغییر کرده");
   await page
     .getByRole("button", { name: "دریافت آخرین نسخه", exact: true })
     .click();
   await expect(response).toHaveValue("پاسخ در حال بررسی من");
   await expect(page.getByText("پاسخ همکار", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "ثبت نتیجه", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("نتیجه ثبت شد");
+  await expect(editor.getByRole("status")).toContainText("نتیجه ثبت شد");
   await expect(response).toBeVisible();
   expect(versions).toEqual([1, 2]);
 });

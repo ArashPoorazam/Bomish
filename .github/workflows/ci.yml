@@ -22,7 +22,7 @@ jobs:
           POSTGRES_PASSWORD: test-only
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U bomish" --health-interval 5s --health-timeout 3s --health-retries 10
+          --health-cmd "pg_isready -U bomish -d bomish_browser" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       DATABASE_URL: postgres://bomish:test-only@localhost:5432/bomish_browser?sslmode=disable
       TEST_DATABASE_URL: postgres://bomish:test-only@localhost:5432/bomish_browser?sslmode=disable
@@ -35,16 +35,18 @@ jobs:
       SHIPPING_ACCEPTANCE: ${{ matrix.store-mode == 'simulation' && 'true' || 'false' }}
       STORE_MODE: ${{ matrix.store-mode }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend/tools/api-types/package-lock.json
       - run: go test -race ./...
         working-directory: backend
       - run: go vet ./...
@@ -88,7 +90,7 @@ jobs:
       - run: npm run test:e2e
         if: matrix.store-mode == 'simulation'
         working-directory: frontend
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: browser-test-results-${{ matrix.store-mode }}
@@ -101,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Production container and restore smoke test
         run: bash scripts/verify-production-containers.sh
       - name: Scan API image

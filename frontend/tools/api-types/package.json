@@ -1,0 +1,12 @@
+{
+  "name": "@bomish/api-types",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "generate": "openapi-typescript ../../../api/openapi.json -o ../../src/lib/api-types.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.3"
+  }
+}
