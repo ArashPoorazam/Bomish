@@ -16,6 +16,18 @@ test("staff overrides survive role changes, enforce read-only access, and reset"
   const form = page
     .locator("form")
     .filter({ has: page.getByLabel("نام و نام خانوادگی", { exact: true }) });
+  await expect(form.locator(".permission-section")).toHaveCount(10);
+  for (const label of [
+    "نمای کلی",
+    "همکاران و حساب‌ها",
+    "تحلیل داده‌ها",
+    "رویدادها",
+  ])
+    await expect(
+      form
+        .locator(".permission-section")
+        .filter({ has: page.getByText(label, { exact: true }) }),
+    ).toHaveCount(0);
   const username = `permissions-${Date.now()}`;
   await form
     .getByLabel("نام و نام خانوادگی", { exact: true })
@@ -107,6 +119,25 @@ test("staff overrides survive role changes, enforce read-only access, and reset"
   await expect(
     staff.getByRole("button", { name: "ذخیره پیش‌نویس", exact: true }),
   ).toBeDisabled();
+  await staff.goto(origin + "/staff/account");
+  await expect(
+    staff.getByRole("heading", { name: "اطلاعات حساب", exact: true }),
+  ).toBeVisible();
+  await expect(staff.locator(".staff-account-details")).toContainText(username);
+  await expect(
+    staff.getByRole("button", { name: "تغییر گذرواژه", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    staff.getByRole("link", { name: "فروش من", exact: true }),
+  ).toHaveCount(0);
+  await staff.goto(origin + "/staff/sales");
+  await expect(
+    staff.getByText("دسترسی به فروش شخصی برای این حساب فعال نیست."),
+  ).toBeVisible();
+  await staff.goto(origin + "/staff/shipping");
+  await expect(
+    staff.getByRole("heading", { name: "دسترسی محدود" }),
+  ).toBeVisible();
   await staffContext.close();
 
   await page.setViewportSize({ width: 1440, height: 1000 });

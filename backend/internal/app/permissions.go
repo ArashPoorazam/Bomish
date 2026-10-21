@@ -21,6 +21,10 @@ func effectivePermissions(role string, restrictions []string, overrides ...map[s
 		custom = overrides[0]
 	}
 	for _, section := range permissionSections {
+		// Old saved overrides cannot delegate the independently protected owner workspace.
+		if section.OwnerOnly && role != "owner" {
+			continue
+		}
 		inherited := slices.Contains(defaults, section.Key)
 		legacy := section.Key
 		if legacy == "support" || legacy == "custom" {

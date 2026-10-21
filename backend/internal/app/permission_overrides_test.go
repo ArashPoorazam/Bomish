@@ -165,3 +165,63 @@ func TestMemberPermissionOverridesIntegration(t *testing.T) {
 		t.Fatal("unknown override accepted", code)
 	}
 }
+
+func TestAssignablePermissionMatrix(t *testing.T) {
+	for _, section := range permissionSections {
+		t.Run(section.Key, func(t *testing.T) {
+			keys := []string{section.Key}
+			for _, action := range section.Actions {
+				keys = append(keys, section.Key+"."+action)
+			}
+			grants := map[string]bool{}
+			for _, key := range keys {
+				grants[key] = true
+				if validPermission(key) == section.OwnerOnly {
+					t.Fatalf("incorrect assignability for %s", key)
+				}
+			}
+			for role := range roleSections {
+				got := effectivePermissions(role, nil, grants)
+				for _, key := range keys {
+					if slices.Contains(got, key) == section.OwnerOnly {
+						t.Fatalf("%s grant %s: %v", role, key, got)
+					}
+				}
+				grants[section.Key] = false
+				got = effectivePermissions(role, nil, grants)
+				for _, key := range keys {
+					if slices.Contains(got, key) {
+						t.Fatalf("%s section denial left %s enabled", role, key)
+					}
+				}
+				grants[section.Key] = true
+			}
+		})
+	}
+}
+
+func TestPermissionOptionsMatchAssignableSections(t *testing.T) {
+	a := setup(t)
+	owner := couponOwner(t, a)
+	var options struct {
+		Sections []permissionSection `json:"sections"`
+	}
+	owner.ok(t, "GET", "/omnisire/permission-options", nil, &options)
+	if len(options.Sections) != 10 {
+		t.Fatalf("unexpected assignable sections: %v", options.Sections)
+	}
+	for _, section := range options.Sections {
+		if !validPermission(section.Key) {
+			t.Fatalf("non-assignable section offered: %s", section.Key)
+		}
+	}
+	staff, id := testStaff(t, a, "salesperson", nil)
+	if _, err := a.Pool.Exec(context.Background(), `UPDATE staff SET permission_overrides='{"members":true,"members.edit":true,"analytics":true,"overview":true,"events":true}'::jsonb WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/omnisire/summary", "/omnisire/members", "/omnisire/analytics", "/omnisire/events"} {
+		if code, _ := staff.call("GET", path, nil); code != 403 {
+			t.Fatalf("owner-only route %s returned %d", path, code)
+		}
+	}
+}

@@ -97,6 +97,7 @@ export function MemberForm({
       className="stack"
       onSubmit={async (e) => {
         e.preventDefault();
+        if (busy || !options) return;
         setBusy(true);
         setError("");
         try {
@@ -108,7 +109,17 @@ export function MemberForm({
             role: v.role,
             active: v.active,
             restrictions: [],
-            permissionOverrides: v.permissionOverrides,
+            permissionOverrides: Object.fromEntries(
+              Object.entries(v.permissionOverrides).filter(([key]) =>
+                options.sections.some(
+                  (section) =>
+                    key === section.key ||
+                    section.actions.some(
+                      (action) => key === `${section.key}.${action}`,
+                    ),
+                ),
+              ),
+            ),
             password: creating ? v.password : "",
           };
           const res = await api<{ id?: string }>(
@@ -211,7 +222,8 @@ export function MemberForm({
         <div className="permission-heading">
           <p>
             نقش، دسترسی‌های پیش‌فرض را تعیین می‌کند. تغییرات اختصاصی با تغییر
-            نقش حفظ می‌شوند.
+            نقش حفظ می‌شوند. بخش‌های امنی‌سایر مانند همکاران، تحلیل داده‌ها و
+            رویدادها فقط برای مالک هستند و قابل واگذاری نیستند.
           </p>
           <button
             type="button"
