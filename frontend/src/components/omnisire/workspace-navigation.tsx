@@ -12,7 +12,7 @@ import {
   LayoutDashboard,
   Users,
   History,
-  Wallet,
+  UserRound,
   ChevronDown,
 } from "lucide-react";
 import type { NotificationCounts } from "../requests/notifications";
@@ -80,7 +80,8 @@ export function WorkspaceNavigation({
   const can = (key: string) => hasStaffPermission({ role, permissions }, key);
   const management = managementLinks
     .filter(
-      (item) => can(item.id) && (role === "owner" || item.id === "shipping"),
+      (item) =>
+        can(item.id) && (owner ? role === "owner" : item.id === "shipping"),
     )
     .map((item) =>
       item.id === "shipping" && !owner
@@ -112,16 +113,16 @@ export function WorkspaceNavigation({
               can(sectionPermission(key)),
           ),
         },
-        ...(can("sales")
-          ? [
-              {
-                id: "sales",
-                href: "/staff/sales",
-                label: "فروش من",
-                Icon: Wallet,
-              },
-            ]
-          : []),
+        {
+          id: "account",
+          href: "/staff/account",
+          label: "حساب کاربری",
+          Icon: UserRound,
+          children: [
+            ...(can("sales") ? [["sales", "فروش من"]] : []),
+            ["password", "تغییر گذرواژه"],
+          ],
+        },
         ...management,
       ];
   const badge = (key: string) => {
@@ -179,9 +180,24 @@ export function WorkspaceNavigation({
                     ) : (
                       <Link
                         key={key}
-                        href={`${href}?section=${key}`}
+                        href={
+                          id === "account"
+                            ? key === "sales"
+                              ? "/staff/sales"
+                              : "/staff/account"
+                            : `${href}?section=${key}`
+                        }
                         aria-current={
-                          activeSection === key ? "page" : undefined
+                          (
+                            id === "account"
+                              ? path ===
+                                (key === "sales"
+                                  ? "/staff/sales"
+                                  : "/staff/account")
+                              : activeSection === key
+                          )
+                            ? "page"
+                            : undefined
                         }
                         onClick={onNavigate}
                       >

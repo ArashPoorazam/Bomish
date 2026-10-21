@@ -3,6 +3,7 @@ import { useLiveQuery } from "@/hooks/use-live-query";
 import Link from "next/link";
 import type { Order } from "@/lib/types";
 import { useStore } from "./store-provider";
+import { CancelOrder } from "./cancel-order";
 import { AccountShell } from "./account-shell";
 import { OrderView, PendingPayment } from "./customer-order";
 export function OrderTracking({ id }: { id: string }) {
@@ -44,6 +45,7 @@ export function OrderTracking({ id }: { id: string }) {
       {result ? (
         <>
           <PendingPayment order={result.order} onPaid={refresh} />
+          <CancelOrder order={result.order} onCancelled={refresh} />
           <OrderView order={result.order} trackingUrl={result.trackingUrl} />
         </>
       ) : (

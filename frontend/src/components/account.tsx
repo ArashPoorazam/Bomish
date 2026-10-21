@@ -6,6 +6,7 @@ import type { Address, Order } from "@/lib/types";
 import { useLiveQuery } from "@/hooks/use-live-query";
 import { fa, statuses } from "@/lib/format";
 import { useStore } from "./store-provider";
+import { CancelOrder } from "./cancel-order";
 import { AccountShell } from "./account-shell";
 import { AccountAddresses } from "./account-addresses";
 import { activeOrderStates, OrderSummary, orderStates } from "./customer-order";
@@ -153,7 +154,10 @@ export function Account({
               </label>
               <div className="account-order-list">
                 {filtered.map((o) => (
-                  <OrderSummary key={o.id} order={o} />
+                  <div key={o.id} className="stack">
+                    <OrderSummary order={o} />
+                    <CancelOrder order={o} onCancelled={reload} />
+                  </div>
                 ))}
               </div>
               {!filtered.length && (
