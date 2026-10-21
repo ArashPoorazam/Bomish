@@ -1,4 +1,7 @@
 /* Stable navigation and feedback shared by Staff and Omnisire. */
+html:has(.omni-shell) {
+  scroll-behavior: auto;
+}
 .omni-sidebar {
   height: 100dvh;
   overscroll-behavior-y: contain;

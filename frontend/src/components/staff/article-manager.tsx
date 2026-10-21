@@ -197,7 +197,7 @@ export function ArticleManager({
                 </article>
               ))}
             </div>
-            {loading && (
+            {loading && !visible.length && (
               <div className="workspace-list-loading" role="status">
                 در حال دریافت اطلاعات…
               </div>

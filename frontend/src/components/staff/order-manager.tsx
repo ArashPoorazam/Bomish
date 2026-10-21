@@ -224,7 +224,7 @@ export function OrderManager({
             </span>
           </button>
         ))}
-        {loading && (
+        {loading && !visible.length && (
           <div className="workspace-list-loading" role="status">
             در حال دریافت اطلاعات…
           </div>

@@ -158,11 +158,13 @@ export function WorkspaceNavigation({
                 >
                   <Icon size={20} />
                   {label}
-                  {id === "requests" && counts && (
-                    <span className="notification-badge">
-                      {fa(counts.orders + counts.support + counts.custom)}
-                    </span>
-                  )}
+                  {id === "requests" &&
+                    counts &&
+                    counts.orders + counts.support + counts.custom > 0 && (
+                      <span className="notification-badge">
+                        {fa(counts.orders + counts.support + counts.custom)}
+                      </span>
+                    )}
                   <ChevronDown size={16} />
                 </button>
                 <div

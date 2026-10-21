@@ -71,7 +71,7 @@ async function mockWorkspace(page: Page) {
 test("Staff preserves sidebar position and collapsed groups across routes with matching active styles", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 1440, height: 600 });
+  await page.setViewportSize({ width: 1440, height: 420 });
   await mockWorkspace(page);
   await page.goto("/staff?section=orders");
   await expect(page.locator(".staff-order-row")).toHaveCount(20);
@@ -193,8 +193,13 @@ test("orders polling preserves row positions, scroll and focus through slow resp
     release!();
     await response;
     if (failure)
-      await expect(page.getByRole("alert")).toContainText("خطای موقت");
-    else await expect(page.getByRole("alert")).toHaveCount(0);
+      await expect(
+        page.locator(".omni-content").getByRole("alert"),
+      ).toContainText("خطای موقت");
+    else
+      await expect(
+        page.locator(".omni-content").getByRole("alert"),
+      ).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => scrollY)).toBe(scroll);
     expect((await rows.nth(4).boundingBox())!.y).toBe(before!.y);
     await expect(search).toBeFocused();
@@ -227,7 +232,9 @@ test("account shows identity, validates passwords, handles errors and works on m
   await confirm.fill("different-password");
   const save = page.getByRole("button", { name: "تغییر گذرواژه", exact: true });
   await save.click();
-  await expect(page.getByRole("alert")).toContainText("یکسان نیست");
+  await expect(page.locator(".omni-content").getByRole("alert")).toContainText(
+    "یکسان نیست",
+  );
   expect(changes).toHaveLength(0);
   await expect(confirm).toBeFocused();
   await confirm.fill("new-password-123");
@@ -236,11 +243,15 @@ test("account shows identity, validates passwords, handles errors and works on m
     .click();
   await expect(next).toHaveAttribute("type", "text");
   await save.click();
-  await expect(page.getByRole("alert")).toContainText("نادرست");
+  await expect(page.locator(".omni-content").getByRole("alert")).toContainText(
+    "نادرست",
+  );
   await expect(next).toHaveValue("new-password-123");
   fail = false;
   await save.click();
-  await expect(page.getByRole("status")).toContainText("گذرواژه تغییر کرد");
+  await expect(
+    page.locator(".staff-account-feedback").getByRole("status"),
+  ).toContainText("گذرواژه تغییر کرد");
   await expect(next).toHaveValue("");
   await expect(next).toHaveAttribute("type", "password");
   await expect(current).toHaveValue("");

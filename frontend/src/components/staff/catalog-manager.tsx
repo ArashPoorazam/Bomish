@@ -277,7 +277,7 @@ export function CatalogManager({
                 </tbody>
               </table>
             </div>
-            {loading && (
+            {loading && !visible.length && (
               <div className="workspace-list-loading" role="status">
                 در حال دریافت اطلاعات…
               </div>
