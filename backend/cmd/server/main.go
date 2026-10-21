@@ -15,6 +15,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	// The minimal runtime image has no system timezone database.
+	_ "time/tzdata"
 )
 
 func main() {
