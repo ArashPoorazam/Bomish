@@ -1,0 +1,223 @@
+/* Stable navigation and feedback shared by Staff and Omnisire. */
+.omni-sidebar {
+  height: 100dvh;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+.omni-sidebar > * {
+  flex-shrink: 0;
+}
+.omni-sidebar nav .omni-nav-children a[aria-current="page"],
+.omni-nav-children button[aria-current="page"] {
+  background: #e2ecc9;
+  color: #203b32;
+  font-weight: 700;
+  box-shadow: inset -3px 0 #a7c46e;
+}
+.omni-sidebar :is(a, button):focus-visible {
+  outline: 2px solid #deecb5;
+  outline-offset: 3px;
+}
+.workspace-feedback {
+  position: fixed;
+  inset-inline-end: 24px;
+  bottom: 24px;
+  z-index: 40;
+  max-width: min(420px, calc(100vw - 48px));
+  pointer-events: none;
+}
+.workspace-feedback:empty {
+  display: none;
+}
+.workspace-feedback > p {
+  margin: 0;
+  padding: 10px 16px;
+  border: 1px solid #dce2d5;
+  border-radius: 12px;
+  background: #fffef9;
+  box-shadow: 0 6px 24px #203b3214;
+}
+.workspace-list-loading {
+  min-height: 320px;
+  display: grid;
+  place-items: center;
+  color: #63735f;
+  background: linear-gradient(180deg, #f5f6f0, #fffef9);
+  border-radius: 12px;
+  font-size: 13px;
+}
+.staff-account-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(360px, 1.2fr);
+  align-items: start;
+  gap: 24px;
+  max-width: 1120px;
+}
+.staff-account-layout .omni-panel {
+  margin: 0;
+  padding: 30px;
+}
+.staff-account-profile {
+  background: linear-gradient(155deg, #edf2e1 0, #fffef9 55%);
+}
+.staff-account-avatar {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
+  background: #203b32;
+  color: #e2ecc9;
+  margin-bottom: 22px;
+}
+.staff-account-eyebrow {
+  font-size: 12px;
+  color: #63735f;
+}
+.staff-account-identity h2 {
+  font-size: 23px;
+  margin: 6px 0 12px;
+  overflow-wrap: anywhere;
+}
+.staff-account-details {
+  margin: 28px 0 20px;
+}
+.staff-account-details > div {
+  padding: 15px 0;
+  border-bottom: 1px solid #e0e5d9;
+}
+.staff-account-details dt {
+  color: #63735f;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+.staff-account-details dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.staff-account-details bdi {
+  user-select: all;
+}
+.staff-account-masked {
+  letter-spacing: 3px;
+  color: #728069;
+}
+.staff-account-note {
+  display: flex;
+  gap: 10px;
+  color: #63735f;
+  line-height: 1.9;
+}
+.staff-account-note svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.staff-account-section-heading {
+  display: flex;
+  align-items: start;
+  gap: 14px;
+  margin-bottom: 26px;
+}
+.staff-account-section-heading h2 {
+  margin: 0 0 6px;
+}
+.staff-account-section-heading p {
+  color: #63735f;
+  margin: 0;
+  line-height: 1.9;
+}
+.staff-account-security-icon {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border-radius: 14px;
+  background: #edf2e1;
+  color: #38583c;
+}
+.staff-password-field {
+  display: grid;
+  gap: 8px;
+}
+.staff-password-field > label {
+  font-weight: 600;
+}
+.staff-password-input {
+  position: relative;
+}
+.staff-password-input input {
+  width: 100%;
+  padding-right: 50px;
+  height: 48px;
+}
+.staff-password-input button {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #63735f;
+}
+.staff-password-input button:hover {
+  background: #edf2e1;
+}
+.staff-password-field small {
+  color: #63735f;
+  font-size: 11px;
+}
+.staff-account-session-note {
+  margin: 0;
+  padding: 14px 16px;
+  background: #f5f6f0;
+  border-radius: 10px;
+  color: #63735f;
+  line-height: 1.9;
+}
+.staff-account-feedback {
+  min-height: 48px;
+}
+.staff-account-feedback p {
+  margin: 0;
+  line-height: 1.9;
+}
+.staff-account-success {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  color: #315b3c;
+}
+.staff-account-success svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.staff-account-save {
+  justify-self: start;
+  min-width: 180px;
+}
+@media (max-width: 1100px) {
+  .staff-account-layout {
+    grid-template-columns: 1fr;
+  }
+  .staff-account-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 24px;
+  }
+}
+@media (max-width: 600px) {
+  .staff-account-layout .omni-panel {
+    padding: 22px;
+  }
+  .staff-account-details {
+    grid-template-columns: 1fr;
+  }
+  .staff-account-save {
+    width: 100%;
+  }
+}

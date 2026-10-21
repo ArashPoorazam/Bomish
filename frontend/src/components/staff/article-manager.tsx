@@ -9,6 +9,7 @@ import { ArticleEditor, newArticle } from "./article-editor";
 
 type EditorState = { dirty: boolean; busy: boolean };
 export function ArticleManager({
+  loading = false,
   initialQuery = "",
   articles,
   owner,
@@ -17,6 +18,7 @@ export function ArticleManager({
   onEditorStateChange,
   onEditingChange,
 }: {
+  loading?: boolean;
   initialQuery?: string;
   articles: Article[];
   owner: boolean;
@@ -195,7 +197,12 @@ export function ArticleManager({
                 </article>
               ))}
             </div>
-            {!visible.length && (
+            {loading && (
+              <div className="workspace-list-loading" role="status">
+                در حال دریافت اطلاعات…
+              </div>
+            )}
+            {!visible.length && !loading && (
               <div className="form-card product-empty">
                 <BookOpen size={36} />
                 <h3>

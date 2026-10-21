@@ -5,6 +5,7 @@ import { Header } from "./header";
 import { SupportButton } from "./requests/support-button";
 import { Footer } from "./footer";
 import { api } from "@/lib/api";
+import { WorkspaceNavigationProvider } from "./omnisire/navigation-state";
 export function WorkspaceFrame({ children }: { children: ReactNode }) {
   const path = usePathname();
   const admin = path.startsWith("/staff") || path.startsWith("/omnisire");
@@ -18,7 +19,9 @@ export function WorkspaceFrame({ children }: { children: ReactNode }) {
           <Header />
         </>
       )}
-      <main id="main">{children}</main>
+      <main id="main">
+        <WorkspaceNavigationProvider>{children}</WorkspaceNavigationProvider>
+      </main>
       {!admin && (
         <>
           <Footer />

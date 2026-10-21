@@ -4,14 +4,8 @@ import (
 	"bomish/internal/db"
 	"bomish/internal/domain"
 	"context"
-	"github.com/jackc/pgx/v5"
 	"net/http"
 )
-
-type querier interface {
-	Query(context.Context, string, ...any) (pgx.Rows, error)
-	QueryRow(context.Context, string, ...any) pgx.Row
-}
 
 func loadCart(ctx context.Context, q querier, s string) (domain.Cart, error) {
 	out := domain.Cart{Items: []domain.CartItem{}}

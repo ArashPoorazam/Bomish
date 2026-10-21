@@ -1,11 +1,7 @@
 package app
 
 import (
-	"context"
-	"encoding/json"
-	"github.com/jackc/pgx/v5"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -59,111 +55,18 @@ func (a *App) omnisireRoutes(m *http.ServeMux) {
 		m.HandleFunc(route, a.permit(h, section, action))
 	}
 	m.HandleFunc("GET /api/v1/omnisire/permission-options", a.permit(a.permissionOptions, "members"))
-	m.HandleFunc("GET /api/v1/staff/sales", a.permit(a.personalSales, "sales"))
-	m.HandleFunc("POST /api/v1/referral", a.captureReferral)
-	m.HandleFunc("GET /api/v1/staff/product-options", a.productOptions)
-	m.HandleFunc("GET /api/v1/staff/category-counts", a.permit(a.categoryCounts, "categories"))
 }
 
-type pageResult struct {
-	Items    []map[string]any `json:"items"`
-	Total    int64            `json:"total"`
-	Page     int              `json:"page"`
-	PageSize int              `json:"pageSize"`
-}
-
-func pageArgs(r *http.Request) (int, int) {
-	p, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	n, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
-	if p < 1 {
-		p = 1
-	}
-	if p > 1000000 {
-		p = 1000000
-	}
-	if n < 1 {
-		n = 25
-	}
-	if n > 100 {
-		n = 100
-	}
-	return p, n
-}
-func queryMaps(ctx context.Context, q querier, sql string, args ...any) ([]map[string]any, error) {
-	rows, e := q.Query(ctx, sql, args...)
-	if e != nil {
-		return nil, e
-	}
-	defer rows.Close()
-	out := []map[string]any{}
-	fields := rows.FieldDescriptions()
-	for rows.Next() {
-		vals, e := rows.Values()
-		if e != nil {
-			return nil, e
-		}
-		row := map[string]any{}
-		for i, f := range fields {
-			row[string(f.Name)] = vals[i]
-		}
-		out = append(out, row)
-	}
-	return out, rows.Err()
-}
-func (a *App) paged(w http.ResponseWriter, r *http.Request, sql string, args []any, sort string) {
-	p, n := pageArgs(r)
-	var total int64
-	if e := a.Pool.QueryRow(r.Context(), "SELECT count(*) FROM ("+sql+") report", args...).Scan(&total); e != nil {
-		a.dbError(w, e)
-		return
-	}
-	args = append(args, n, (p-1)*n)
-	items, e := queryMaps(r.Context(), a.Pool, sql+" ORDER BY "+sort+" LIMIT $"+strconv.Itoa(len(args)-1)+" OFFSET $"+strconv.Itoa(len(args)), args...)
+func (a *App) summary(w http.ResponseWriter, r *http.Request) {
+	from, to := reportDates(r)
+	out, e := queryMaps(r.Context(), a.Pool, `SELECT (SELECT coalesce(sum(subtotal_rials-discount_rials),0)::bigint FROM orders WHERE paid_at>=$1 AND paid_at<$2 AND status IN ('paid','packing','shipped','received')) AS revenue,(SELECT count(*) FROM orders WHERE paid_at>=$1 AND paid_at<$2 AND status IN ('paid','packing','shipped','received')) AS orders,(SELECT count(*) FROM staff WHERE active AND archived_at IS NULL) AS members,(SELECT coalesce(sum(balance),0)::bigint FROM (SELECT sum(amount_rials) balance FROM member_ledger GROUP BY staff_id HAVING sum(amount_rials)>0) b) AS payable`, from, to)
 	if e != nil {
 		a.dbError(w, e)
 		return
 	}
-	write(w, 200, pageResult{items, total, p, n})
+	write(w, 200, out[0])
 }
-func auditJSON(ctx context.Context, detail any) ([]byte, error) {
-	b, err := json.Marshal(detail)
-	if err != nil {
-		return nil, err
-	}
-	if requestID, ok := ctx.Value(requestIDKey{}).(string); ok {
-		var fields map[string]any
-		if json.Unmarshal(b, &fields) == nil && fields != nil {
-			fields["requestId"] = requestID
-			return json.Marshal(fields)
-		}
-	}
-	return b, nil
-}
-func auditDetail(ctx context.Context, tx pgx.Tx, actor, action, id string, detail any) error {
-	b, e := auditJSON(ctx, detail)
-	if e != nil {
-		return e
-	}
-	_, e = tx.Exec(ctx, "INSERT INTO audit_events(staff_id,action,entity_id,detail) VALUES(nullif($1,''),$2,$3,$4)", actor, action, id, b)
-	return e
-}
-func (a *App) logEvent(ctx context.Context, actor, action, id string, detail any) {
-	b, _ := auditJSON(ctx, detail)
-	_, _ = a.Pool.Exec(ctx, "INSERT INTO audit_events(staff_id,action,entity_id,detail) VALUES(nullif($1,''),$2,$3,$4)", actor, action, id, b)
-}
-func reportDates(r *http.Request) (time.Time, time.Time) {
-	zone, _ := time.LoadLocation("Asia/Tehran")
-	now := time.Now().In(zone)
-	end := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, zone)
-	start := end.AddDate(0, 0, -30)
-	if t, e := time.ParseInLocation("2006-01-02", r.URL.Query().Get("from"), zone); e == nil {
-		start = t
-	}
-	if t, e := time.ParseInLocation("2006-01-02", r.URL.Query().Get("to"), zone); e == nil {
-		end = t.AddDate(0, 0, 1)
-	}
-	return start, end
-}
+
 func (a *App) listEvents(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	from, to := reportDates(r)

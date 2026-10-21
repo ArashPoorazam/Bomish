@@ -137,6 +137,10 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("PUT /api/v1/staff/home/slides", a.permit(a.saveHomeSlides, "home"))
 	m.HandleFunc("GET /api/v1/staff/suggestions", a.permit(a.suggestions, "home"))
 	m.HandleFunc("PUT /api/v1/staff/suggestions", a.permit(a.saveSuggestions, "home"))
+	m.HandleFunc("GET /api/v1/staff/sales", a.permit(a.personalSales, "sales"))
+	m.HandleFunc("POST /api/v1/referral", a.captureReferral)
+	m.HandleFunc("GET /api/v1/staff/product-options", a.productOptions)
+	m.HandleFunc("GET /api/v1/staff/category-counts", a.permit(a.categoryCounts, "categories"))
 	a.omnisireRoutes(m)
 	return a.observe(a.middleware(m), m)
 }
@@ -243,7 +247,14 @@ func (a *App) cookie(w http.ResponseWriter, r *http.Request, value string) {
 }
 func (a *App) sessionInfo(w http.ResponseWriter, r *http.Request) {
 	s := current(r)
-	write(w, 200, map[string]any{"csrf": s.CSRF, "authenticated": s.UserID != "", "role": s.Role, "staffId": s.StaffID, "permissions": s.Permissions, "development": a.Dev, "omnisireVerified": s.Role == "owner" && s.OmnisireVerified, "catalogOnly": a.CatalogOnly})
+	var username, fullName string
+	if s.StaffID != "" {
+		if err := a.Pool.QueryRow(r.Context(), "SELECT username,full_name FROM staff WHERE id=$1", s.StaffID).Scan(&username, &fullName); err != nil {
+			a.dbError(w, err)
+			return
+		}
+	}
+	write(w, 200, map[string]any{"username": username, "fullName": fullName, "csrf": s.CSRF, "authenticated": s.UserID != "", "role": s.Role, "staffId": s.StaffID, "permissions": s.Permissions, "development": a.Dev, "omnisireVerified": s.Role == "owner" && s.OmnisireVerified, "catalogOnly": a.CatalogOnly})
 }
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	a.logEvent(r.Context(), current(r).StaffID, "auth.logout", current(r).StaffID, map[string]string{})

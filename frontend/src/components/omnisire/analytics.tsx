@@ -187,7 +187,7 @@ export function AnalyticsPage({
               تلاش دوباره نمودار
             </button>
           </div>
-        ) : chart.loading ? (
+        ) : chart.loading && !data ? (
           <div className="analytics-summary-skeleton" role="status">
             <span>در حال محاسبه گزارش…</span>
             <i />
@@ -299,7 +299,7 @@ export function AnalyticsPage({
               </div>
             )}
             {selectionNotice && <p role="status">{selectionNotice}</p>}
-            {chart.loading ? (
+            {chart.loading && !data ? (
               <div className="analytics-chart-loading" role="status">
                 در حال آماده‌سازی نمودار…
               </div>
@@ -323,7 +323,7 @@ export function AnalyticsPage({
               )
             )}
           </section>
-          {!isOverview && !filters.customer && !chart.loading && data && (
+          {!isOverview && !filters.customer && data && (
             <Ranking
               data={data}
               metric={metric}

@@ -101,3 +101,23 @@ func TestCustomerCancelAssignedCourier(t *testing.T) {
 		t.Fatalf("cancelled order prepared again: %d", code)
 	}
 }
+
+func TestStaffSessionAccountIdentity(t *testing.T) {
+	a := setup(t)
+	staff, id := testStaff(t, a, "editor", nil)
+	var account map[string]any
+	staff.ok(t, "GET", "/session?workspace=staff", nil, &account)
+	if account["username"] != id || account["fullName"] != "آزمایش" {
+		t.Fatalf("incorrect account identity: %v", account)
+	}
+	for _, key := range []string{"password", "passwordHash", "password_hash", "totpSecret"} {
+		if _, exists := account[key]; exists {
+			t.Fatalf("session exposed %s", key)
+		}
+	}
+	var customer map[string]any
+	staff.ok(t, "GET", "/session", nil, &customer)
+	if customer["username"] != "" || customer["fullName"] != "" {
+		t.Fatal("staff identity leaked into customer session")
+	}
+}

@@ -7804,6 +7804,8 @@ export interface components {
             staffId: string;
             omnisireVerified: boolean;
             catalogOnly: boolean;
+            username: string;
+            fullName: string;
         };
         Quote: {
             /** Format: int64 */

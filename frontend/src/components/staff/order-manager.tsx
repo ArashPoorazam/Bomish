@@ -7,6 +7,7 @@ import { deliveryStatuses, providerName } from "@/lib/shipping";
 import { StaffOrderStages, orderStamp } from "./order-stages";
 import { StaffOrderDetail } from "./order-detail";
 export function OrderManager({
+  loading = false,
   initialQuery = "",
   customerHistory = false,
   orders,
@@ -15,6 +16,7 @@ export function OrderManager({
   onStateChange,
   onDetailChange,
 }: {
+  loading?: boolean;
   initialQuery?: string;
   customerHistory?: boolean;
   orders: Order[];
@@ -222,7 +224,12 @@ export function OrderManager({
             </span>
           </button>
         ))}
-        {!visible.length && (
+        {loading && (
+          <div className="workspace-list-loading" role="status">
+            در حال دریافت اطلاعات…
+          </div>
+        )}
+        {!visible.length && !loading && (
           <div className="form-card empty-state">
             سفارشی با این جستجو و وضعیت پیدا نشد.
           </div>

@@ -23,6 +23,25 @@ import { StaffRequests } from "../requests/staff-requests";
 import { HomeManagement } from "./home-management";
 import { PermissionFields } from "./permissions";
 import { OrderManager } from "./order-manager";
+function sectionFilters(section: string, q = ""): Record<string, string> {
+  return {
+    ...(q ? { q } : {}),
+    ...(section === "orders" && !q ? { status: "active" } : {}),
+    ...(section === "articles" ? { sort: "newest" } : {}),
+    ...(section === "products" &&
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("shipping") === "missing"
+      ? { shippingIncomplete: "true" }
+      : {}),
+  };
+}
+const filterSignature = (filters: Record<string, string>) =>
+  JSON.stringify(
+    Object.entries(filters)
+      .filter(([, value]) => value !== "")
+      .sort(),
+  );
+
 export function Dashboard({
   initialSection = "",
   initialQuery = "",
@@ -34,7 +53,12 @@ export function Dashboard({
   const permissions = user?.permissions || [];
   const key = `${user?.role}:${permissions.join(",")}`;
   const can = (permission: string) => hasStaffPermission(user, permission);
+  const defaultSection =
+    Object.keys(sectionLabels).find((section) =>
+      can(sectionPermission(section)),
+    ) || "";
   const [tab, setTab] = useState(initialSection);
+  const pending = useRef(false);
   const requestVersion = useRef(0);
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -47,76 +71,88 @@ export function Dashboard({
   const [editor, setEditor] = useState({ dirty: false, busy: false });
   const [page, setPage] = useState(1),
     [listData, setListData] = useState<PageData | null>(null),
-    [filters, setFilters] = useState<Record<string, string>>({
-      q: initialQuery,
-    });
-  const filterKey = JSON.stringify(filters);
+    [filters, setFilters] = useState<Record<string, string>>(() =>
+      sectionFilters(initialSection, initialQuery),
+    );
+  const filterKey = filterSignature(filters);
   const onFilters = useCallback((next: Record<string, string>) => {
     setFilters((prev) =>
-      JSON.stringify(prev) === JSON.stringify(next) ? prev : next,
+      filterSignature(prev) === filterSignature(next) ? prev : next,
     );
     setPage(1);
   }, []);
   useEffect(() => {
     if (!user?.role) return;
-    if (!Object.hasOwn(sectionLabels, tab) || !can(sectionPermission(tab)))
-      setTab(
-        Object.keys(sectionLabels).find((key) => can(sectionPermission(key))) ||
-          "",
-      );
-  }, [key, tab]);
-  const reload = useCallback(async () => {
-    const request = ++requestVersion.current;
-    if (!user?.role || !tab || !can(sectionPermission(tab)) || tab === "sales")
-      return;
-    setBusy(true);
-    setError("");
-    try {
-      if (["categories", "pricing"].includes(tab)) {
-        const [p, c] = await Promise.all([
-          api<Product[]>("/staff/product-options"),
-          api<Category[]>("/categories"),
-        ]);
-        if (request !== requestVersion.current) return;
-        setProducts(p);
-        setCategories(c);
-      }
-      if (tab === "products") {
-        const categories = await api<Category[]>("/categories");
-        if (request !== requestVersion.current) return;
-        setCategories(categories);
-        const d = await api<PageData>(
-          "/staff/products?" +
-            new URLSearchParams({ ...filters, page: String(page) }),
-        );
-        if (request !== requestVersion.current) return;
-        setProducts(d.items as unknown as Product[]);
-        setListData(d);
-      }
-      if (tab === "articles") {
-        const d = await api<PageData>(
-          "/staff/articles?" +
-            new URLSearchParams({ ...filters, page: String(page) }),
-        );
-        if (request !== requestVersion.current) return;
-        setArticles(d.items as unknown as Article[]);
-        setListData(d);
-      }
-      if (tab === "orders") {
-        const d = await api<PageData>(
-          "/staff/orders?" +
-            new URLSearchParams({ ...filters, page: String(page) }),
-        );
-        if (request !== requestVersion.current) return;
-        setOrders(d.items as unknown as Order[]);
-        setListData(d);
-      }
-    } catch (e) {
-      if (request === requestVersion.current) setError((e as Error).message);
-    } finally {
-      if (request === requestVersion.current) setBusy(false);
+    if (!Object.hasOwn(sectionLabels, tab) || !can(sectionPermission(tab))) {
+      setTab(defaultSection);
+      setFilters(sectionFilters(defaultSection, initialQuery));
     }
-  }, [tab, key, page, filterKey]);
+  }, [key, tab, defaultSection, initialQuery]);
+  const reload = useCallback(
+    async (background = false) => {
+      const request = ++requestVersion.current;
+      if (
+        !user?.role ||
+        !tab ||
+        !can(sectionPermission(tab)) ||
+        tab === "sales"
+      )
+        return;
+      pending.current = true;
+      if (!background) setBusy(true);
+      setError("");
+      try {
+        if (["categories", "pricing"].includes(tab)) {
+          const [p, c] = await Promise.all([
+            api<Product[]>("/staff/product-options"),
+            api<Category[]>("/categories"),
+          ]);
+          if (request !== requestVersion.current) return;
+          setProducts(p);
+          setCategories(c);
+        }
+        if (tab === "products") {
+          const [categories, d] = await Promise.all([
+            api<Category[]>("/categories"),
+            api<PageData>(
+              "/staff/products?" +
+                new URLSearchParams({ ...filters, page: String(page) }),
+            ),
+          ]);
+          if (request !== requestVersion.current) return;
+          setCategories(categories);
+          setProducts(d.items as unknown as Product[]);
+          setListData(d);
+        }
+        if (tab === "articles") {
+          const d = await api<PageData>(
+            "/staff/articles?" +
+              new URLSearchParams({ ...filters, page: String(page) }),
+          );
+          if (request !== requestVersion.current) return;
+          setArticles(d.items as unknown as Article[]);
+          setListData(d);
+        }
+        if (tab === "orders") {
+          const d = await api<PageData>(
+            "/staff/orders?" +
+              new URLSearchParams({ ...filters, page: String(page) }),
+          );
+          if (request !== requestVersion.current) return;
+          setOrders(d.items as unknown as Order[]);
+          setListData(d);
+        }
+      } catch (e) {
+        if (request === requestVersion.current) setError((e as Error).message);
+      } finally {
+        if (request === requestVersion.current) {
+          pending.current = false;
+          setBusy(false);
+        }
+      }
+    },
+    [tab, key, page, filterKey],
+  );
   useEffect(() => {
     void reload();
     return () => {
@@ -126,7 +162,8 @@ export function Dashboard({
   useEffect(() => {
     if (tab !== "orders" || viewingOrder || editor.busy) return;
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void reload();
+      if (document.visibilityState === "visible" && !pending.current)
+        void reload(true);
     }, 10000);
     return () => clearInterval(timer);
   }, [tab, viewingOrder, editor.busy, reload]);
@@ -155,7 +192,9 @@ export function Dashboard({
       }
       activeSection={tab}
       navigationLocked={editor.busy}
+      navigationDirty={editor.dirty}
       onSectionChange={(p) => {
+        if (p === tab) return;
         if (
           editor.dirty &&
           !confirm("تغییرات ذخیره نشده‌اند. بدون ذخیره خارج می‌شوید؟")
@@ -165,7 +204,7 @@ export function Dashboard({
         setPage(1);
         setEditingArticle(false);
         setViewingOrder(false);
-        setFilters({});
+        setFilters(sectionFilters(p));
         setListData(null);
         setTab(p);
         window.history.replaceState(null, "", `/staff?section=${p}`);
@@ -174,6 +213,7 @@ export function Dashboard({
       <Feedback error={error} loading={busy} />
       {tab === "products" && (
         <CatalogManager
+          loading={!listData && !error}
           initialQuery={tab === initialSection ? initialQuery : ""}
           products={products}
           categories={categories}
@@ -186,6 +226,7 @@ export function Dashboard({
       )}
       {tab === "articles" && (
         <ArticleManager
+          loading={!listData && !error}
           initialQuery={tab === initialSection ? initialQuery : ""}
           onFilters={onFilters}
           articles={articles}
@@ -207,6 +248,7 @@ export function Dashboard({
       )}
       {tab === "orders" && (
         <OrderManager
+          loading={!listData && !error}
           initialQuery={tab === initialSection ? initialQuery : ""}
           onFilters={onFilters}
           orders={orders}
@@ -230,7 +272,7 @@ export function Dashboard({
         <div className="omni-welcome">
           <h2>فروش‌های شما، دستاورد شما</h2>
           <p>لینک اختصاصی، کمیسیون و پرداخت‌های خود را در یک‌جا ببینید.</p>
-          <Link className="button" href="/staff/sales">
+          <Link scroll={false} className="button" href="/staff/sales">
             مشاهده فروش من
           </Link>
         </div>

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useNavigationState } from "./navigation-state";
 import Link from "next/link";
 import { hasStaffPermission } from "@/lib/staff-permissions";
 import { fa } from "@/lib/format";
@@ -63,6 +64,7 @@ export function WorkspaceNavigation({
   activeSection,
   onSectionChange,
   locked,
+  beforeNavigate,
   onNavigate,
   counts,
 }: {
@@ -72,11 +74,13 @@ export function WorkspaceNavigation({
   activeSection?: string;
   onSectionChange?: (s: string) => void;
   locked: boolean;
+  beforeNavigate: () => boolean;
   onNavigate: () => void;
   counts: NotificationCounts | null;
 }) {
   const path = usePathname();
-  const [closed, setClosed] = useState<Record<string, boolean>>({});
+  const navigation = useNavigationState(owner);
+  const [closed, setClosed] = useState(navigation.closed);
   const can = (key: string) => hasStaffPermission({ role, permissions }, key);
   const management = managementLinks
     .filter(
@@ -88,8 +92,18 @@ export function WorkspaceNavigation({
         ? { ...item, href: "/staff/shipping" }
         : item,
     );
+  const account = {
+    id: "account",
+    href: owner ? "/omnisire/account" : "/staff/account",
+    label: "حساب کاربری",
+    Icon: UserRound,
+    children: [
+      ...(!owner && can("sales") ? [["sales", "فروش من"]] : []),
+      ["profile", "اطلاعات حساب"],
+    ],
+  };
   const groups = owner
-    ? management
+    ? [...management, account]
     : [
         {
           id: "store",
@@ -113,16 +127,7 @@ export function WorkspaceNavigation({
               can(sectionPermission(key)),
           ),
         },
-        {
-          id: "account",
-          href: "/staff/account",
-          label: "حساب کاربری",
-          Icon: UserRound,
-          children: [
-            ...(can("sales") ? [["sales", "فروش من"]] : []),
-            ["password", "تغییر گذرواژه"],
-          ],
-        },
+        account,
         ...management,
       ];
   const badge = (key: string) => {
@@ -145,7 +150,11 @@ export function WorkspaceNavigation({
                   className="omni-nav-parent"
                   aria-expanded={!closed[id]}
                   aria-controls={`nav-${id}`}
-                  onClick={() => setClosed({ ...closed, [id]: !closed[id] })}
+                  onClick={() => {
+                    const next = { ...closed, [id]: !closed[id] };
+                    navigation.closed = next;
+                    setClosed(next);
+                  }}
                 >
                   <Icon size={20} />
                   {label}
@@ -162,7 +171,7 @@ export function WorkspaceNavigation({
                   hidden={!!closed[id]}
                 >
                   {children.map(([key, text]) =>
-                    onSectionChange && path === href ? (
+                    id !== "account" && onSectionChange && path === href ? (
                       <button
                         key={key}
                         disabled={locked}
@@ -179,27 +188,30 @@ export function WorkspaceNavigation({
                       </button>
                     ) : (
                       <Link
+                        scroll={false}
                         key={key}
                         href={
                           id === "account"
                             ? key === "sales"
                               ? "/staff/sales"
-                              : "/staff/account"
+                              : href
                             : `${href}?section=${key}`
                         }
                         aria-current={
                           (
                             id === "account"
                               ? path ===
-                                (key === "sales"
-                                  ? "/staff/sales"
-                                  : "/staff/account")
+                                (key === "sales" ? "/staff/sales" : href)
                               : activeSection === key
                           )
                             ? "page"
                             : undefined
                         }
-                        onClick={onNavigate}
+                        onNavigate={(event) => {
+                          if (locked || !beforeNavigate())
+                            event.preventDefault();
+                          else onNavigate();
+                        }}
                       >
                         {text}
                         {badge(key)}
@@ -210,9 +222,18 @@ export function WorkspaceNavigation({
               </>
             ) : (
               <Link
+                scroll={false}
                 href={href}
-                aria-current={path === href ? "page" : undefined}
-                onClick={onNavigate}
+                aria-current={
+                  path === href ||
+                  (href !== "/omnisire" && path.startsWith(`${href}/`))
+                    ? "page"
+                    : undefined
+                }
+                onNavigate={(event) => {
+                  if (locked || !beforeNavigate()) event.preventDefault();
+                  else onNavigate();
+                }}
               >
                 <Icon size={20} />
                 {label}

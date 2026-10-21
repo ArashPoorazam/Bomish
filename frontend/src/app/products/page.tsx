@@ -26,6 +26,7 @@ export default async function Products({
   ])
     if (q[name]) params.set(name, q[name]!);
   params.set("page", q.page || "1");
+  params.set("pageSize", "20");
   const [all, categories] = await Promise.all([
     serverApi<{
       items: Product[];

@@ -9,16 +9,6 @@ import (
 	"time"
 )
 
-// List responses are bounded; explicit pagination returns an envelope.
-func listResponse(w http.ResponseWriter, r *http.Request, items any, total int64) {
-	p, n := pageArgs(r)
-	if r.URL.Query().Has("page") {
-		write(w, 200, map[string]any{"items": items, "total": total, "page": p, "pageSize": n})
-	} else {
-		w.Header().Set("X-Total-Count", strconv.FormatInt(total, 10))
-		write(w, 200, items)
-	}
-}
 func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 	q := r.URL.Query()
 	page, size := pageArgs(r)
@@ -133,16 +123,6 @@ func (a *App) productOptions(w http.ResponseWriter, r *http.Request) {
 	}
 	a.catalogPage(w, r, can(r, "products") || can(r, "pricing"))
 }
-func (a *App) summary(w http.ResponseWriter, r *http.Request) {
-	from, to := reportDates(r)
-	out, e := queryMaps(r.Context(), a.Pool, `SELECT (SELECT coalesce(sum(subtotal_rials-discount_rials),0)::bigint FROM orders WHERE paid_at>=$1 AND paid_at<$2 AND status IN ('paid','packing','shipped','received')) AS revenue,(SELECT count(*) FROM orders WHERE paid_at>=$1 AND paid_at<$2 AND status IN ('paid','packing','shipped','received')) AS orders,(SELECT count(*) FROM staff WHERE active AND archived_at IS NULL) AS members,(SELECT coalesce(sum(balance),0)::bigint FROM (SELECT sum(amount_rials) balance FROM member_ledger GROUP BY staff_id HAVING sum(amount_rials)>0) b) AS payable`, from, to)
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	write(w, 200, out[0])
-}
-
 func (a *App) categoryCounts(w http.ResponseWriter, r *http.Request) {
 	rows, e := queryMaps(r.Context(), a.Pool, `SELECT c.id,count(DISTINCT p.id) AS count FROM categories c LEFT JOIN products p ON p.category_id=c.id OR EXISTS(SELECT 1 FROM product_drafts d WHERE d.product_id=p.id AND d.content->>'categoryId'=c.id) GROUP BY c.id`)
 	if e != nil {

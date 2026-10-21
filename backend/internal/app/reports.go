@@ -157,3 +157,17 @@ func (a *App) reportSeries(w http.ResponseWriter, r *http.Request) {
 	}
 	write(w, 200, map[string]any{"items": items, "combined": combined, "count": count, "metric": metric})
 }
+
+func reportDates(r *http.Request) (time.Time, time.Time) {
+	zone, _ := time.LoadLocation("Asia/Tehran")
+	now := time.Now().In(zone)
+	end := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, zone)
+	start := end.AddDate(0, 0, -30)
+	if t, e := time.ParseInLocation("2006-01-02", r.URL.Query().Get("from"), zone); e == nil {
+		start = t
+	}
+	if t, e := time.ParseInLocation("2006-01-02", r.URL.Query().Get("to"), zone); e == nil {
+		end = t.AddDate(0, 0, 1)
+	}
+	return start, end
+}

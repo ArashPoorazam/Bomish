@@ -7677,6 +7677,12 @@
           },
           "catalogOnly": {
             "type": "boolean"
+          },
+          "username": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
           }
         },
         "required": [
@@ -7687,7 +7693,9 @@
           "permissions",
           "staffId",
           "omnisireVerified",
-          "catalogOnly"
+          "catalogOnly",
+          "username",
+          "fullName"
         ],
         "additionalProperties": false
       },

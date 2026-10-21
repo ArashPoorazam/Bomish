@@ -1,5 +1,12 @@
 "use client";
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type ReactNode,
+} from "react";
+import { useNavigationState } from "./navigation-state";
 import Link from "next/link";
 import { hasStaffPermission } from "@/lib/staff-permissions";
 import { usePathname } from "next/navigation";
@@ -49,31 +56,49 @@ export function useLoad<T>(url: string | null, revision = 0) {
     !!user?.role &&
     (!url?.startsWith("/omnisire/") ||
       (user.role === "owner" && user.omnisireVerified));
-  const key = `${identity}:${revision}:${url}`;
+  const resource = `${identity}:${url}`;
+  const key = `${resource}:${revision}`;
   const [state, setState] = useState<{
     key: string;
+    resource: string;
     data: T | null;
     error: string;
     loading: boolean;
-  }>({ key: "", data: null, error: "", loading: true });
+  }>({ key: "", resource: "", data: null, error: "", loading: true });
   useEffect(() => {
     const controller = new AbortController();
     if (!allowed || !url) return;
-    setState({ key, data: null, error: "", loading: true });
+    setState((previous) => ({
+      key,
+      resource,
+      data: previous.resource === resource ? previous.data : null,
+      error: "",
+      loading: true,
+    }));
     api<T>(url, "GET", undefined, controller.signal)
       .then((data) => {
         if (!controller.signal.aborted)
-          setState({ key, data, error: "", loading: false });
+          setState({ key, resource, data, error: "", loading: false });
       })
       .catch((e) => {
         if (!controller.signal.aborted)
-          setState({ key, data: null, error: e.message, loading: false });
+          setState((previous) => ({
+            ...previous,
+            key,
+            resource,
+            error: e.message,
+            loading: false,
+          }));
       });
     return () => controller.abort();
-  }, [url, revision, identity, key, allowed]);
+  }, [url, revision, identity, key, resource, allowed]);
   if (!url) return { data: null, error: "", loading: false };
   if (state.key !== key || !allowed)
-    return { data: null, error: "", loading: !user || !!user.role };
+    return {
+      data: allowed && state.resource === resource ? state.data : null,
+      error: "",
+      loading: !user || !!user.role,
+    };
   return state;
 }
 export function Workspace({
@@ -83,6 +108,7 @@ export function Workspace({
   activeSection,
   onSectionChange,
   navigationLocked = false,
+  navigationDirty = false,
   actions,
   titleDetail,
   description,
@@ -93,6 +119,7 @@ export function Workspace({
   activeSection?: string;
   onSectionChange?: (section: string) => void;
   navigationLocked?: boolean;
+  navigationDirty?: boolean;
   actions?: ReactNode;
   titleDetail?: ReactNode;
   description?: string;
@@ -100,22 +127,29 @@ export function Workspace({
   const { user, refresh, sessionError } = useStore();
   const path = usePathname();
   const requiredPermission = owner
-    ? path.split("/")[2] || "overview"
+    ? path === "/omnisire/account"
+      ? null
+      : path.split("/")[2] || "overview"
     : activeSection
       ? sectionPermission(activeSection)
       : null;
   const requests = activeSection === "support" || activeSection === "custom";
   const notifications = useRequestNotifications();
   const [open, setOpen] = useState(false);
+  const navigation = useNavigationState(owner);
+  const sidebar = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    if (sidebar.current) sidebar.current.scrollTop = navigation.scrollTop;
+  }, [navigation, user?.role, user?.omnisireVerified]);
   const menuButton = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
-    closeButton.current?.focus();
+    closeButton.current?.focus({ preventScroll: true });
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
-        menuButton.current?.focus();
+        menuButton.current?.focus({ preventScroll: true });
       }
     };
     window.addEventListener("keydown", escape);
@@ -168,6 +202,10 @@ export function Workspace({
       className={`omni-shell ${activeSection === "support" || activeSection === "custom" ? "omni-requests" : ""}`}
     >
       <aside
+        ref={sidebar}
+        onScroll={(event) => {
+          navigation.scrollTop = event.currentTarget.scrollTop;
+        }}
         id="workspace-navigation"
         className={`omni-sidebar ${open ? "is-open" : ""}`}
       >
@@ -177,12 +215,16 @@ export function Workspace({
           aria-label="بستن فهرست"
           onClick={() => {
             setOpen(false);
-            menuButton.current?.focus();
+            menuButton.current?.focus({ preventScroll: true });
           }}
         >
           <X />
         </button>
-        <Link href={owner ? "/omnisire" : "/staff"} className="omni-brand">
+        <Link
+          scroll={false}
+          href={owner ? "/omnisire" : "/staff"}
+          className="omni-brand"
+        >
           <span className="omni-mark">O</span>
           <span>{owner ? "Omnisire" : "Staff Interface"}</span>
         </Link>
@@ -193,7 +235,14 @@ export function Workspace({
           activeSection={activeSection}
           onSectionChange={onSectionChange}
           locked={navigationLocked}
-          onNavigate={() => setOpen(false)}
+          beforeNavigate={() =>
+            !navigationDirty ||
+            window.confirm("تغییرات ذخیره نشده‌اند. بدون ذخیره خارج می‌شوید؟")
+          }
+          onNavigate={() => {
+            setOpen(false);
+            if (open) menuButton.current?.focus({ preventScroll: true });
+          }}
           counts={notifications.data}
         />
         <div className="omni-side-bottom">
@@ -204,7 +253,7 @@ export function Workspace({
             <small role="status">دریافت اعلان‌ها موقتاً انجام نشد.</small>
           )}
           {owner && (
-            <Link href="/staff">
+            <Link scroll={false} href="/staff">
               Staff Interface <ArrowUpLeft size={18} />
             </Link>
           )}
@@ -275,7 +324,7 @@ export function Feedback({
   loading?: boolean;
 }) {
   return (
-    <>
+    <div className="workspace-feedback">
       {error && (
         <p className="error" role="alert">
           {error}
@@ -286,7 +335,7 @@ export function Feedback({
           در حال دریافت اطلاعات…
         </p>
       )}
-    </>
+    </div>
   );
 }
 export function Stats({

@@ -9,6 +9,7 @@ import { ProductEditor, newProduct } from "./product-editor";
 import { RichText } from "@/components/rich-text";
 import { api } from "@/lib/api";
 export function CatalogManager({
+  loading = false,
   initialQuery = "",
   products,
   categories,
@@ -18,6 +19,7 @@ export function CatalogManager({
   reload,
   onEditorStateChange,
 }: {
+  loading?: boolean;
   initialQuery?: string;
   products: Product[];
   categories: Category[];
@@ -275,7 +277,12 @@ export function CatalogManager({
                 </tbody>
               </table>
             </div>
-            {!visible.length && (
+            {loading && (
+              <div className="workspace-list-loading" role="status">
+                در حال دریافت اطلاعات…
+              </div>
+            )}
+            {!visible.length && !loading && (
               <div className="empty-state">محصولی با این فیلترها پیدا نشد.</div>
             )}
           </div>
