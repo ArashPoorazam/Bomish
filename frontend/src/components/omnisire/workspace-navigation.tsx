@@ -20,6 +20,7 @@ import type { NotificationCounts } from "../requests/notifications";
 export const sectionLabels: Record<string, string> = {
   products: "محصولات",
   articles: "مجله",
+  packaging: "بسته‌بندی‌ها",
   categories: "دسته‌بندی‌ها",
   pricing: "قیمت و تخفیف",
   orders: "سفارش‌ها",
@@ -98,8 +99,8 @@ export function WorkspaceNavigation({
     label: "حساب کاربری",
     Icon: UserRound,
     children: [
-      ...(!owner && can("sales") ? [["sales", "فروش من"]] : []),
       ["profile", "اطلاعات حساب"],
+      ...(!owner && can("sales") ? [["sales", "فروش من"]] : []),
     ],
   };
   const groups = owner

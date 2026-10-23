@@ -68,6 +68,18 @@ The suggestion editor has separate saved-selection and product-search retry acti
 
 Migration `010_notification_event_indexes.sql` adds indexed newest-event lookups for messages, custom requests, and orders. Migration `009_requests_and_suggestions.sql` adds the persisted conversations, messages, read markers, suggestions, restock timestamps, and supporting indexes. Development applies migrations at startup; production checks the schema and requires an explicit migration job. Legacy staff browser sessions need one staff sign-in after switching to the separate cookie. These changes retain the existing development-only payment/provider restrictions.
 
+## Reusable product packaging
+
+Staff with packaging permissions manage reusable containers under **مدیریت فروشگاه → بسته‌بندی‌ها**. Packaging has independently assignable view, create, and edit permissions; product access still allows reading the catalog to select existing containers. Each definition stores its name, empty weight in grams, outer length/width/height in millimetres (edited as centimetres), and volume in cubic centimetres. Volume can be entered or calculated from the outer dimensions; packing and carrier volumetric limits continue to use the outer dimensions.
+
+Migration 023 only creates `product_packaging`; it does not rewrite existing products, drafts, carts, quotes, or orders. A selling variant can optionally select `packagingId`. Variants without a selection retain their existing manually measured shipping weight and dimensions, including the existing rules for incomplete drafts.
+
+On product save the server resolves the selected definition, ignores client-supplied packaging snapshots, and stores a snapshot with the draft. For `g`/`kg` variants, net weight comes from the amount; for `ml`/`l` variants, staff must enter `netGrams` explicitly. `shippingGrams = netGrams + packaging.emptyGrams`. Each purchased unit contributes this gross weight once; postal cartons are added separately by the packing engine. Product creation/edit permissions also govern packaging creation/editing.
+
+Editing a packaging definition immediately updates every linked variant in products and product drafts in the same transaction, including published products. Product-specific net weights, prices, text, availability, and publication states are preserved. If a linked variant would exceed the shipping-weight limit, the entire edit rolls back. A shared/exclusive transaction lock coordinates packaging edits with product saves and publication. The catalog shows distinct linked-product counts and the editor explains the effect before saving.
+
+Existing orders and shipping snapshots retain their original measurements. Unconsumed quotes become stale when their current published product measurements change and must be recalculated through the existing quote-binding check. Product save responses include the resolved product so the editor shows authoritative measurements. In production, apply migration 023 with the normal migration command before starting the updated backend, then deploy the frontend. No manual reassignment or backfill is required.
+
 ## Calculated shipping
 
 Migration 012 is additive. Migration 019 removes the mode selector; all new checkout uses calculated shipping with providers initially disabled; saved revisions are audited and archived. Package `lengthMm`, `widthMm`, `heightMm`, `shippingGrams` and `shippingVerified` describe outer, wrapped merchandise. `Package.Weight()` and order-item `grams` retain their original merchandise semantics. Published completeness is computed separately from drafts. Incomplete drafts remain editable; calculated publication and quoting require complete measurements.

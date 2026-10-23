@@ -24,7 +24,7 @@ func TestPermissionOverrides(t *testing.T) {
 		t.Fatal("anonymous grant", got)
 	}
 	got := effectivePermissions("manager", []string{"requests", "products"})
-	for _, key := range []string{"support", "custom", "home", "products", "products.edit"} {
+	for _, key := range []string{"support", "custom", "home", "products", "products.edit", "packaging", "packaging.edit"} {
 		if slices.Contains(got, key) {
 			t.Fatal("legacy restriction bypass", key)
 		}
@@ -64,7 +64,7 @@ func TestPermissionActionEnforcement(t *testing.T) {
 func TestMemberPermissionOverridesIntegration(t *testing.T) {
 	a := setup(t)
 	owner := couponOwner(t, a)
-	body := map[string]any{"fullName": "آزمایش دسترسی", "username": "override-user", "phone": "09123456789", "bankCard": "5022291002696175", "role": "salesperson", "active": true, "password": "test-password-123", "restrictions": []string{}, "permissionOverrides": map[string]bool{"products": true, "products.create": true, "pricing": true, "pricing.edit": true, "sales": false, "support": true, "home": true, "categories": true, "categories.create": true}}
+	body := map[string]any{"fullName": "آزمایش دسترسی", "username": "override-user", "phone": "09123456789", "bankCard": "5022291002696175", "role": "salesperson", "active": true, "password": "test-password-123", "restrictions": []string{}, "permissionOverrides": map[string]bool{"products": true, "products.create": true, "pricing": true, "pricing.edit": true, "sales": false, "support": true, "home": true, "categories": true, "categories.create": true, "packaging": true, "packaging.create": true, "packaging.edit": false}}
 	var created map[string]string
 	owner.ok(t, "POST", "/omnisire/members", body, &created)
 	attach := func() *client {
@@ -76,7 +76,7 @@ func TestMemberPermissionOverridesIntegration(t *testing.T) {
 		return c
 	}
 	c := attach()
-	for _, path := range []string{"/staff/products", "/staff/requests?kind=support", "/staff/home/slides"} {
+	for _, path := range []string{"/staff/products", "/staff/requests?kind=support", "/staff/home/slides", "/staff/product-packaging"} {
 		c.ok(t, "GET", path, nil, nil)
 	}
 	for _, path := range []string{"/staff/sales", "/staff/requests?kind=custom", "/omnisire/members"} {
@@ -143,7 +143,7 @@ func TestMemberPermissionOverridesIntegration(t *testing.T) {
 		Overrides map[string]bool `json:"permissionOverrides"`
 	}
 	owner.ok(t, "GET", "/omnisire/members/"+created["id"], nil, &member)
-	if member.Overrides["products"] != true || member.Overrides["sales"] != false || len(member.Overrides) == 0 {
+	if member.Overrides["products"] != true || member.Overrides["sales"] != false || !member.Overrides["packaging"] || !member.Overrides["packaging.create"] || member.Overrides["packaging.edit"] || len(member.Overrides) == 0 {
 		t.Fatal("overrides lost", member)
 	}
 	c = attach()
@@ -207,7 +207,7 @@ func TestPermissionOptionsMatchAssignableSections(t *testing.T) {
 		Sections []permissionSection `json:"sections"`
 	}
 	owner.ok(t, "GET", "/omnisire/permission-options", nil, &options)
-	if len(options.Sections) != 10 {
+	if len(options.Sections) != 11 {
 		t.Fatalf("unexpected assignable sections: %v", options.Sections)
 	}
 	for _, section := range options.Sections {

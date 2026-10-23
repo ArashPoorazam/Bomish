@@ -30,7 +30,7 @@ func effectivePermissions(role string, restrictions []string, overrides ...map[s
 		if legacy == "support" || legacy == "custom" {
 			legacy = "requests"
 		}
-		if legacy == "home" {
+		if legacy == "home" || legacy == "packaging" {
 			legacy = "products"
 		}
 		restricted := slices.Contains(restrictions, legacy)

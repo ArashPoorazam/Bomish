@@ -12,6 +12,7 @@ type permissionSection struct {
 var permissionSections = []permissionSection{
 	{"products", "محصولات", []string{"create", "edit", "delete"}, false},
 	{"articles", "مجله", []string{"create", "edit", "delete"}, false},
+	{"packaging", "بسته‌بندی‌ها", []string{"create", "edit"}, false},
 	{"categories", "دسته‌بندی‌ها", []string{"create", "edit", "delete"}, false},
 	{"pricing", "قیمت و تخفیف", []string{"create", "edit", "delete"}, false},
 	{"orders", "سفارش‌ها", []string{"edit", "manage"}, false},
@@ -27,8 +28,8 @@ var permissionSections = []permissionSection{
 }
 
 var roleSections = map[string][]string{
-	"manager":     {"products", "articles", "categories", "pricing", "orders", "support", "custom", "home", "shipping", "sales"},
-	"editor":      {"products", "articles", "categories", "pricing", "home", "sales"},
+	"manager":     {"products", "articles", "packaging", "categories", "pricing", "orders", "support", "custom", "home", "shipping", "sales"},
+	"editor":      {"products", "articles", "packaging", "categories", "pricing", "home", "sales"},
 	"operator":    {"orders", "support", "custom", "sales"},
 	"salesperson": {"sales"},
 	"courier":     {"sales"},

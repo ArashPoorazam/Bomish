@@ -11,6 +11,75 @@
     }
   ],
   "paths": {
+    "/staff/product-packaging": {
+      "get": {
+        "summary": "List reusable product packaging (packaging or products permission)",
+        "responses": {
+          "200": {
+            "description": "Packaging catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductPackaging"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed"
+          }
+        }
+      }
+    },
+    "/staff/product-packaging/{id}": {
+      "put": {
+        "summary": "Create or edit packaging (packaging.create or packaging.edit permission); atomically refresh all linked product variants and drafts",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductPackaging"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved packaging",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductPackaging"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid packaging measurements"
+          },
+          "422": {
+            "description": "A linked product would have invalid shipping measurements; no changes applied"
+          },
+          "403": {
+            "description": "Not allowed"
+          }
+        }
+      }
+    },
     "/session": {
       "get": {
         "responses": {
@@ -1521,7 +1590,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OK"
+                  "type": "object",
+                  "required": ["ok", "product"],
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "product": { "$ref": "#/components/schemas/Product" }
+                  }
                 }
               }
             }
@@ -8009,9 +8083,78 @@
         ],
         "additionalProperties": false
       },
+      "ProductPackaging": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "emptyGrams",
+          "lengthMm",
+          "widthMm",
+          "heightMm",
+          "volumeCm3"
+        ],
+        "properties": {
+          "usedByProducts": {
+            "type": "integer",
+            "readOnly": true,
+            "description": "Distinct linked products, including drafts.",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "emptyGrams": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "lengthMm": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3000
+          },
+          "widthMm": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3000
+          },
+          "heightMm": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3000
+          },
+          "volumeCm3": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 27000000
+          }
+        }
+      },
       "Package": {
         "type": "object",
         "properties": {
+          "packagingId": {
+            "type": "string",
+            "description": "Optional reusable packaging ID. Empty for legacy/manual shipping measurements."
+          },
+          "packaging": {
+            "$ref": "#/components/schemas/ProductPackaging",
+            "description": "Server-resolved packaging measurements refreshed when either product or packaging is saved."
+          },
+          "netGrams": {
+            "type": "integer",
+            "description": "Net contents weight, required for ml/l when packaging is selected. Derived from amount for g/kg.",
+            "minimum": 0,
+            "maximum": 1000000
+          },
           "id": {
             "type": "string"
           },

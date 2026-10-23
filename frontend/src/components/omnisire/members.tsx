@@ -49,7 +49,7 @@ function memberOverrides(member?: Member): Record<string, boolean> {
       key === "requests"
         ? ["support", "custom"]
         : key === "products"
-          ? ["products", "home"]
+          ? ["products", "home", "packaging"]
           : [key];
     for (const section of sections) overrides[section] = false;
   }

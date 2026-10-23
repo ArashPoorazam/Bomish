@@ -23,6 +23,7 @@ import { StaffRequests } from "../requests/staff-requests";
 import { HomeManagement } from "./home-management";
 import { PermissionFields } from "./permissions";
 import { OrderManager } from "./order-manager";
+import { PackagingManager } from "./packaging-manager";
 function sectionFilters(section: string, q = ""): Record<string, string> {
   return {
     ...(q ? { q } : {}),
@@ -239,6 +240,7 @@ export function Dashboard({
       {tab === "categories" && (
         <CategoryManager categories={categories} reload={reload} />
       )}
+      {tab === "packaging" && <PackagingManager onStateChange={setEditor} />}
       {tab === "pricing" && (
         <PriceManager
           products={products}

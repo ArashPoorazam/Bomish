@@ -123,6 +123,8 @@ npm run test:e2e
 
 Browser tests require both local servers and development fixtures. To use an installed Chromium: `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`. Browser tests create demo orders and a demo product; run them against a disposable development database.
 
+The live packaging workflow is opt-in: `PACKAGING_ACCEPTANCE=true CHROMIUM_PATH=/usr/bin/chromium npx playwright test product-packaging-live.spec.ts` (from `frontend`, against a disposable seeded server). It creates packaging and a product, then verifies that editing the packaging immediately updates the linked product. `product-editor.spec.ts` covers the editor, search/filter controls, keyboard interaction, and error recovery with mocked API responses.
+
 Regenerate database access after changing queries: `cd backend && sqlc generate`. Regenerate the frontend contract after editing `api/openapi.json`: `cd frontend && npm run api:generate`.
 
 ## Store management

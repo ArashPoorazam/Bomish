@@ -163,24 +163,32 @@ export function ProductEditor({
     setBusy(publish ? "publish" : "draft");
     setError("");
     let draftSaved = false;
+    let savedProduct = editorProduct;
     try {
-      await api("/staff/products/" + p.id, "PUT", {
-        ...p,
-        confirmMeasurements: packagesReviewed
-          ? p.packages
-              .filter(
-                (pack) =>
-                  measurementIssues({ ...pack, shippingVerified: true })
-                    .length === 0,
-              )
-              .map((pack) => pack.id)
-          : [],
-      });
+      const result = await api<{ product?: Product }>(
+        "/staff/products/" + p.id,
+        "PUT",
+        {
+          ...p,
+          confirmMeasurements: packagesReviewed
+            ? p.packages
+                .filter(
+                  (pack) =>
+                    measurementIssues({ ...pack, shippingVerified: true })
+                      .length === 0,
+                )
+                .map((pack) => pack.id)
+            : [],
+        },
+      );
+      savedProduct = result.product
+        ? normalizeProduct(result.product)
+        : editorProduct;
       draftSaved = true;
-      setSaved(JSON.stringify(p));
+      setSaved(JSON.stringify(savedProduct));
       if (publish) await api("/staff/products/" + p.id + "/publish", "POST");
       const next = {
-        ...editorProduct,
+        ...savedProduct,
         status: publish ? "published" : "draft",
       } as Product;
       setP(next);
@@ -205,7 +213,7 @@ export function ProductEditor({
       }
     } catch (e) {
       if (draftSaved) {
-        const next = { ...p, status: "draft" } as Product;
+        const next = { ...savedProduct, status: "draft" } as Product;
         setP(next);
         setSaved(JSON.stringify(next));
       }

@@ -77,6 +77,15 @@ export function productIssues(p: Product, publish: boolean) {
     });
   p.packages.forEach((pack, i) => {
     if (
+      pack.packagingId &&
+      (!pack.netGrams || pack.netGrams < 1 || !Number.isInteger(pack.netGrams))
+    ) {
+      issues.push({
+        step: "packages",
+        text: `وزن خالص محصول را برای بسته ${i + 1} وارد کنید.`,
+      });
+    }
+    if (
       pack.amount <= 0 ||
       pack.amount > 1000000 ||
       (packageWeight(pack) < 1 &&

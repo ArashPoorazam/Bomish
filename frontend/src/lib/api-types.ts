@@ -4,6 +4,112 @@
  */
 
 export interface paths {
+    "/staff/product-packaging": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List reusable product packaging (packaging or products permission) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Packaging catalog */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProductPackaging"][];
+                    };
+                };
+                /** @description Not allowed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/product-packaging/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Create or edit packaging (packaging.create or packaging.edit permission); atomically refresh all linked product variants and drafts */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ProductPackaging"];
+                };
+            };
+            responses: {
+                /** @description Saved packaging */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProductPackaging"];
+                    };
+                };
+                /** @description Invalid packaging measurements */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not allowed */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description A linked product would have invalid shipping measurements; no changes applied */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/session": {
         parameters: {
             query?: never;
@@ -1734,7 +1840,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["OK"];
+                        "application/json": {
+                            ok: boolean;
+                            product: components["schemas"]["Product"];
+                        };
                     };
                 };
                 /** @description Invalid input */
@@ -7894,7 +8003,24 @@ export interface components {
         OK: {
             ok: boolean;
         };
+        ProductPackaging: {
+            /** @description Distinct linked products, including drafts. */
+            readonly usedByProducts?: number;
+            id: string;
+            name: string;
+            emptyGrams: number;
+            lengthMm: number;
+            widthMm: number;
+            heightMm: number;
+            volumeCm3: number;
+        };
         Package: {
+            /** @description Optional reusable packaging ID. Empty for legacy/manual shipping measurements. */
+            packagingId?: string;
+            /** @description Server-resolved packaging measurements refreshed when either product or packaging is saved. */
+            packaging?: components["schemas"]["ProductPackaging"];
+            /** @description Net contents weight, required for ml/l when packaging is selected. Derived from amount for g/kg. */
+            netGrams?: number;
             id: string;
             amount: number;
             /** @enum {string} */

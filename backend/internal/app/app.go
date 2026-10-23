@@ -115,6 +115,8 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("POST /api/v1/orders/{id}/cancel", a.cancelOrder)
 	m.HandleFunc("POST /api/v1/orders/{id}/simulate", a.simulatePayment)
 	m.HandleFunc("GET /api/v1/staff/products", a.permit(a.staffProducts, "products"))
+	m.HandleFunc("GET /api/v1/staff/product-packaging", a.permitAny(a.productPackaging, "packaging", "products"))
+	m.HandleFunc("PUT /api/v1/staff/product-packaging/{id}", a.permitAny(a.saveProductPackaging, "packaging.create", "packaging.edit"))
 	m.HandleFunc("PUT /api/v1/staff/products/{id}", a.permitAny(a.saveProduct, "products.create", "products.edit"))
 	m.HandleFunc("POST /api/v1/staff/products/{id}/publish", a.permit(a.publishProduct, "products"))
 	m.HandleFunc("POST /api/v1/staff/products/{id}/archive", a.permit(a.archiveProduct, "products", "delete"))

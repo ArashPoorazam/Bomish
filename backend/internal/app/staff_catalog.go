@@ -23,6 +23,26 @@ func (a *App) saveProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := in.Product
+	tx, e := a.Pool.Begin(r.Context())
+	if e != nil {
+		a.dbError(w, e)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	if _, e = tx.Exec(r.Context(), "SELECT pg_advisory_xact_lock_shared(hashtextextended('product-packaging-sync',0))"); e != nil {
+		a.dbError(w, e)
+		return
+	}
+	if !authorizeCatalogSave(w, r, tx, "products", "products", r.PathValue("id")) {
+		return
+	}
+	if message, err := resolveProductPackaging(r, tx, &p); err != nil {
+		a.dbError(w, err)
+		return
+	} else if message != "" {
+		fail(w, 400, message)
+		return
+	}
 	for i := range p.Packages {
 		for _, id := range in.ConfirmMeasurements {
 			if p.Packages[i].ID == id {
@@ -47,15 +67,6 @@ func (a *App) saveProduct(w http.ResponseWriter, r *http.Request) {
 
 	if e := p.Validate(false); e != nil {
 		fail(w, 400, e.Error())
-		return
-	}
-	tx, e := a.Pool.Begin(r.Context())
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	defer tx.Rollback(r.Context())
-	if !authorizeCatalogSave(w, r, tx, "products", "products", p.ID) {
 		return
 	}
 	if _, e = tx.Exec(r.Context(), "SELECT set_config('bomish.actor',$1,true)", current(r).StaffID); e != nil {
@@ -105,7 +116,7 @@ func (a *App) saveProduct(w http.ResponseWriter, r *http.Request) {
 		a.dbError(w, e)
 		return
 	}
-	write(w, 200, map[string]bool{"ok": true})
+	write(w, 200, map[string]any{"ok": true, "product": p})
 }
 func (a *App) publishProduct(w http.ResponseWriter, r *http.Request) {
 	tx, e := a.Pool.Begin(r.Context())
@@ -114,6 +125,10 @@ func (a *App) publishProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	if _, e = tx.Exec(r.Context(), "SELECT pg_advisory_xact_lock_shared(hashtextextended('product-packaging-sync',0))"); e != nil {
+		a.dbError(w, e)
+		return
+	}
 	if _, e = tx.Exec(r.Context(), "SELECT set_config('bomish.actor',$1,true)", current(r).StaffID); e != nil {
 		a.dbError(w, e)
 		return

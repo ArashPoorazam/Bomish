@@ -67,6 +67,7 @@ async function workspace(page: Page) {
       },
       "/cart": { items: [], subtotalRials: 0 },
       "/staff/products": { items: [legacy], total: 1, page: 1, pageSize: 25 },
+      "/staff/product-packaging": [],
       "/staff/product-options": new URL(route.request().url()).searchParams.has(
         "page",
       )
@@ -111,6 +112,196 @@ async function step(page: Page, name: string) {
     .getByRole("button", { name })
     .click();
 }
+test("packaging selector calculates gross weight and requires measured liquid weight", async ({
+  page,
+}) => {
+  const saved = await workspace(page);
+  await page.route("**/api/v1/staff/product-packaging", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "jar",
+          name: "شیشه",
+          emptyGrams: 150,
+          lengthMm: 80,
+          widthMm: 80,
+          heightMm: 100,
+          volumeCm3: 640,
+        },
+      ],
+    }),
+  );
+  await page.getByRole("button", { name: "ویرایش", exact: true }).click();
+  await step(page, "بسته‌ها");
+  await page.getByLabel("بسته‌بندی محصول", { exact: true }).selectOption("jar");
+  await expect(page.getByText("وزن ارسال:")).toContainText("۲۵۰");
+  await page.getByLabel("مقدار محتویات", { exact: true }).fill("500");
+  await expect(page.getByText("وزن ارسال:")).toContainText("۶۵۰");
+  await page.getByLabel("واحد", { exact: true }).selectOption("l");
+  await page.getByLabel("مقدار محتویات", { exact: true }).fill("0.5");
+  await page.getByLabel("وزن خالص محصول (گرم)", { exact: true }).fill("");
+  await page
+    .getByRole("button", { name: "ذخیره پیش‌نویس", exact: true })
+    .click();
+  expect(saved).toHaveLength(0);
+  await page.getByLabel("وزن خالص محصول (گرم)", { exact: true }).fill("450");
+  await expect(page.getByText("وزن ارسال:")).toContainText("۶۰۰");
+  await page
+    .getByRole("button", { name: "ذخیره پیش‌نویس", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "پیش‌نویس ذخیره شد" }),
+  ).toBeVisible();
+  expect(saved[0]).toMatchObject({
+    packages: [
+      {
+        packagingId: "jar",
+        netGrams: 450,
+        shippingGrams: 600,
+        lengthMm: 80,
+        widthMm: 80,
+        heightMm: 100,
+      },
+    ],
+  });
+});
+
+test("staff define and edit reusable packaging under store management", async ({
+  page,
+}) => {
+  await workspace(page);
+  let items: Record<string, unknown>[] = [];
+  await page.route("**/api/v1/staff/product-packaging**", async (route) => {
+    if (route.request().method() === "PUT") {
+      const item = route.request().postDataJSON();
+      items = [...items.filter((previous) => previous.id !== item.id), item];
+      return route.fulfill({ json: item });
+    }
+    return route.fulfill({ json: items });
+  });
+  await page
+    .getByRole("navigation", { name: "ناوبری فضای کار" })
+    .getByRole("button", { name: "بسته‌بندی‌ها", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "افزودن بسته‌بندی", exact: true })
+    .click();
+  await page.getByLabel("نام بسته‌بندی", { exact: true }).fill("شیشه عسل");
+  await page.getByLabel("وزن بسته‌بندی خالی (گرم)").fill("150");
+  await page.getByLabel("طول بیرونی (سانتی‌متر)").fill("8");
+  await page.getByLabel("عرض بیرونی (سانتی‌متر)").fill("8");
+  await page.getByLabel("ارتفاع بیرونی (سانتی‌متر)").fill("10");
+  await page.getByRole("button", { name: "محاسبه حجم از ابعاد" }).click();
+  await expect(page.getByLabel("حجم (سانتی‌متر مکعب)")).toHaveValue("640");
+  await page
+    .getByRole("button", { name: "ذخیره بسته‌بندی", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("بسته‌بندی ذخیره شد.");
+  expect(items).toHaveLength(1);
+  expect(items[0]).toMatchObject({
+    name: "شیشه عسل",
+    emptyGrams: 150,
+    lengthMm: 80,
+    widthMm: 80,
+    heightMm: 100,
+    volumeCm3: 640,
+  });
+  await page.getByRole("button", { name: "ویرایش شیشه عسل" }).click();
+  await page.getByLabel("وزن بسته‌بندی خالی (گرم)").fill("200");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/packaging-mobile.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "ذخیره بسته‌بندی", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("بسته‌بندی ذخیره شد.");
+  expect(items).toHaveLength(1);
+  expect(items[0].emptyGrams).toBe(200);
+});
+test("packaging filters, impact preview, failed saves and keyboard dismissal preserve edits", async ({
+  page,
+}) => {
+  await workspace(page);
+  const items = [
+    {
+      id: "jar",
+      name: "شیشه عسل",
+      emptyGrams: 150,
+      lengthMm: 80,
+      widthMm: 80,
+      heightMm: 100,
+      volumeCm3: 640,
+      usedByProducts: 2,
+    },
+    {
+      id: "pouch",
+      name: "پاکت ادویه",
+      emptyGrams: 10,
+      lengthMm: 100,
+      widthMm: 30,
+      heightMm: 150,
+      volumeCm3: 450,
+      usedByProducts: 0,
+    },
+  ];
+  await page.route("**/api/v1/staff/product-packaging**", async (route) => {
+    if (route.request().method() === "PUT")
+      return route.fulfill({
+        status: 422,
+        json: { error: "وزن یکی از محصولات بیش از حد مجاز است" },
+      });
+    return route.fulfill({ json: items });
+  });
+  await page
+    .getByRole("navigation", { name: "ناوبری فضای کار" })
+    .getByRole("button", { name: "بسته‌بندی‌ها", exact: true })
+    .click();
+  await expect(page.locator(".packaging-card")).toHaveCount(2);
+  await page.getByLabel("جستجوی بسته‌بندی", { exact: true }).fill("پاکت");
+  await expect(page.locator(".packaging-card")).toHaveCount(1);
+  await expect(page.locator(".packaging-card")).toContainText("پاکت ادویه");
+  await page.getByLabel("جستجوی بسته‌بندی", { exact: true }).fill("");
+  await page.getByRole("button", { name: "در حال استفاده" }).click();
+  await expect(page.locator(".packaging-card")).toHaveCount(1);
+  await page.getByRole("button", { name: "ویرایش شیشه عسل" }).click();
+  const editor = page.getByRole("dialog", {
+    name: "ویرایش بسته‌بندی",
+    exact: true,
+  });
+  await expect(page.getByLabel("نام بسته‌بندی", { exact: true })).toBeFocused();
+  await expect(editor).toContainText("۲ محصول به‌روز می‌شود");
+  await expect(
+    editor.getByRole("button", { name: "ذخیره بسته‌بندی", exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel("وزن بسته‌بندی خالی (گرم)").fill("200");
+  await editor
+    .getByRole("button", { name: "ذخیره بسته‌بندی", exact: true })
+    .click();
+  await expect(editor.getByRole("alert")).toBeFocused();
+  await expect(editor.getByRole("alert")).toContainText("وزن یکی از محصولات");
+  await expect(page.getByLabel("وزن بسته‌بندی خالی (گرم)")).toHaveValue("200");
+  await page.keyboard.press("Tab");
+  expect(
+    await editor.evaluate((element) =>
+      element.contains(document.activeElement),
+    ),
+  ).toBe(true);
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.keyboard.press("Escape");
+  await expect(editor).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.keyboard.press("Escape");
+  await expect(editor).not.toBeVisible();
+  await expect(page.locator(".packaging-card")).toContainText("۱۵۰");
+});
+
 test("legacy null lists open, step state persists, drafts save, and mobile layout fits", async ({
   page,
 }) => {

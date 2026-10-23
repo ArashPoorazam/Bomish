@@ -1,8 +1,11 @@
 import { Plus, Trash2, Package as PackageIcon } from "lucide-react";
-import type { Package } from "@/lib/types";
+import { useCallback, useEffect, useState } from "react";
+import type { Package, ProductPackaging } from "@/lib/types";
+import { api } from "@/lib/api";
+import { withProductPackaging } from "@/lib/product-packaging";
 import { digits, fa, packageLabel, money } from "@/lib/format";
 import { MeasurementNumber } from "./measurement-number";
-import { PackageMeasurements } from "./product-measurements";
+import { ProductPackagingFields } from "./product-packaging-fields";
 import type { ProductFields } from "./product-form";
 
 export function ProductPackages({
@@ -10,14 +13,51 @@ export function ProductPackages({
   field,
   owner,
 }: ProductFields & { owner: boolean }) {
+  const [packaging, setPackaging] = useState<ProductPackaging[]>([]);
+  const [packagingError, setPackagingError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const loadPackaging = useCallback(async () => {
+    setLoading(true);
+    setPackagingError("");
+    try {
+      setPackaging(await api<ProductPackaging[]>("/staff/product-packaging"));
+    } catch (error) {
+      setPackagingError((error as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    void loadPackaging();
+  }, [loadPackaging]);
   function update(index: number, value: Partial<Package>) {
     field(
       "packages",
-      p.packages.map((pack, i) => (i === index ? { ...pack, ...value } : pack)),
+      p.packages.map((pack, i) => {
+        if (i !== index) return pack;
+        const next = { ...pack, ...value };
+        if (
+          next.packagingId &&
+          (pack.unit === "g" || pack.unit === "kg") &&
+          (next.unit === "ml" || next.unit === "l")
+        )
+          next.netGrams = 0;
+        return next.packagingId && next.packaging
+          ? withProductPackaging(next, next.packaging)
+          : next;
+      }),
     );
   }
   return (
     <div className="stack">
+      {packagingError && (
+        <div role="alert" className="error">
+          {packagingError}{" "}
+          <button type="button" onClick={() => void loadPackaging()}>
+            تلاش دوباره برای دریافت بسته‌بندی‌ها
+          </button>
+        </div>
+      )}
       {!owner && (
         <p className="notice">
           قیمت بسته‌ها پیش از انتشار توسط مالک تعیین می‌شود.
@@ -46,6 +86,7 @@ export function ProductPackages({
             <label>
               واحد
               <select
+                aria-label="واحد"
                 value={pack.unit}
                 onChange={(e) =>
                   update(i, { unit: e.target.value as Package["unit"] })
@@ -106,8 +147,10 @@ export function ProductPackages({
               </small>
             </label>
           </div>
-          <PackageMeasurements
+          <ProductPackagingFields
             pack={pack}
+            options={packaging}
+            loading={loading}
             onChange={(patch) => update(i, patch)}
           />
           <div className="package-footer">

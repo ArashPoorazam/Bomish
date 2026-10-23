@@ -12,16 +12,19 @@ type Nutrient struct {
 	Value string `json:"value"`
 }
 type Package struct {
-	ID               string  `json:"id"`
-	Amount           float64 `json:"amount"`
-	Unit             string  `json:"unit"`
-	PriceRials       int64   `json:"priceRials"`
-	MaxQuantity      int64   `json:"maxQuantity"`
-	ShippingGrams    int64   `json:"shippingGrams"`
-	LengthMm         int64   `json:"lengthMm"`
-	WidthMm          int64   `json:"widthMm"`
-	HeightMm         int64   `json:"heightMm"`
-	ShippingVerified bool    `json:"shippingVerified"`
+	PackagingID      string            `json:"packagingId,omitempty"`
+	Packaging        *ProductPackaging `json:"packaging,omitempty"`
+	NetGrams         int64             `json:"netGrams,omitempty"`
+	ID               string            `json:"id"`
+	Amount           float64           `json:"amount"`
+	Unit             string            `json:"unit"`
+	PriceRials       int64             `json:"priceRials"`
+	MaxQuantity      int64             `json:"maxQuantity"`
+	ShippingGrams    int64             `json:"shippingGrams"`
+	LengthMm         int64             `json:"lengthMm"`
+	WidthMm          int64             `json:"widthMm"`
+	HeightMm         int64             `json:"heightMm"`
+	ShippingVerified bool              `json:"shippingVerified"`
 }
 type Section struct {
 	Title string `json:"title"`

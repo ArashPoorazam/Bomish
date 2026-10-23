@@ -11,6 +11,7 @@ export type ShippingConfig = components["schemas"]["ShippingConfig"];
 export type Member = components["schemas"]["Member"];
 
 export type Package = components["schemas"]["Package"];
+export type ProductPackaging = components["schemas"]["ProductPackaging"];
 
 export type DiscountCode = components["schemas"]["DiscountCode"];
 export type DiscountCodeInput = components["schemas"]["DiscountCodeInput"];

@@ -16,7 +16,7 @@ test("staff overrides survive role changes, enforce read-only access, and reset"
   const form = page
     .locator("form")
     .filter({ has: page.getByLabel("نام و نام خانوادگی", { exact: true }) });
-  await expect(form.locator(".permission-section")).toHaveCount(10);
+  await expect(form.locator(".permission-section")).toHaveCount(11);
   for (const label of [
     "نمای کلی",
     "همکاران و حساب‌ها",
@@ -42,6 +42,12 @@ test("staff overrides survive role changes, enforce read-only access, and reset"
     form
       .locator(".permission-section")
       .filter({ has: page.getByText(label, { exact: true }) });
+  await section("بسته‌بندی‌ها")
+    .getByRole("checkbox", { name: "مشاهده بخش" })
+    .check();
+  await section("بسته‌بندی‌ها")
+    .getByRole("checkbox", { name: "ویرایش / انجام عملیات" })
+    .check();
   await section("محصولات")
     .getByRole("checkbox", { name: "مشاهده بخش" })
     .check();
@@ -90,6 +96,8 @@ test("staff overrides survive role changes, enforce read-only access, and reset"
   expect(detail.permissionOverrides).toMatchObject({
     products: true,
     "products.edit": false,
+    packaging: true,
+    "packaging.edit": true,
     sales: false,
   });
 
