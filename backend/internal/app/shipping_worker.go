@@ -2,6 +2,7 @@ package app
 
 import (
 	"bomish/internal/carrier"
+	"bomish/internal/domain"
 	"context"
 	"encoding/json"
 	"github.com/jackc/pgx/v5"
@@ -124,11 +125,21 @@ func (a *App) applyBooking(ctx context.Context, id, order, lease string, b carri
 		return e
 	}
 	var ref, status, ownedLease string
-	if e = tx.QueryRow(ctx, "SELECT reference,status,coalesce(lease_token,'') FROM shipment_attempts WHERE id=$1 FOR UPDATE", id).Scan(&ref, &status, &ownedLease); e != nil {
+	var previousResponse []byte
+	if e = tx.QueryRow(ctx, "SELECT reference,status,coalesce(lease_token,''),response FROM shipment_attempts WHERE id=$1 FOR UPDATE", id).Scan(&ref, &status, &ownedLease, &previousResponse); e != nil {
 		return e
 	}
 	if ownedLease != lease || b.Reference != ref || b.ID == "" {
 		return nil
+	}
+	// Status-only updates must not discard a previously identified driver.
+	var previousBooking carrier.Booking
+	_ = json.Unmarshal(previousResponse, &previousBooking)
+	if b.DriverName == "" {
+		b.DriverName = previousBooking.DriverName
+	}
+	if b.DriverPhone == "" {
+		b.DriverPhone = previousBooking.DriverPhone
 	}
 	confirmed := d.Status
 	if confirmed == "unknown" {
@@ -164,7 +175,7 @@ func (a *App) applyBooking(ctx context.Context, id, order, lease string, b carri
 			if _, e = tx.Exec(ctx, "UPDATE orders SET status='shipped' WHERE id=$1", order); e != nil {
 				return e
 			}
-			if e = queueOrderSMS(ctx, tx, order, "shipped"); e != nil {
+			if e = queueOrderSMS(ctx, tx, order, "shipped", &domain.CourierContact{Name: b.DriverName, Phone: b.DriverPhone}); e != nil {
 				return e
 			}
 			orderStatus = "shipped"

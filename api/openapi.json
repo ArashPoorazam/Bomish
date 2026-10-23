@@ -9879,6 +9879,13 @@
           },
           "fallbackAccepted": {
             "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackingItem"
+            },
+            "description": "Purchased package snapshot, independent of postal cartons. Older snapshots use parcel placements."
           }
         },
         "required": [
@@ -9913,6 +9920,12 @@
           },
           "quote": {
             "$ref": "#/components/schemas/CarrierQuote"
+          },
+          "parcels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Parcel"
+            }
           }
         },
         "required": [
@@ -10035,7 +10048,7 @@
         "properties": {
           "method": {
             "type": "string",
-            "description": "snapp, post, or own_courier. Courier member identity is staff-only."
+            "description": "snapp, post, or own_courier. Assigned courier contact is available after dispatch; staff ID remains private."
           },
           "service": {
             "type": "string"
@@ -10074,6 +10087,9 @@
             "items": {
               "$ref": "#/components/schemas/DeliveryEvent"
             }
+          },
+          "courier": {
+            "$ref": "#/components/schemas/CourierContact"
           }
         },
         "required": [
@@ -10280,6 +10296,22 @@
             "type": "string"
           }
         }
+      },
+      "CourierContact": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ],
+        "additionalProperties": false
       }
     },
     "securitySchemes": {

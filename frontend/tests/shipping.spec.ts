@@ -297,8 +297,11 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
   await customerPage
     .getByLabel("نشانی‌های ذخیره‌شده")
     .selectOption({ index: 1 });
+  await customerPage
+    .getByRole("button", { name: "ارسال با پیک", exact: false })
+    .click();
   await expect(
-    customerPage.getByText("ارسال با پیک در تهران · 1 کارتن ارسال"),
+    customerPage.getByText("ارسال با پیک در تهران", { exact: true }),
   ).toBeVisible();
   await customerPage.screenshot({
     path: testInfo.outputPath("checkout-mobile.png"),
@@ -323,9 +326,9 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
   await expect(
     page.getByRole("heading", { name: "ارسال تهران · ارسال سفارش" }),
   ).toBeVisible();
-  // Existing per-line checklist plus physical parcel confirmation are both mandatory.
+  // Courier readiness requires the per-line checklist, without carton confirmation.
 
-  // Use the documented checklist endpoint if its existing label differs; parcel readiness stays in UI.
+  // Confirm order lines through the API, then verify courier readiness in the UI.
   const order = await (
     await page.request.get(`/api/v1/staff/orders/${id}`)
   ).json();
@@ -340,16 +343,7 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
   await page
     .getByRole("button", { name: "به‌روزرسانی وضعیت ارسال", exact: true })
     .click();
-  await page
-    .getByRole("checkbox", {
-      name: "محتویات، وزن و بسته‌بندی واقعی این کارتن را تأیید می‌کنم",
-    })
-    .check();
-  await page
-    .getByLabel("دلیل اصلاح / نتیجه بررسی واقعی")
-    .fill("بسته‌بندی آزمایشی و وزن بررسی شد");
-  await page.getByRole("button", { name: "ذخیره بسته‌بندی واقعی" }).click();
-  await expect(page.getByText("تغییر ثبت شد.", { exact: true })).toBeVisible();
+  await expect(page.getByText("کارتن انتخابی", { exact: true })).toHaveCount(0);
   await page
     .getByRole("button", { name: "تأیید آمادگی ارسال", exact: true })
     .click();
@@ -528,16 +522,7 @@ test("Tehran staff courier: role, packing, assignment, history and delivery", as
   const itemChecks = page.locator(".staff-packing-item input[type=checkbox]");
   for (let i = 0; i < (await itemChecks.count()); i++)
     await itemChecks.nth(i).check();
-  await page
-    .getByRole("checkbox", {
-      name: "محتویات، وزن و بسته‌بندی واقعی این کارتن را تأیید می‌کنم",
-    })
-    .check();
-  await page
-    .getByLabel("دلیل اصلاح / نتیجه بررسی واقعی")
-    .fill("تأیید بسته برای پیک بومیش");
-  await page.getByRole("button", { name: "ذخیره بسته‌بندی واقعی" }).click();
-  await expect(page.getByText("تغییر ثبت شد.", { exact: true })).toBeVisible();
+  await expect(page.getByText("کارتن انتخابی", { exact: true })).toHaveCount(0);
   await page
     .getByRole("button", { name: "تأیید آمادگی ارسال", exact: true })
     .click();
@@ -574,7 +559,7 @@ test("Tehran staff courier: role, packing, assignment, history and delivery", as
   await expect(dispatch).toBeDisabled();
   await page
     .getByRole("checkbox", {
-      name: "همه کارتن‌ها را به پیک تهران آزمایشی تحویل داده‌ام.",
+      name: "همه بسته‌ها را به پیک تهران آزمایشی تحویل داده‌ام.",
     })
     .check();
   for (const width of [390, 768, 1440]) {
@@ -635,7 +620,7 @@ test("Tehran staff courier: role, packing, assignment, history and delivery", as
   await customer.close();
 });
 
-test("missing pin explicitly accepts post, postal tracking and zero cost stay distinct", async ({
+test("customer selects post without a pin, postal tracking and zero cost stay distinct", async ({
   browser,
   page,
 }, testInfo) => {
@@ -694,19 +679,20 @@ test("missing pin explicitly accepts post, postal tracking and zero cost stay di
   await cp.goto("/checkout");
   await cp.getByLabel("نشانی‌های ذخیره‌شده").selectOption({ index: 1 });
   await expect(
-    cp.getByRole("button", { name: /ارسال با پست به مبلغ/ }),
-  ).toBeVisible();
-  await expect(
     cp.getByRole("button", { name: "تأیید سفارش و پرداخت" }),
-  ).toBeDisabled();
-  await cp.screenshot({
-    path: testInfo.outputPath("postal-fallback-mobile.png"),
-    fullPage: true,
-  });
-  await cp.getByRole("button", { name: /ارسال با پست به مبلغ/ }).click();
+  ).toHaveCount(0);
+  await cp.getByRole("button", { name: "ارسال با پیک", exact: false }).click();
+  await expect(cp.locator(".checkout-page .error[role=alert]")).toContainText(
+    "موقعیت تحویل",
+  );
+  await cp.getByRole("button", { name: "ارسال با پست", exact: false }).click();
   await expect(
     cp.getByRole("button", { name: "تأیید سفارش و پرداخت" }),
   ).toBeEnabled();
+  await cp.screenshot({
+    path: testInfo.outputPath("postal-choice-mobile.png"),
+    fullPage: true,
+  });
   await cp.getByRole("button", { name: "تأیید سفارش و پرداخت" }).click();
   await cp.getByRole("button", { name: "شبیه‌سازی پرداخت موفق" }).click();
   await cp.waitForURL("**/account/orders/*");

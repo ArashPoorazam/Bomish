@@ -140,10 +140,26 @@ export function OrderView({
               )
                 ? "ارسال با پیک در تهران"
                 : providerName(o.shipping.method)}{" "}
-              · {fa(o.shipping.parcels.length)} کارتن ارسال
+              {o.shipping.method === "post" && (
+                <> · {fa(o.shipping.parcels.length)} کارتن ارسال</>
+              )}
             </h4>
             <p>{deliveryStatuses[o.shipping.status] ?? "در حال بررسی ارسال"}</p>
             {o.shipping.simulated && <small>ارسال شبیه‌سازی‌شده</small>}
+            {o.shipping.courier && (
+              <p>
+                پیک سفارش: {o.shipping.courier.name || "پیک"}
+                {o.shipping.courier.phone && (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <a href={`tel:${o.shipping.courier.phone}`}>
+                      <bdi>{o.shipping.courier.phone}</bdi>
+                    </a>
+                  </>
+                )}
+              </p>
+            )}
             {o.shipping.parcels.map((p, i) => (
               <div key={p.id}>
                 {p.tracking && (

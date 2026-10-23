@@ -44,6 +44,9 @@ func (s simulation) Lookup(ctx context.Context, ref string) (carrier.Booking, er
 	if e != nil {
 		return b, carrier.ErrUnknown
 	}
+	if b.Status == "accepted" || b.Status == "picked_up" || b.Status == "delivered" {
+		b.DriverName, b.DriverPhone = "پیک آزمایشی", "09121110002"
+	}
 	return b, nil
 }
 func (s simulation) Cancel(ctx context.Context, ref string) (carrier.Booking, error) {

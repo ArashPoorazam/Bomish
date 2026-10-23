@@ -52,6 +52,18 @@ function CommerceCheckout() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [key, setKey] = useState("");
+  const [deliveryChoice, setDeliveryChoice] = useState<{
+    destination: string;
+    method: "snapp" | "post";
+  } | null>(null);
+  const deliveryDestination = `${address.provinceId}:${address.cityId}`;
+  const isTehran =
+    address.province.trim() === "تهران" && address.city.trim() === "تهران";
+  const method = isTehran
+    ? deliveryChoice?.destination === deliveryDestination
+      ? deliveryChoice.method
+      : ""
+    : "post";
   const [quoteBusy, setQuoteBusy] = useState(false),
     [quoteRetry, setQuoteRetry] = useState(0);
   const quoteSequence = useRef(0);
@@ -98,6 +110,7 @@ function CommerceCheckout() {
     setKey(crypto.randomUUID());
     if (
       !user?.authenticated ||
+      !method ||
       !address.cityId ||
       !address.recipient ||
       address.street.length < 10 ||
@@ -112,6 +125,7 @@ function CommerceCheckout() {
         address,
         province: address.province,
         discountCode: appliedCode,
+        method,
       })
         .then((q) => {
           if (sequence === quoteSequence.current) {
@@ -132,6 +146,7 @@ function CommerceCheckout() {
     };
   }, [
     destinationKey,
+    method,
     cartSnapshot,
     appliedCode,
     orderId,
@@ -155,7 +170,13 @@ function CommerceCheckout() {
   }
   async function applyCode(remove = false) {
     if (busy || orderId) return;
+    if (!method) {
+      setCodeError("ابتدا روش ارسال را انتخاب کنید.");
+      return;
+    }
+    const sequence = ++quoteSequence.current;
     setBusy(true);
+    setQuoteBusy(false);
     setCodeError("");
     try {
       const next = remove ? "" : codeInput.trim().toUpperCase();
@@ -163,14 +184,17 @@ function CommerceCheckout() {
         province: address.province,
         address,
         discountCode: next,
+        method,
       });
+      if (sequence !== quoteSequence.current) return;
       // Only an address-validated quote can unlock placing the order.
-      if (quote) setQuote(result);
+      setQuote(result);
       setAppliedCode(result.discountCode);
       setCodeInput(result.discountCode);
       setKey(crypto.randomUUID());
     } catch (e) {
-      setCodeError((e as Error).message);
+      if (sequence === quoteSequence.current)
+        setCodeError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -178,6 +202,7 @@ function CommerceCheckout() {
   async function createOrder() {
     if (
       !quote ||
+      quote.method !== method ||
       quote.requiresAcceptance ||
       quoteBusy ||
       (quote.expiresAt && Date.parse(quote.expiresAt) <= Date.now())
@@ -436,6 +461,49 @@ function CommerceCheckout() {
           </div>
           <section className="delivery-selection stack" aria-live="polite">
             <h3>روش ارسال</h3>
+            {isTehran && !orderId && (
+              <div
+                className="checkout-delivery-options"
+                role="group"
+                aria-label="روش ارسال در تهران"
+              >
+                {(
+                  [
+                    ["snapp", "ارسال با پیک", "🏍️"],
+                    ["post", "ارسال با پست", "📮"],
+                  ] as const
+                ).map(([value, label, sticker]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className="checkout-delivery-option"
+                    aria-pressed={method === value}
+                    disabled={busy}
+                    onClick={() => {
+                      quoteSequence.current++;
+                      setQuote(null);
+                      setError("");
+                      setDeliveryChoice({
+                        destination: deliveryDestination,
+                        method: value,
+                      });
+                      setQuoteRetry((n) => n + 1);
+                    }}
+                  >
+                    <span
+                      className="checkout-delivery-sticker"
+                      aria-hidden="true"
+                    >
+                      {sticker}
+                    </span>
+                    <strong>{label}</strong>
+                    <small>
+                      {value === "snapp" ? "اسنپ یا پیک بومیش" : "ارسال پستی"}
+                    </small>
+                  </button>
+                ))}
+              </div>
+            )}
             {quoteBusy ? (
               <p>در حال دریافت هزینه ارسال…</p>
             ) : quote ? (
@@ -444,14 +512,16 @@ function CommerceCheckout() {
                   {quote.method === "snapp"
                     ? "ارسال با پیک در تهران"
                     : providerName(quote.method)}{" "}
-                  · {quote.parcelCount} کارتن ارسال
+                  {quote.method === "post" && (
+                    <> · {fa(quote.parcelCount ?? 0)} کارتن ارسال</>
+                  )}
                 </strong>
                 {quote.simulated && (
                   <span className="badge">شبیه‌سازی‌شده</span>
                 )}
                 <p>
                   {quote.method === "snapp"
-                    ? "هزینه بر اساس نرخ اسنپ محاسبه می‌شود. پس از بسته‌بندی، سفارش با اسنپ یا پیک بومیش ارسال خواهد شد."
+                    ? "هزینه بر اساس نرخ اسنپ‌باکس محاسبه می‌شود و شرایط ارسال رایگان برقرار است. سفارش با اسنپ یا پیک بومیش ارسال می‌شود."
                     : "مرسوله پس از بسته‌بندی به پست سپرده می‌شود."}
                 </p>
                 {quote.fallbackReason && <p>{quote.fallbackReason}</p>}
@@ -501,12 +571,16 @@ function CommerceCheckout() {
                 </small>
               </>
             ) : (
-              <p>هزینه ارسال پس از تکمیل نشانی مشخص می‌شود.</p>
+              <p>
+                {isTehran && !method
+                  ? "ارسال با پیک یا پست را انتخاب کنید."
+                  : "هزینه ارسال پس از تکمیل نشانی مشخص می‌شود."}
+              </p>
             )}
             <button
               type="button"
               className="button secondary"
-              disabled={quoteBusy}
+              disabled={quoteBusy || busy || !!orderId || !method}
               onClick={() => setQuoteRetry((n) => n + 1)}
             >
               محاسبه دوباره ارسال
@@ -598,7 +672,7 @@ function CommerceCheckout() {
                 ? quote.shippingRials === 0
                   ? "رایگان"
                   : money(quote.shippingRials) + " تومان"
-                : "پس از انتخاب نشانی"}
+                : "پس از انتخاب نشانی و روش ارسال"}
             </span>
           </div>
           {quote && quote.discountRials > 0 && (
@@ -619,7 +693,12 @@ function CommerceCheckout() {
                 <button
                   className="button full"
                   style={{ marginTop: 16 }}
-                  disabled={busy || quoteBusy || !!quote.requiresAcceptance}
+                  disabled={
+                    busy ||
+                    quoteBusy ||
+                    quote.method !== method ||
+                    !!quote.requiresAcceptance
+                  }
                   onClick={createOrder}
                 >
                   تأیید سفارش و پرداخت

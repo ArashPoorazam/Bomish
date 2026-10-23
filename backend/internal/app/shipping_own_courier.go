@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bomish/internal/domain"
 	"errors"
 	"net/http"
 	"strings"
@@ -108,7 +109,7 @@ func (a *App) recordOwnCourierMilestone(r *http.Request, tx pgx.Tx, d *deliveryR
 	if _, err := tx.Exec(ctx, `INSERT INTO delivery_events(order_id,event_key,status,actor) VALUES($1,$2,$3,$4)`, d.OrderID, d.OrderID+":own_courier:"+d.Status, d.Status, current(r).StaffID); err != nil {
 		return err
 	}
-	if err := queueOrderSMS(ctx, tx, d.OrderID, stage); err != nil {
+	if err := queueOrderSMS(ctx, tx, d.OrderID, stage, &domain.CourierContact{Name: d.AssignedCourier.FullName, Phone: d.AssignedCourier.Phone}); err != nil {
 		return err
 	}
 	return auditDetail(ctx, tx, current(r).StaffID, "shipping.own-courier."+stage, d.OrderID, map[string]any{"courier": d.AssignedCourier, "status": d.Status})

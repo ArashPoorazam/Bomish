@@ -10,7 +10,7 @@ Private credentials and deployment environment values live in the root `.env` fi
 | `KAVENEGAR_PAID_TEMPLATE` | Approved payment-confirmed template. |
 | `KAVENEGAR_PACKED_TEMPLATE` | Approved packing-complete template. |
 | `KAVENEGAR_POST_TEMPLATE` | Approved postal-handoff template. |
-| `KAVENEGAR_SNAPP_TEMPLATE` | Approved Snapp-pickup template. |
+| `KAVENEGAR_SNAPP_TEMPLATE` | Approved courier-pickup template for Snapp and Bomish couriers; order ID, courier phone and name tokens. |
 | `KAVENEGAR_DELIVERED_TEMPLATE` | Approved delivered template. |
 | `KAVENEGAR_VERIFY_TEMPLATE` | Approved verification template containing `%token`. |
 | `SUPPORT_URL` | Full `https://wa.me/989…` or `https://t.me/…` support link. An owner-panel support link overrides this default. |
@@ -24,7 +24,7 @@ Kavenegar uses [verification Lookup](https://kavenegar.com/rest.html) for both l
 
 ### Kavenegar templates and activation
 
-Register these six templates in the Kavenegar console. Replace `https://YOUR-DOMAIN` below with the public `APP_ORIGIN`, without a trailing slash, **before submitting for approval**. The hostname and `/account/orders/` path are fixed template text; only `%token` is substituted. Order tokens are the full opaque order ID, not its abbreviated display value. Login tokens are six digits. The backend sends `type=sms`; no automatic voice fallback is requested.
+Register these six templates in the Kavenegar console. Replace `https://YOUR-DOMAIN` below with the public `APP_ORIGIN`, without a trailing slash, **before submitting for approval**. The hostname and `/account/orders/` path are fixed template text; `%token` is the order ID (or login code). The courier-dispatch template also uses `%token2` for the courier mobile and `%token10` for the courier name. Order tokens are the full opaque order ID, not its abbreviated display value. Login tokens are six digits. The backend sends `type=sms`; no automatic voice fallback is requested.
 
 | Environment setting | Suggested template name | Persian template text |
 |---|---|---|
@@ -32,7 +32,7 @@ Register these six templates in the Kavenegar console. Replace `https://YOUR-DOM
 | `KAVENEGAR_PAID_TEMPLATE` | `bomish-paid` | بومیش: پرداخت شما تأیید و سفارش ثبت شد. پیگیری: https://YOUR-DOMAIN/account/orders/%token |
 | `KAVENEGAR_PACKED_TEMPLATE` | `bomish-packed` | بومیش: بسته‌بندی سفارش شما کامل شد. پیگیری: https://YOUR-DOMAIN/account/orders/%token |
 | `KAVENEGAR_POST_TEMPLATE` | `bomish-post` | بومیش: سفارش شما به پست تحویل داده شد و در مسیر ارسال است. پیگیری: https://YOUR-DOMAIN/account/orders/%token |
-| `KAVENEGAR_SNAPP_TEMPLATE` | `bomish-snapp` | بومیش: سفارش شما تحویل پیک اسنپ شد و در مسیر شماست. پیگیری: https://YOUR-DOMAIN/account/orders/%token |
+| `KAVENEGAR_SNAPP_TEMPLATE` | `bomish-snapp` | بومیش: سفارش شما تحویل پیک شد و در راه شماست. نام پیک: %token10 شماره همراه: %token2 پیگیری: https://YOUR-DOMAIN/account/orders/%token |
 | `KAVENEGAR_DELIVERED_TEMPLATE` | `bomish-delivered` | بومیش: تحویل سفارش شما تأیید شد. جزئیات: https://YOUR-DOMAIN/account/orders/%token |
 
 Keep `SMS_ENABLED=false` until the account is funded and each template, including its link, is approved. Configure the key and template names privately in the deployment environment; Compose forwards them to the Go server only. Restart after configuration changes. Test all six templates with a designated merchant test phone in an isolated environment before customer activation. For an HTTPS staging domain, register matching staging templates; the native local launcher intentionally uses HTTP and cannot activate real SMS. Verify the Kavenegar account is not in debug mode when checking real handset receipt. Login expiry, resend cooldown, attempt limits and one-time consumption remain unchanged.
@@ -41,7 +41,7 @@ The production/payment gate and live Snapp adapter gate remain in place. This ch
 
 ### Notification delivery and recovery
 
-Order transitions save history and one deduplicated notification job per milestone in the same transaction. Messages go to the purchaser's verified account number, not the recipient phone in the shipping address. The job snapshots the phone and delivery method. A separate worker runs every five seconds, independently of carrier processing; queued work may take longer under load. Before submission it suppresses jobs whose milestone is no longer current. Reopened packing postpones its pending message until the checklist and applicable readiness confirmation are complete. In-flight submissions cannot be recalled if a newer milestone arrives while the provider is processing them.
+Order transitions save history and one deduplicated notification job per milestone in the same transaction. Messages go to the purchaser's verified account number, not the recipient phone in the shipping address. The job snapshots the purchaser phone and delivery method. Courier pickup also snapshots the assigned courier name and mobile; both Snapp and Bomish use the courier template. If Snapp has not supplied a valid driver mobile, the job waits for contact details while the order remains shipped. A later delivery or cancellation suppresses the obsolete pickup message. Status-only provider updates retain previously supplied driver contact. A separate worker runs every five seconds, independently of carrier processing; queued work may take longer under load. Before submission it suppresses jobs whose milestone is no longer current. Reopened packing postpones its pending message until the checklist and applicable readiness confirmation are complete. In-flight submissions cannot be recalled if a newer milestone arrives while the provider is processing them.
 
 Migration 014 skips all pre-existing pending order messages (`pre_activation`); it preserves history and marks old `sent` jobs as `accepted`. Any new job created with SMS disabled is permanently `skipped` (`sms_disabled`). Enabling SMS never replays those jobs. Accepted and skipped milestones are never automatically recreated.
 
@@ -117,7 +117,7 @@ Operations must enter a measured Tehran origin with confirmed pin and verified a
 
 Provider checks are read-only. No settings save, checkout quote, payment or packing completion creates a courier. Staff explicitly requests the courier after review. Postal label purchase and booking remain outside the application; record a distinct barcode and nullable actual cost for each parcel. Zero cost means zero; blank means unknown.
 
-Provider check results are retained in the audit history and shown only for the same saved configuration revision and simulation/live environment. Changing settings or leaving simulation requires a fresh check. Driver name/phone, when supplied by the provider, are exposed only in the authorized staff delivery view. An uncertain refresh retains the last confirmed milestone internally so a later stale response cannot regress pickup.
+Provider check results are retained in the audit history and shown only for the same saved configuration revision and simulation/live environment. Changing settings or leaving simulation requires a fresh check. Driver name/phone are shown to staff and, after handoff, to the purchaser in their authenticated order details. Staff IDs and carrier financial data remain staff-only. An uncertain refresh retains the last confirmed milestone internally so a later stale response cannot regress pickup.
 
 For recovery: refresh an uncertain shipment first. Do not delete attempts or recycle references. A manager/owner with orders permission may record a reason and confirm that the provider has no active booking through the resolution action. Resolve or cancel before correcting packing or changing methods. A method change needs a fresh alternative quote, a reason and customer consent obtained outside the application. The app does not automatically contact the customer or issue refunds for these exceptions. The customer invoice remains unchanged.
 
@@ -221,13 +221,15 @@ same effective permissions returned by `/session?workspace=staff`.
 
 ## Tehran dispatch: Snapp or a staff courier
 
-Tehran checkout uses the existing Snapp quotation, including the configured fees and free-shipping policy. Customers see that dispatch may use Snapp or Bomish’s own courier. The paid invoice and stored quote never change when staff choose the courier. Postal fallback and delivery outside eligible Tehran coverage remain unchanged.
+Tehran customers explicitly select **🏍️ ارسال با پیک** or **📮 ارسال با پست**. Post uses carton planning, carton gross weight and postal quotation. Courier uses purchased package gross weights, dimensions, total volume and package count for motorcycle capacity, without any carton planning, carton weight or carton confirmation. `snapp.maxParcels` limits individual purchased packages for courier orders. The Snapp Box fare determines the courier customer charge; the existing free-shipping threshold applies to both methods. Staff choosing Snapp or Bomish's own courier never changes the paid invoice. A failed explicit courier quote leaves checkout blocked until the customer retries or selects post; it never silently switches methods. Destinations outside Tehran use post. Legacy clients requesting automatic selection retain exact-quote postal fallback acceptance.
 
-After confirming the item checklist, physical cartons and readiness, staff see a separate dispatch panel. **اسنپ** requires a fresh dispatch-price review and uses the existing booking/reconciliation workflow. **پیک بومیش** lists only active, non-archived members with role **پیک** (`courier`). Create or edit these accounts in **همکاران**. This role defaults to personal sales access, without order or member management; existing permission overrides still apply.
+Before enabling live courier SMS, update the approved template named by `KAVENEGAR_SNAPP_TEMPLATE` to the three-token text above. The code does not modify the merchant's Kavenegar templates or enable live SMS. Kavenegar's [Lookup contract](https://kavenegar.com/rest.html) supports the mobile in `token2` and a name of up to 100 characters/five spaces in `token10`; longer names are bounded for this field.
 
-Selecting a member alone does not dispatch. Staff confirm that all cartons have been handed to the named courier, then submit the handoff. This atomically saves the member ID and identity snapshot, records an audited delivery event, marks the order shipped and queues the existing shipment milestone notification. A separate confirmation records customer receipt. Own-courier dispatch does not call Snapp, requires no new fare quote, and leaves actual cost unknown. The member’s later renaming, suspension, role change or archival does not erase the assignment.
+After confirming the item checklist and readiness, staff see a separate courier dispatch panel. Physical carton confirmation is required only for post. **اسنپ** requires a fresh dispatch-price review and uses the existing booking/reconciliation workflow. **پیک بومیش** lists only active, non-archived members with role **پیک** (`courier`). Create or edit these accounts in **همکاران**. This role defaults to personal sales access, without order or member management; existing permission overrides still apply.
 
-An active or unresolved Snapp booking blocks internal dispatch. Resolve or complete cancellation first. Parcel or checklist changes invalidate readiness and dispatch-price review. Concurrent dispatches use the existing version check and order lock, so only one dispatch can succeed. Customers see «پیک بومیش» after handoff without staff identity or financial information; staff can filter orders by that method.
+Selecting a member alone does not dispatch. Staff confirm that all packages have been handed to the named courier, then submit the handoff. This atomically saves the member ID and identity snapshot, records an audited delivery event, marks the order shipped and queues the existing shipment milestone notification. A separate confirmation records customer receipt. Own-courier dispatch does not call Snapp, requires no new fare quote, and leaves actual cost unknown. The member’s later renaming, suspension, role change or archival does not erase the assignment.
+
+An active or unresolved Snapp booking blocks internal dispatch. Resolve or complete cancellation first. Parcel or checklist changes invalidate readiness and dispatch-price review. Concurrent dispatches use the existing version check and order lock, so only one dispatch can succeed. Customers see «پیک بومیش» and the assigned courier name/mobile after handoff, without the staff ID or financial information; staff can filter orders by that method.
 
 Migration `021_staff_courier.sql` adds the role and nullable assignment fields without altering historical orders. It runs on API startup. New endpoints require `orders.edit`:
 

@@ -70,7 +70,9 @@ func prepareShipping(t *testing.T, c, staff *client, id string) deliveryRecord {
 		d.Parcels[i].Confirmed = true
 		d.Parcels[i].MeasuredGrams = d.Parcels[i].GrossGrams
 	}
-	staff.ok(t, "PUT", "/staff/orders/"+id+"/parcels", map[string]any{"version": d.Version, "parcels": d.Parcels, "reason": "physical packing verified"}, &d)
+	if d.Method == "post" {
+		staff.ok(t, "PUT", "/staff/orders/"+id+"/parcels", map[string]any{"version": d.Version, "parcels": d.Parcels, "reason": "physical packing verified"}, &d)
+	}
 	staff.ok(t, "POST", "/staff/orders/"+id+"/ready", map[string]any{"version": d.Version}, &d)
 	return d
 }

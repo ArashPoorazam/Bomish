@@ -192,3 +192,40 @@
     padding-block: 24px 40px;
   }
 }
+
+.checkout-delivery-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.checkout-delivery-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 8px;
+  border: 2px solid #d7ddd4;
+  border-radius: 16px;
+  background: #fffdf8;
+  color: inherit;
+  cursor: pointer;
+}
+.checkout-delivery-option[aria-pressed="true"] {
+  border-color: #315b3e;
+  background: #edf4e9;
+}
+.checkout-delivery-option:focus-visible {
+  outline: 3px solid #315b3e;
+  outline-offset: 3px;
+}
+.checkout-delivery-option:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.checkout-delivery-sticker {
+  font-size: 36px;
+  line-height: 1.3;
+}
+.checkout-delivery-option small {
+  font-size: 11px;
+}

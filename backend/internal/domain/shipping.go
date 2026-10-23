@@ -57,7 +57,13 @@ type CustomerParcel struct {
 }
 
 // Delivery is the allowlisted customer projection. Staff-only financial/operational data lives elsewhere.
+type CourierContact struct {
+	Name  string `json:"name"`
+	Phone string `json:"phone"`
+}
+
 type Delivery struct {
+	Courier   *CourierContact  `json:"courier,omitempty"`
 	Method    string           `json:"method"`
 	Service   string           `json:"service"`
 	Status    string           `json:"status"`

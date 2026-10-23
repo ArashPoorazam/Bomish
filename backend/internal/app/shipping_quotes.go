@@ -13,6 +13,7 @@ import (
 )
 
 type shippingSnapshot struct {
+	Items            []packing.Item   `json:"items,omitempty"`
 	Config           calculatedConfig `json:"config"`
 	Destination      domain.Address   `json:"destination"`
 	Algorithm        string           `json:"algorithm"`
@@ -92,7 +93,9 @@ func tehranDestination(c calculatedConfig, d domain.Address) bool {
 	l, ok := findLocality(c, d)
 	return ok && domain.Normalize(l.City) == "تهران" && domain.Normalize(l.Province) == "تهران"
 }
-func snappEligible(c calculatedConfig, d domain.Address, parcels []packing.Parcel) (bool, string) {
+
+// Courier capacity is checked on the purchased packages, without selecting cartons.
+func snappEligible(c calculatedConfig, d domain.Address, items []packing.Item) (bool, string) {
 	if !tehranDestination(c, d) || d.CityID != c.Snapp.CityID {
 		return false, "پیک در این شهر فعال نیست"
 	}
@@ -102,18 +105,20 @@ func snappEligible(c calculatedConfig, d domain.Address, parcels []packing.Parce
 	if !insideArea(*d.Latitude, *d.Longitude, c.Snapp.Area) {
 		return false, "موقعیت خارج از محدوده پیک است"
 	}
+	if len(items) == 0 {
+		return false, "سفارش بدون بسته قابل ارسال نیست"
+	}
 	var weight, volume int64
-	for _, p := range parcels {
-		weight += p.Weight()
-		volume += p.Box.Outside.Volume()
-		s := p.Box.Outside
-		m := c.Snapp.MaxSize
-		if s.Length > m.Length || s.Width > m.Width || s.Height > m.Height {
-			return false, "ابعاد کارتن بیش از ظرفیت پیک است"
+	for _, item := range items {
+		weight += item.Grams
+		volume += item.Size.Volume()
+		s, m := item.Size, c.Snapp.MaxSize
+		if !s.Valid() || item.Grams < 1 || s.Height > m.Height || !((s.Length <= m.Length && s.Width <= m.Width) || (s.Width <= m.Length && s.Length <= m.Width)) {
+			return false, "ابعاد بسته بیش از ظرفیت پیک است"
 		}
 	}
-	if weight > c.Snapp.MaxGrams || volume > c.Snapp.MaxVolumeCm3*1000 || len(parcels) > c.Snapp.MaxParcels {
-		return false, "حجم یا وزن سفارش بیش از ظرفیت پیک است"
+	if weight > c.Snapp.MaxGrams || volume > c.Snapp.MaxVolumeCm3*1000 || len(items) > c.Snapp.MaxParcels {
+		return false, "تعداد، حجم یا وزن بسته‌ها بیش از ظرفیت پیک است"
 	}
 	return true, ""
 }
@@ -138,7 +143,9 @@ func postalPacking(items []packing.Item, c calculatedConfig) ([]packing.Parcel, 
 		if box.PostalSizeID == "" || size.Length > limit.Length || size.Width > limit.Width || size.Height > limit.Height {
 			continue
 		}
-		box.MaxGrams = min(box.MaxGrams, c.Tapin.MaxGrams)
+		if box.MaxGrams == 0 || box.MaxGrams > c.Tapin.MaxGrams {
+			box.MaxGrams = c.Tapin.MaxGrams
+		}
 		boxes = append(boxes, box)
 	}
 	return packing.Plan(items, boxes)
@@ -150,7 +157,7 @@ func shippingRequest(s shippingSnapshot) carrier.Request {
 		p = s.Config.Tapin
 	}
 	l, _ := findLocality(s.Config, s.Destination)
-	return carrier.Request{Origin: s.Config.Origin, Destination: s.Destination, Parcels: s.Parcels, Service: p.Service, ShopID: p.ShopID, ProvinceCode: l.TapinProvince, CityCode: l.TapinCity}
+	return carrier.Request{Origin: s.Config.Origin, Destination: s.Destination, Parcels: s.Parcels, Items: snapshotItems(s), Service: p.Service, ShopID: p.ShopID, ProvinceCode: l.TapinProvince, CityCode: l.TapinCity}
 }
 func (a *App) shippingProvider(method string) carrier.Quoter {
 	if a.ShippingProvider != nil {
@@ -183,10 +190,8 @@ func (a *App) calculateShipping(ctx context.Context, c domain.Cart, in shippingQ
 	if e != nil {
 		return s, e
 	}
-	s.Parcels, e = packing.Plan(items, cfg.Boxes)
-	if e != nil {
-		return s, e
-	}
+	s.Items = items
+	s.Parcels = []packing.Parcel{}
 	if _, ok := findLocality(cfg, s.Destination); !ok {
 		return s, &packing.Failure{Code: "unsupported_destination", Detail: "شهر و استان را از فهرست انتخاب کنید"}
 	}
@@ -196,10 +201,13 @@ func (a *App) calculateShipping(ctx context.Context, c domain.Cart, in shippingQ
 	tehran := tehranDestination(cfg, s.Destination)
 	s.Method = "post"
 	if tehran {
-		eligible, reason := snappEligible(cfg, s.Destination, s.Parcels)
+		eligible, reason := snappEligible(cfg, s.Destination, items)
 		if !cfg.Snapp.Enabled || !cfg.Snapp.Verified {
 			eligible = false
 			reason = "سرویس پیک فعال نیست"
+		}
+		if in.Method == "snapp" && !eligible {
+			return s, &packing.Failure{Code: "courier_unavailable", Detail: reason + "؛ ارسال با پست را انتخاب کنید"}
 		}
 		s.FallbackReason = reason
 		if eligible && in.Method != "post" {
@@ -209,9 +217,15 @@ func (a *App) calculateShipping(ctx context.Context, c domain.Cart, in shippingQ
 			s.FallbackReason = "پست به انتخاب شما"
 		}
 	}
+	if !tehran && in.Method == "snapp" {
+		return s, &packing.Failure{Code: "courier_unavailable", Detail: "ارسال با پیک فقط در شهر تهران فعال است"}
+	}
 	if s.Method == "snapp" {
 		s.CarrierQuote, e = a.shippingProvider("snapp").Quote(ctx, shippingRequest(s))
 		if e != nil {
+			if in.Method == "snapp" {
+				return s, &packing.Failure{Code: "provider_unavailable", Detail: "دریافت کرایه پیک انجام نشد؛ دوباره تلاش کنید یا ارسال با پست را انتخاب کنید"}
+			}
 			s.Method = "post"
 			s.FallbackReason = "استعلام پیک در دسترس نیست"
 		}
@@ -237,8 +251,8 @@ func (a *App) calculateShipping(ctx context.Context, c domain.Cart, in shippingQ
 	if e != nil {
 		return s, &packing.Failure{Code: "provider_unavailable", Detail: "دریافت هزینه ارسال انجام نشد؛ دوباره تلاش کنید یا با پشتیبانی تماس بگیرید"}
 	}
-	// A Tehran postal quote must be accepted by its exact ID; a boolean cannot accept a new price.
-	s.FallbackAccepted = !tehran || s.Method == "snapp"
+	// Explicit postal selection needs no fallback consent. Legacy automatic fallback still does.
+	s.FallbackAccepted = in.Method == "post" || !tehran || s.Method == "snapp"
 	p := cfg.Tapin
 	if s.Method == "snapp" {
 		p = cfg.Snapp
@@ -254,8 +268,14 @@ func (a *App) calculateShipping(ctx context.Context, c domain.Cart, in shippingQ
 	}
 	s.Totals.ShippingRials = carrier.CustomerCharge(s.CarrierQuote.CostRials, c.SubtotalRials, threshold)
 	s.Totals.TotalRials = c.SubtotalRials + s.Totals.ShippingRials
-	for _, p := range s.Parcels {
-		s.Totals.WeightGrams += p.Weight()
+	if s.Method == "snapp" {
+		for _, item := range items {
+			s.Totals.WeightGrams += item.Grams
+		}
+	} else {
+		for _, p := range s.Parcels {
+			s.Totals.WeightGrams += p.Weight()
+		}
 	}
 	e = applyDiscount(ctx, a.Pool, &s.Totals, in.DiscountCode, userID, false)
 	return s, e

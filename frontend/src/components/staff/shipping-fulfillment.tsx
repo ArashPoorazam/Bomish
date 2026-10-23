@@ -132,7 +132,9 @@ export function ShippingFulfillment({
       draft.current = false;
       setMessage(
         path === "ready"
-          ? "بسته‌بندی تأیید شد؛ اکنون پیک ارسال را انتخاب کنید."
+          ? result.method === "snapp"
+            ? "آمادگی تأیید شد؛ اکنون پیک ارسال را انتخاب کنید."
+            : "بسته‌بندی پستی تأیید شد؛ سفارش آماده ارسال است."
           : "تغییر ثبت شد.",
       );
       if (!(dialog === "method" && path === "dispatch-quote")) close();
@@ -172,13 +174,13 @@ export function ShippingFulfillment({
         <h3>
           {data.assignedCourier
             ? "پیک بومیش"
-            : data.method === "snapp" && can("edit_parcels")
+            : data.method === "snapp" && can("ready")
               ? "ارسال تهران"
               : providerName(data.method)}{" "}
           · ارسال سفارش
         </h3>
         <span className="badge">
-          {data.ready && can("edit_parcels")
+          {data.ready && can("ready")
             ? "آماده ارسال"
             : (deliveryStatuses[data.status] ?? data.status)}
         </span>
@@ -234,22 +236,24 @@ export function ShippingFulfillment({
           </p>
         )}
       </div>
-      <button
-        className="button secondary no-print"
-        type="button"
-        onClick={() => {
-          const details = packingDetails.current;
-          const wasOpen = details?.open ?? false;
-          if (details) details.open = true;
-          try {
-            window.print();
-          } finally {
-            if (details) details.open = wasOpen;
-          }
-        }}
-      >
-        چاپ اطلاعات بسته‌بندی
-      </button>
+      {data.method === "post" && (
+        <button
+          className="button secondary no-print"
+          type="button"
+          onClick={() => {
+            const details = packingDetails.current;
+            const wasOpen = details?.open ?? false;
+            if (details) details.open = true;
+            try {
+              window.print();
+            } finally {
+              if (details) details.open = wasOpen;
+            }
+          }}
+        >
+          چاپ اطلاعات بسته‌بندی
+        </button>
+      )}
       {(data.driverName || data.driverPhone) && (
         <p>
           پیک: {data.driverName || "نام اعلام نشده"}
@@ -287,256 +291,278 @@ export function ShippingFulfillment({
           )}
         </section>
       )}
-      <details
-        ref={packingDetails}
-        className="shipping-packing-step"
-        open={!data.ready}
-      >
-        <summary>
-          ۱. بسته‌بندی سفارش {data.ready ? "· تأیید شده" : "· نیازمند تأیید"}
-        </summary>
+      {data.method === "snapp" && can("ready") && !data.ready && (
         <div className="stack">
-          <fieldset className="product-step-fields stack" disabled={busy}>
-            {parcels.map((p, i) => (
-              <div key={p.id} className="stack">
-                <ParcelView parcel={p} />
-                {can("edit_parcels") && (
-                  <div className="product-package stack">
-                    <label>
-                      کارتن انتخابی
-                      <select
-                        value={p.box.id}
-                        onChange={(e) => {
-                          const box = data.snapshot.config.boxes.find(
-                            (b) => b.id === e.target.value,
-                          );
-                          if (box)
-                            changeParcel(i, {
-                              box,
-                              manual: true,
-                              confirmed: false,
-                              grossGrams:
-                                box.emptyGrams +
-                                box.fillerGrams +
-                                p.placements.reduce(
-                                  (s, v) => s + v.item.grams,
-                                  0,
-                                ),
-                            });
-                        }}
-                      >
-                        {data.snapshot.config.boxes
-                          .filter((b) => b.active && b.verified)
-                          .map((b) => (
-                            <option key={b.id} value={b.id}>
-                              {b.name}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                    <MeasurementNumber
-                      label="وزن اندازه‌گیری‌شده کارتن (گرم)"
-                      value={p.measuredGrams}
-                      onChange={(n) => changeParcel(i, { measuredGrams: n })}
-                    />
-                    <label className="check-label">
-                      <input
-                        type="checkbox"
-                        checked={p.confirmed}
-                        onChange={(e) =>
-                          changeParcel(i, { confirmed: e.target.checked })
-                        }
-                      />
-                      محتویات، وزن و بسته‌بندی واقعی این کارتن را تأیید می‌کنم
-                    </label>
-                    <details>
-                      <summary>اصلاح تخصیص بسته‌ها</summary>
-                      {p.placements.map((v, j) => (
-                        <label
-                          key={
-                            v.item.productId + v.item.packageId + v.item.unit
-                          }
+          <p>
+            پس از تأیید همه ردیف‌های سفارش در چک‌لیست، آمادگی ارسال با پیک را
+            ثبت کنید.
+          </p>
+          <button
+            type="button"
+            className="button"
+            disabled={busy}
+            onClick={() => void act("ready", { version: data.version })}
+          >
+            تأیید آمادگی ارسال
+          </button>
+        </div>
+      )}
+      {data.method === "post" && (
+        <details
+          ref={packingDetails}
+          className="shipping-packing-step"
+          open={!data.ready}
+        >
+          <summary>
+            ۱. بسته‌بندی سفارش {data.ready ? "· تأیید شده" : "· نیازمند تأیید"}
+          </summary>
+          <div className="stack">
+            <fieldset className="product-step-fields stack" disabled={busy}>
+              {parcels.map((p, i) => (
+                <div key={p.id} className="stack">
+                  <ParcelView parcel={p} />
+                  {can("edit_parcels") && (
+                    <div className="product-package stack">
+                      <label>
+                        کارتن انتخابی
+                        <select
+                          value={p.box.id}
+                          onChange={(e) => {
+                            const box = data.snapshot.config.boxes.find(
+                              (b) => b.id === e.target.value,
+                            );
+                            if (box)
+                              changeParcel(i, {
+                                box,
+                                manual: true,
+                                confirmed: false,
+                                grossGrams:
+                                  box.emptyGrams +
+                                  box.fillerGrams +
+                                  p.placements.reduce(
+                                    (s, v) => s + v.item.grams,
+                                    0,
+                                  ),
+                              });
+                          }}
                         >
-                          {v.item.label} · واحد {fa(v.item.unit + 1)}
-                          <select
-                            value={p.id}
-                            onChange={(e) => {
-                              const to = e.target.value;
-                              setParcels((ps) =>
-                                ps
-                                  .map((x, k) => {
-                                    const placements =
-                                      k === i
-                                        ? x.placements.filter((_, n) => n !== j)
-                                        : x.id === to
-                                          ? [
-                                              ...x.placements,
-                                              { ...v, x: 0, y: 0, z: 0 },
-                                            ]
-                                          : x.placements;
-                                    return {
-                                      ...x,
-                                      placements,
-                                      manual: true,
-                                      confirmed: false,
-                                      measuredGrams: 0,
-                                      grossGrams:
-                                        x.box.emptyGrams +
-                                        x.box.fillerGrams +
-                                        placements.reduce(
-                                          (s, p) => s + p.item.grams,
-                                          0,
-                                        ),
-                                    };
-                                  })
-                                  .filter((x) => x.placements.length > 0),
-                              );
-                            }}
-                          >
-                            {parcels.map((x) => (
-                              <option key={x.id} value={x.id}>
-                                {x.box.name} · {x.id}
+                          {data.snapshot.config.boxes
+                            .filter((b) => b.active && b.verified)
+                            .map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.name}
                               </option>
                             ))}
-                          </select>
-                        </label>
-                      ))}
-                    </details>
-                  </div>
-                )}
-                {can("postal_details") && (
-                  <div className="form-grid">
-                    <label>
-                      بارکد پستی این کارتن
-                      <input
-                        dir="ltr"
-                        inputMode="numeric"
-                        value={p.tracking}
-                        onChange={(e) =>
-                          changeParcel(i, { tracking: digits(e.target.value) })
-                        }
+                        </select>
+                      </label>
+                      <MeasurementNumber
+                        label="وزن اندازه‌گیری‌شده کارتن (گرم)"
+                        value={p.measuredGrams}
+                        onChange={(n) => changeParcel(i, { measuredGrams: n })}
                       />
-                    </label>
-                    <label>
-                      هزینه واقعی (تومان؛ خالی یعنی نامشخص)
-                      <input
-                        dir="ltr"
-                        inputMode="numeric"
-                        value={
-                          p.actualCostRials === null
-                            ? ""
-                            : p.actualCostRials / 10
+                      <label className="check-label">
+                        <input
+                          type="checkbox"
+                          checked={p.confirmed}
+                          onChange={(e) =>
+                            changeParcel(i, { confirmed: e.target.checked })
+                          }
+                        />
+                        محتویات، وزن و بسته‌بندی واقعی این کارتن را تأیید می‌کنم
+                      </label>
+                      <details>
+                        <summary>اصلاح تخصیص بسته‌ها</summary>
+                        {p.placements.map((v, j) => (
+                          <label
+                            key={
+                              v.item.productId + v.item.packageId + v.item.unit
+                            }
+                          >
+                            {v.item.label} · واحد {fa(v.item.unit + 1)}
+                            <select
+                              value={p.id}
+                              onChange={(e) => {
+                                const to = e.target.value;
+                                setParcels((ps) =>
+                                  ps
+                                    .map((x, k) => {
+                                      const placements =
+                                        k === i
+                                          ? x.placements.filter(
+                                              (_, n) => n !== j,
+                                            )
+                                          : x.id === to
+                                            ? [
+                                                ...x.placements,
+                                                { ...v, x: 0, y: 0, z: 0 },
+                                              ]
+                                            : x.placements;
+                                      return {
+                                        ...x,
+                                        placements,
+                                        manual: true,
+                                        confirmed: false,
+                                        measuredGrams: 0,
+                                        grossGrams:
+                                          x.box.emptyGrams +
+                                          x.box.fillerGrams +
+                                          placements.reduce(
+                                            (s, p) => s + p.item.grams,
+                                            0,
+                                          ),
+                                      };
+                                    })
+                                    .filter((x) => x.placements.length > 0),
+                                );
+                              }}
+                            >
+                              {parcels.map((x) => (
+                                <option key={x.id} value={x.id}>
+                                  {x.box.name} · {x.id}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ))}
+                      </details>
+                    </div>
+                  )}
+                  {can("postal_details") && (
+                    <div className="form-grid">
+                      <label>
+                        بارکد پستی این کارتن
+                        <input
+                          dir="ltr"
+                          inputMode="numeric"
+                          value={p.tracking}
+                          onChange={(e) =>
+                            changeParcel(i, {
+                              tracking: digits(e.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        هزینه واقعی (تومان؛ خالی یعنی نامشخص)
+                        <input
+                          dir="ltr"
+                          inputMode="numeric"
+                          value={
+                            p.actualCostRials === null
+                              ? ""
+                              : p.actualCostRials / 10
+                          }
+                          onChange={(e) =>
+                            changeParcel(i, {
+                              actualCostRials:
+                                e.target.value === ""
+                                  ? null
+                                  : Number(digits(e.target.value)) * 10,
+                            })
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() =>
+                          void act(
+                            `parcels/${p.id}`,
+                            {
+                              version: data.version,
+                              tracking: p.tracking,
+                              actualCostRials: p.actualCostRials,
+                            },
+                            "PATCH",
+                          )
                         }
-                        onChange={(e) =>
-                          changeParcel(i, {
-                            actualCostRials:
-                              e.target.value === ""
-                                ? null
-                                : Number(digits(e.target.value)) * 10,
-                          })
-                        }
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="button secondary"
-                      onClick={() =>
-                        void act(
-                          `parcels/${p.id}`,
-                          {
-                            version: data.version,
-                            tracking: p.tracking,
-                            actualCostRials: p.actualCostRials,
-                          },
-                          "PATCH",
-                        )
-                      }
-                    >
-                      ذخیره رهگیری و هزینه کارتن
-                    </button>
-                  </div>
-                )}
+                      >
+                        ذخیره رهگیری و هزینه کارتن
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </fieldset>
+            {can("edit_parcels") && (
+              <div className="stack">
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={busy}
+                  onClick={() => {
+                    const box = data.snapshot.config.boxes.find(
+                      (b) => b.active && b.verified,
+                    );
+                    if (box)
+                      setParcels([
+                        ...parcels,
+                        {
+                          id: crypto.randomUUID(),
+                          box,
+                          placements: [],
+                          grossGrams: box.emptyGrams + box.fillerGrams,
+                          measuredGrams: 0,
+                          confirmed: false,
+                          manual: true,
+                          tracking: "",
+                          actualCostRials: null,
+                        },
+                      ]);
+                  }}
+                >
+                  افزودن کارتن برای اصلاح دستی
+                </button>
+                <label>
+                  دلیل اصلاح / نتیجه بررسی واقعی
+                  <input
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="button"
+                  disabled={busy || !dirty || !reason.trim()}
+                  onClick={() =>
+                    void act(
+                      "parcels",
+                      { version: data.version, parcels, reason },
+                      "PUT",
+                    )
+                  }
+                >
+                  ذخیره بسته‌بندی واقعی
+                </button>
               </div>
-            ))}
-          </fieldset>
-          {can("edit_parcels") && (
-            <div className="stack">
+            )}
+            {dirty && (
               <button
                 type="button"
                 className="button secondary"
                 disabled={busy}
                 onClick={() => {
-                  const box = data.snapshot.config.boxes.find(
-                    (b) => b.active && b.verified,
-                  );
-                  if (box)
-                    setParcels([
-                      ...parcels,
-                      {
-                        id: crypto.randomUUID(),
-                        box,
-                        placements: [],
-                        grossGrams: box.emptyGrams + box.fillerGrams,
-                        measuredGrams: 0,
-                        confirmed: false,
-                        manual: true,
-                        tracking: "",
-                        actualCostRials: null,
-                      },
-                    ]);
+                  draft.current = false;
+                  setParcels(data.parcels);
+                  void load();
                 }}
               >
-                افزودن کارتن برای اصلاح دستی
+                کنار گذاشتن ویرایش و دریافت آخرین وضعیت
               </button>
-              <label>
-                دلیل اصلاح / نتیجه بررسی واقعی
-                <input
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                />
-              </label>
+            )}
+            {can("ready") && !data.ready && (
               <button
                 type="button"
                 className="button"
-                disabled={busy || !dirty || !reason.trim()}
-                onClick={() =>
-                  void act(
-                    "parcels",
-                    { version: data.version, parcels, reason },
-                    "PUT",
-                  )
-                }
+                disabled={busy || dirty}
+                onClick={() => void act("ready", { version: data.version })}
               >
-                ذخیره بسته‌بندی واقعی
+                تأیید آمادگی ارسال
               </button>
-            </div>
-          )}
-          {dirty && (
-            <button
-              type="button"
-              className="button secondary"
-              disabled={busy}
-              onClick={() => {
-                draft.current = false;
-                setParcels(data.parcels);
-                void load();
-              }}
-            >
-              کنار گذاشتن ویرایش و دریافت آخرین وضعیت
-            </button>
-          )}
-          {can("ready") && !data.ready && (
-            <button
-              type="button"
-              className="button"
-              disabled={busy || dirty}
-              onClick={() => void act("ready", { version: data.version })}
-            >
-              تأیید آمادگی ارسال
-            </button>
-          )}
-        </div>
-      </details>
+            )}
+          </div>
+        </details>
+      )}
       {data.method === "snapp" && can("own_courier_dispatch") && !dirty && (
         <ShippingDispatchChoice
           key={data.orderId}
@@ -550,9 +576,9 @@ export function ShippingFulfillment({
       {data.method === "snapp" &&
         !data.assignedCourier &&
         (!data.ready || dirty) &&
-        can("edit_parcels") && (
+        can("ready") && (
           <p className="notice">
-            ۲. انتخاب پیک و ارسال · پس از ذخیره بسته‌بندی و تأیید آمادگی،
+            ۲. انتخاب پیک و ارسال · پس از تکمیل چک‌لیست و تأیید آمادگی،
             می‌توانید اسنپ یا پیک بومیش را انتخاب کنید.
           </p>
         )}

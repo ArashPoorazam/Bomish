@@ -16,6 +16,7 @@ type Request struct {
 	Reference    string           `json:"reference"`
 	Origin       domain.Address   `json:"origin"`
 	Destination  domain.Address   `json:"destination"`
+	Items        []packing.Item   `json:"items,omitempty"`
 	Parcels      []packing.Parcel `json:"parcels"`
 	Service      string           `json:"service"`
 	ShopID       string           `json:"shopId"`

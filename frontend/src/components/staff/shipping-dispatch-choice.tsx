@@ -59,7 +59,7 @@ export function ShippingDispatchChoice({
       <div>
         <h4>۲. انتخاب پیک و ارسال</h4>
         <p>
-          بسته‌بندی تأیید شده است. همه کارتن‌های این سفارش با پیک انتخابی ارسال
+          سفارش آماده ارسال است. همه بسته‌های این سفارش با پیک انتخابی ارسال
           می‌شوند.
         </p>
         <p className="shipping-dispatch-price">
@@ -216,12 +216,13 @@ export function ShippingDispatchChoice({
                 disabled={busy}
                 onChange={(e) => setConfirmed(e.target.checked)}
               />
-              همه کارتن‌ها را به {selected.fullName} تحویل داده‌ام.
+              همه بسته‌ها را به {selected.fullName} تحویل داده‌ام.
             </label>
           )}
           <p>
             با ثبت تحویل، سفارش «ارسال‌شده» می‌شود و نام پیک در سابقه سفارش
-            می‌ماند. تحویل به مشتری در مرحله بعد تأیید می‌شود.
+            می‌ماند. نام و شماره همراه پیک برای خریدار پیامک می‌شود. تحویل به
+            مشتری در مرحله بعد تأیید می‌شود.
           </p>
           <button
             type="button"

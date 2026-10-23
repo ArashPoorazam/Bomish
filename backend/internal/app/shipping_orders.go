@@ -15,11 +15,12 @@ import (
 )
 
 type dispatchReview struct {
-	ID        string        `json:"id"`
-	Version   int64         `json:"version"`
-	Method    string        `json:"method"`
-	ExpiresAt time.Time     `json:"expiresAt"`
-	Quote     carrier.Quote `json:"quote"`
+	ID        string           `json:"id"`
+	Version   int64            `json:"version"`
+	Method    string           `json:"method"`
+	ExpiresAt time.Time        `json:"expiresAt"`
+	Parcels   []packing.Parcel `json:"parcels,omitempty"`
+	Quote     carrier.Quote    `json:"quote"`
 }
 type deliveryRecord struct {
 	AssignedCourier *staffCourier          `json:"assignedCourier,omitempty"`
@@ -89,7 +90,10 @@ func (a *App) staffDelivery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if (status == "paid" || status == "packing") && !deliveryLocked(d.Status) {
-		d.AllowedActions = append(d.AllowedActions, "edit_parcels", "ready")
+		d.AllowedActions = append(d.AllowedActions, "ready")
+		if d.Method == "post" {
+			d.AllowedActions = append(d.AllowedActions, "edit_parcels")
+		}
 		if d.Ready {
 			d.AllowedActions = append(d.AllowedActions, "dispatch_quote")
 			if d.Method == "snapp" {
@@ -174,7 +178,16 @@ func attachDelivery(ctx context.Context, q querier, o *domain.Order) error {
 	if d.AssignedCourier != nil {
 		v.Method, v.Service = "own_courier", "own_courier"
 	}
+	if d.Method == "snapp" && (o.Status == "shipped" || o.Status == "received") {
+		v.Courier, e = orderCourierContact(ctx, q, o.ID)
+		if e != nil {
+			return e
+		}
+	}
 	for _, p := range d.Parcels {
+		if d.Method != "post" {
+			break
+		}
 		url := ""
 		if d.Method == "post" && validTracking(p.Tracking) {
 			url = postalTrackingURL(p.Tracking)
@@ -241,8 +254,15 @@ func (a *App) deliveryMutation(w http.ResponseWriter, r *http.Request, version i
 	a.staffDelivery(w, r)
 }
 func orderUnits(d deliveryRecord) []packing.Item {
+	return snapshotItems(d.Snapshot)
+}
+func snapshotItems(s shippingSnapshot) []packing.Item {
+	if len(s.Items) > 0 {
+		return s.Items
+	}
+	// Orders created before package snapshots retain their original carton allocation.
 	out := []packing.Item{}
-	for _, p := range d.Snapshot.Parcels {
+	for _, p := range s.Parcels {
 		for _, v := range p.Placements {
 			out = append(out, v.Item)
 		}
@@ -270,6 +290,9 @@ func (a *App) correctParcels(w http.ResponseWriter, r *http.Request) {
 	a.deliveryMutation(w, r, in.Version, func(tx pgx.Tx, d *deliveryRecord, status string) error {
 		if e := editableDelivery(*d, status); e != nil {
 			return e
+		}
+		if d.Method != "post" {
+			return errors.New("ارسال با پیک به محاسبه کارتن نیاز ندارد")
 		}
 		if strings.TrimSpace(in.Reason) == "" {
 			return errors.New("دلیل اصلاح را بنویسید")
@@ -311,6 +334,16 @@ func readyValidation(ctx context.Context, tx pgx.Tx, d deliveryRecord) error {
 	if incomplete > 0 {
 		return errors.New("همه ردیف‌های سفارش را در چک‌لیست تأیید کنید")
 	}
+	if e = d.Snapshot.Destination.Validate(); e != nil {
+		return e
+	}
+	if d.Method == "snapp" {
+		ok, reason := snappEligible(d.Snapshot.Config, d.Snapshot.Destination, orderUnits(d))
+		if !ok {
+			return errors.New(reason)
+		}
+		return nil
+	}
 	for _, p := range d.Parcels {
 		if !p.Confirmed {
 			return errors.New("بسته‌بندی واقعی همه کارتن‌ها را تأیید کنید")
@@ -319,15 +352,7 @@ func readyValidation(ctx context.Context, tx pgx.Tx, d deliveryRecord) error {
 	if e = packing.ValidateCorrections(d.Parcels, orderUnits(d)); e != nil {
 		return e
 	}
-	if e = d.Snapshot.Destination.Validate(); e != nil {
-		return e
-	}
-	if d.Method == "snapp" {
-		ok, reason := snappEligible(d.Snapshot.Config, d.Snapshot.Destination, d.Parcels)
-		if !ok {
-			return errors.New(reason)
-		}
-	} else if e = postalEligible(d.Snapshot.Config, d.Snapshot.Destination, d.Parcels); e != nil {
+	if e = postalEligible(d.Snapshot.Config, d.Snapshot.Destination, d.Parcels); e != nil {
 		return e
 	}
 	return nil
@@ -384,17 +409,28 @@ func (a *App) dispatchQuote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := d.Snapshot
+	s.Items = orderUnits(d)
 	s.Method = method
 	s.Parcels = d.Parcels
 	if method == "snapp" {
-		ok, reason := snappEligible(s.Config, s.Destination, s.Parcels)
+		ok, reason := snappEligible(s.Config, s.Destination, orderUnits(d))
 		if !ok {
 			fail(w, 422, reason)
 			return
 		}
-	} else if e = postalEligible(s.Config, s.Destination, s.Parcels); e != nil {
-		fail(w, 422, e.Error())
-		return
+		s.Parcels = []packing.Parcel{}
+	} else {
+		if method != d.Method {
+			s.Parcels, e = postalPacking(orderUnits(d), s.Config)
+			if e != nil {
+				fail(w, 422, e.Error())
+				return
+			}
+		}
+		if e = postalEligible(s.Config, s.Destination, s.Parcels); e != nil {
+			fail(w, 422, e.Error())
+			return
+		}
 	}
 	q, e := a.shippingProvider(method).Quote(r.Context(), shippingRequest(s))
 	if e != nil {
@@ -412,7 +448,7 @@ func (a *App) dispatchQuote(w http.ResponseWriter, r *http.Request) {
 		if !d.Ready {
 			return errors.New("آمادگی ارسال تغییر کرده")
 		}
-		d.Review = &dispatchReview{ID: token(), Version: d.Version + 1, Method: method, ExpiresAt: expiry, Quote: q}
+		d.Review = &dispatchReview{ID: token(), Version: d.Version + 1, Method: method, ExpiresAt: expiry, Quote: q, Parcels: s.Parcels}
 		return nil
 	})
 }
@@ -447,7 +483,8 @@ func (a *App) bookShipment(w http.ResponseWriter, r *http.Request) {
 		}
 		id := token()
 		s := d.Snapshot
-		s.Parcels = d.Parcels
+		s.Items = orderUnits(*d)
+		s.Parcels = []packing.Parcel{}
 		req := shippingRequest(s)
 		req.Reference = id
 		raw, _ := json.Marshal(req)
@@ -518,6 +555,11 @@ func (a *App) changeDeliveryMethod(w http.ResponseWriter, r *http.Request) {
 			return errors.New("رضایت مشتری، دلیل و بررسی هزینه تازه لازم است")
 		}
 		previousMethod := d.Method
+		d.Snapshot.Items = orderUnits(*d)
+		d.Parcels = d.Review.Parcels
+		if in.Method == "snapp" {
+			d.Parcels = []packing.Parcel{}
+		}
 		reviewedCost := d.Review.Quote.CostRials
 		d.Method = in.Method
 		d.Snapshot.Method = in.Method

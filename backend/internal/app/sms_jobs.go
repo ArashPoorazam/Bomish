@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bomish/internal/domain"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,15 +11,16 @@ import (
 )
 
 type orderSMSPayload struct {
-	OrderID string `json:"orderId"`
-	Stage   string `json:"stage"`
-	Phone   string `json:"phone"`
-	Method  string `json:"method"`
+	Courier *domain.CourierContact `json:"courier,omitempty"`
+	OrderID string                 `json:"orderId"`
+	Stage   string                 `json:"stage"`
+	Phone   string                 `json:"phone"`
+	Method  string                 `json:"method"`
 }
 
 // Order history and notification intent commit together. Disabled sends are
 // permanently skipped, so switching SMS on never drains a development backlog.
-func queueOrderSMS(ctx context.Context, tx pgx.Tx, id, stage string) error {
+func queueOrderSMS(ctx context.Context, tx pgx.Tx, id, stage string, contacts ...*domain.CourierContact) error {
 	switch stage {
 	case "paid", "packing", "shipped", "received":
 	default:
@@ -28,6 +30,9 @@ func queueOrderSMS(ctx context.Context, tx pgx.Tx, id, stage string) error {
 		return err
 	}
 	p := orderSMSPayload{OrderID: id, Stage: stage}
+	if len(contacts) > 0 {
+		p.Courier = contacts[0]
+	}
 	err := tx.QueryRow(ctx, `SELECT u.phone,coalesce(s.method,'legacy_postal') FROM orders o JOIN users u ON u.id=o.user_id LEFT JOIN order_shipping s ON s.order_id=o.id WHERE o.id=$1`, id).Scan(&p.Phone, &p.Method)
 	if err != nil {
 		return err
@@ -102,6 +107,30 @@ func (a *App) claimSMS(ctx context.Context) (*smsJob, error) {
 				return nil, err
 			}
 			return job, tx.Commit(ctx)
+		}
+	}
+	if job.Payload.Stage == "shipped" && job.Payload.Method == "snapp" {
+		if job.Payload.Courier == nil || !domain.ValidPhone(domain.Phone(job.Payload.Courier.Phone)) {
+			job.Payload.Courier, err = orderCourierContact(ctx, tx, job.Payload.OrderID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if job.Payload.Courier == nil || !domain.ValidPhone(domain.Phone(job.Payload.Courier.Phone)) {
+			// A later provider update can supply the driver's contact. Never invent a phone number.
+			_, err = tx.Exec(ctx, `UPDATE jobs SET available_at=now()+interval '30 seconds',last_error='awaiting_courier_details' WHERE id=$1`, job.ID)
+			if err != nil {
+				return nil, err
+			}
+			return job, tx.Commit(ctx)
+		}
+		job.Payload.Courier.Phone = domain.Phone(job.Payload.Courier.Phone)
+		raw, err = json.Marshal(job.Payload)
+		if err != nil {
+			return nil, err
+		}
+		if _, err = tx.Exec(ctx, "UPDATE jobs SET payload=$2 WHERE id=$1", job.ID, raw); err != nil {
+			return nil, err
 		}
 	}
 	job.Template = orderSMSTemplate(job.Payload.Stage, job.Payload.Method)
@@ -180,7 +209,7 @@ func (a *App) ProcessSMS(ctx context.Context) error {
 		if job.AttemptID == 0 {
 			continue
 		}
-		result := sendSMSTemplate(ctx, job.Payload.Phone, job.Template, job.Payload.OrderID)
+		result := sendOrderSMS(ctx, job.Payload, job.Template)
 		finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		err = a.finishSMS(finishCtx, job, result)
 		cancel()

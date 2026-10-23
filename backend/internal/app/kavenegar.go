@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bomish/internal/domain"
 	"context"
 	"encoding/json"
 	"errors"
@@ -70,7 +71,29 @@ type smsResult struct {
 	Retryable      bool
 }
 
+func sendOrderSMS(ctx context.Context, p orderSMSPayload, template string) smsResult {
+	if p.Stage != "shipped" || p.Method != "snapp" {
+		return sendSMSTemplate(ctx, p.Phone, template, p.OrderID)
+	}
+	if p.Courier == nil || !domain.ValidPhone(domain.Phone(p.Courier.Phone)) {
+		return smsResult{Status: "rejected", ErrorCode: "missing_courier_details"}
+	}
+	// Kavenegar token10 permits up to five spaces and 100 characters.
+	words := strings.Fields(p.Courier.Name)
+	if len(words) == 0 {
+		words = []string{"پیک"}
+	}
+	name := []rune(strings.Join(words[:min(len(words), 6)], " "))
+	return sendSMSTokens(ctx, p.Phone, template, p.OrderID, url.Values{
+		"token2":  {domain.Phone(p.Courier.Phone)},
+		"token10": {string(name[:min(len(name), 100)])},
+	})
+}
+
 func sendSMSTemplate(ctx context.Context, phone, template, value string) smsResult {
+	return sendSMSTokens(ctx, phone, template, value, nil)
+}
+func sendSMSTokens(ctx context.Context, phone, template, value string, extra url.Values) smsResult {
 	rejected := func(code string) smsResult { return smsResult{Status: "rejected", ErrorCode: code} }
 	if !smsEnabled() {
 		return rejected("sms_disabled")
@@ -84,6 +107,9 @@ func sendSMSTemplate(ctx context.Context, phone, template, value string) smsResu
 		return rejected("invalid_token")
 	}
 	form := url.Values{"receptor": {phone}, "template": {template}, "token": {value}, "type": {"sms"}}
+	for k, v := range extra {
+		form[k] = v
+	}
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.kavenegar.com/v1/"+url.PathEscape(key)+"/verify/lookup.json", strings.NewReader(form.Encode()))
 	if err != nil {
 		return rejected("configuration")

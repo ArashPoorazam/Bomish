@@ -8406,6 +8406,8 @@ export interface components {
             totals: components["schemas"]["Quote"];
             fallbackReason: string;
             fallbackAccepted: boolean;
+            /** @description Purchased package snapshot, independent of postal cartons. Older snapshots use parcel placements. */
+            items?: components["schemas"]["PackingItem"][];
         };
         DispatchReview: {
             id: string;
@@ -8414,6 +8416,7 @@ export interface components {
             method: string;
             expiresAt: string;
             quote: components["schemas"]["CarrierQuote"];
+            parcels?: components["schemas"]["Parcel"][];
         };
         DeliveryEvent: {
             status: string;
@@ -8440,7 +8443,7 @@ export interface components {
             assignedCourier?: components["schemas"]["StaffCourier"];
         };
         Delivery: {
-            /** @description snapp, post, or own_courier. Courier member identity is staff-only. */
+            /** @description snapp, post, or own_courier. Assigned courier contact is available after dispatch; staff ID remains private. */
             method: string;
             service: string;
             status: string;
@@ -8451,6 +8454,7 @@ export interface components {
                 trackingUrl: string;
             }[];
             events: components["schemas"]["DeliveryEvent"][];
+            courier?: components["schemas"]["CourierContact"];
         };
         CalculatedShippingConfig: {
             /** Format: int64 */
@@ -8500,6 +8504,10 @@ export interface components {
         StaffCourier: {
             id: string;
             fullName: string;
+            phone: string;
+        };
+        CourierContact: {
+            name: string;
             phone: string;
         };
     };

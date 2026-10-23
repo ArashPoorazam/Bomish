@@ -93,10 +93,13 @@ func TestOwnCourierLifecycleAndRoster(t *testing.T) {
 		t.Fatalf("wrong customer projection: %+v", result)
 	}
 	_, raw := customer.call("GET", "/orders/"+id, nil)
-	for _, secret := range []string{courierID, "assignedCourier", "actualCostRials", "پیک سفارش"} {
+	for _, secret := range []string{courierID, "assignedCourier", "actualCostRials"} {
 		if strings.Contains(string(raw), secret) {
 			t.Fatal("courier staff data leaked", secret)
 		}
+	}
+	if result.Order.Shipping.Courier == nil || result.Order.Shipping.Courier.Name != "پیک سفارش" || result.Order.Shipping.Courier.Phone != "09123456789" {
+		t.Fatal("customer courier contact missing", result.Order.Shipping)
 	}
 	var orders []domain.Order
 	operator.ok(t, "GET", "/staff/orders?provider=own_courier", nil, &orders)
