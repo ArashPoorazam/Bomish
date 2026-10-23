@@ -1,9 +1,10 @@
-import { test, expect, type APIRequestContext } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loginStaffAPI } from "./staff-login";
+import { checked, createPackaging } from "./commerce-fixture";
 import type {
   ShippingConfig,
   Product,
@@ -30,18 +31,7 @@ const address: Address = {
   longitude: 51.4,
   pinConfirmed: true,
 };
-async function checked(
-  request: APIRequestContext,
-  path: string,
-  method: string,
-  data: unknown,
-  headers: Record<string, string>,
-) {
-  const r = await request.fetch(`/api/v1${path}`, { method, data, headers });
-  expect(r.ok(), await r.text()).toBeTruthy();
-  return r.json();
-}
-test("calculated shipping: measurements, setup, customer quote, readiness, one courier and delivery", async ({
+test("calculated shipping: packaging, setup, customer quote, readiness, one courier and delivery", async ({
   browser,
   page,
 }, testInfo) => {
@@ -52,18 +42,24 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
   const products = (await (
     await page.request.get("/api/v1/staff/products?pageSize=100")
   ).json()) as Product[];
+  const packaging = await createPackaging(
+    page.request,
+    headers,
+    "shipping-standard",
+  );
+  const longPackaging = await createPackaging(
+    page.request,
+    headers,
+    "shipping-long",
+    { lengthMm: 125, volumeCm3: 1000 },
+  );
   // This suite is opt-in and requires a disposable seeded database with SHIPPING_SIMULATED=true.
   for (const product of products) {
     if (product.status !== "published") continue;
-    product.packages = product.packages.map((p) => ({
-      ...p,
-      lengthMm: 80,
-      widthMm: 80,
-      heightMm: 100,
-      shippingGrams:
-        (p.unit === "kg" ? p.amount * 1000 : p.unit === "g" ? p.amount : 1400) +
-        100,
-      shippingVerified: true,
+    product.packages = product.packages.map((pack) => ({
+      ...pack,
+      packagingId: packaging.id,
+      netGrams: pack.unit === "ml" || pack.unit === "l" ? 1400 : undefined,
     }));
     await checked(
       page.request,
@@ -95,13 +91,12 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
     page.getByRole("heading", { name: "بسته‌ها", exact: true }),
   ).toBeVisible();
   await page
-    .getByLabel("طول (سانتی‌متر)", { exact: true })
+    .getByLabel("بسته‌بندی محصول", { exact: true })
     .first()
-    .fill("۱۲٫۵");
-  await page
-    .getByLabel("طول (سانتی‌متر)", { exact: true })
-    .first()
-    .press("Tab");
+    .selectOption(longPackaging.id);
+  await expect(page.getByLabel("طول (سانتی‌متر)", { exact: true })).toHaveCount(
+    0,
+  );
   for (const width of [360, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     expect(
@@ -121,7 +116,7 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
     ),
   ).toBeTruthy();
   await page.screenshot({
-    path: testInfo.outputPath("measurements-mobile.png"),
+    path: testInfo.outputPath("packaging-mobile.png"),
     fullPage: true,
   });
   await page
@@ -136,6 +131,17 @@ test("calculated shipping: measurements, setup, customer quote, readiness, one c
     undefined,
     headers,
   );
+  const published = (await (
+    await page.request.get(`/api/v1/products/${product.slug}`)
+  ).json()) as Product;
+  expect(published.packages[0]).toMatchObject({
+    packagingId: longPackaging.id,
+    lengthMm: 125,
+    widthMm: 80,
+    heightMm: 100,
+    shippingGrams: 200,
+    shippingVerified: true,
+  });
   let config = (await (
     await page.request.get("/api/v1/staff/shipping")
   ).json()) as ShippingConfig;

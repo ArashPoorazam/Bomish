@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import type { Address, Order, Product } from "../src/lib/types";
 import { packagePrice } from "../src/lib/format";
 import { loginStaffAPI } from "./staff-login";
+import { createPackaging } from "./commerce-fixture";
 
 const address: Address = {
   id: "home",
@@ -243,6 +244,11 @@ test("homepage copy and conditional bestseller carousel navigation", async ({
       "/api/v1/products?available=true&collection=bestsellers&pageSize=12",
     )
   ).json();
+  const suggestions = await (
+    await request.get(
+      "/api/v1/products?available=true&collection=suggestions&pageSize=12",
+    )
+  ).json();
   await page.goto("/");
   await expect(page.locator("main")).not.toContainText("انتخاب آزادانه وزن");
   await expect(page.locator(".principle-card:visible").last()).toContainText(
@@ -255,7 +261,7 @@ test("homepage copy and conditional bestseller carousel navigation", async ({
     name: "محبوب‌های بومیش",
     exact: true,
   });
-  if (!products.length) {
+  if (!products.length && !suggestions.length) {
     await expect(heading).toHaveCount(0);
     return;
   }
@@ -289,6 +295,9 @@ test("discounted package rounds to 1000 toman in listing, purchase, cart, and ch
     "owner",
   );
   const id = `rounding-${Date.now()}`;
+  const packaging = await createPackaging(request, headers, id, {
+    emptyGrams: 50,
+  });
   const source = (await (
     await request.get("/api/v1/products/turmeric")
   ).json()) as Product;
@@ -304,11 +313,8 @@ test("discounted package rounds to 1000 toman in listing, purchase, cart, and ch
         unit: "g",
         priceRials: 470000,
         maxQuantity: 5,
-        shippingGrams: 150,
-        lengthMm: 80,
-        widthMm: 80,
-        heightMm: 100,
-        shippingVerified: true,
+        packagingId: packaging.id,
+        shippingGrams: 0,
       },
     ],
   };

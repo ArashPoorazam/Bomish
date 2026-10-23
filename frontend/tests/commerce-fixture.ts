@@ -4,7 +4,11 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resetBrowserAuthLimits } from "./staff-login";
-import type { Product, ShippingConfig } from "../src/lib/types";
+import type {
+  Product,
+  ProductPackaging,
+  ShippingConfig,
+} from "../src/lib/types";
 
 export const commerceAddress = {
   recipient: "خریدار آزمایشی",
@@ -26,6 +30,30 @@ export async function checked(
   const r = await client.fetch("/api/v1" + path, { method, data, headers });
   expect(r.ok(), await r.text()).toBeTruthy();
   return r.json();
+}
+
+export async function createPackaging(
+  client: APIRequestContext,
+  headers: Record<string, string>,
+  id: string,
+  overrides: Partial<ProductPackaging> = {},
+): Promise<ProductPackaging> {
+  return checked(
+    client,
+    "/staff/product-packaging/" + id,
+    "PUT",
+    {
+      name: "بسته‌بندی آزمایشی",
+      emptyGrams: 100,
+      lengthMm: 80,
+      widthMm: 80,
+      heightMm: 100,
+      volumeCm3: 640,
+      ...overrides,
+      id,
+    },
+    headers,
+  );
 }
 // This fixture is only for the disposable simulation database used by the browser suite.
 export async function prepareCommerce(baseURL: string, slug: string) {
@@ -51,13 +79,15 @@ export async function prepareCommerce(baseURL: string, slug: string) {
     const product: Product = await (
       await admin.get("/api/v1/products/" + slug)
     ).json();
-    product.packages = product.packages.map((p) => ({
-      ...p,
-      lengthMm: 80,
-      widthMm: 80,
-      heightMm: 100,
-      shippingGrams: 1500,
-      shippingVerified: true,
+    const packaging = await createPackaging(
+      admin,
+      headers,
+      "browser-commerce-packaging",
+    );
+    product.packages = product.packages.map((pack) => ({
+      ...pack,
+      packagingId: packaging.id,
+      netGrams: pack.unit === "ml" || pack.unit === "l" ? 1400 : undefined,
     }));
     await checked(
       admin,

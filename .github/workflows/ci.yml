@@ -33,6 +33,7 @@ jobs:
       SHIPPING_SIMULATED: "true"
       SMS_ENABLED: "false"
       SHIPPING_ACCEPTANCE: ${{ matrix.store-mode == 'simulation' && 'true' || 'false' }}
+      PACKAGING_ACCEPTANCE: ${{ matrix.store-mode == 'simulation' && 'true' || 'false' }}
       STORE_MODE: ${{ matrix.store-mode }}
     steps:
       - uses: actions/checkout@v7

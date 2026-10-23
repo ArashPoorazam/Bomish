@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { prepareCommerce, payCart } from "./commerce-fixture";
+import { prepareCommerce, payCart, createPackaging } from "./commerce-fixture";
 import { loginStaff } from "./staff-login";
 const phone = () => `091${String(Date.now()).slice(-8)}`;
 async function loginCustomer(page: Page) {
@@ -164,6 +164,14 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
   const owner = await ownerContext.newPage();
   await owner.goto("/staff");
   await loginStaff(owner, "owner");
+  const session = await (
+    await owner.request.get("/api/v1/session?workspace=staff")
+  ).json();
+  const packaging = await createPackaging(
+    owner.request,
+    { Origin: new URL(owner.url()).origin, "X-CSRF-Token": session.csrf },
+    `publication-${slug}`,
+  );
   await owner.goto("/staff?section=products&q=" + slug);
   await owner
     .getByRole("row")
@@ -175,12 +183,9 @@ test("employee drafts through UI, owner publishes, customer finds product", asyn
     .getByRole("navigation", { name: "مراحل محصول" })
     .getByRole("button", { name: "بسته‌ها" })
     .click();
-  await owner.getByLabel("طول (سانتی‌متر)", { exact: true }).fill("8");
-  await owner.getByLabel("عرض (سانتی‌متر)", { exact: true }).fill("8");
-  await owner.getByLabel("ارتفاع (سانتی‌متر)", { exact: true }).fill("10");
   await owner
-    .getByLabel("وزن بسته آماده ارسال (گرم)", { exact: true })
-    .fill("1500");
+    .getByLabel("بسته‌بندی محصول", { exact: true })
+    .selectOption(packaging.id);
   await owner.getByLabel("قیمت بسته (تومان)", { exact: true }).fill("۱۸۰۰۰۰");
   await expect(
     owner.getByLabel("قیمت بسته (تومان)", { exact: true }),

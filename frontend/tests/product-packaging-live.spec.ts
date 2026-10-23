@@ -76,9 +76,13 @@ test("staff packaging and new product persist through the real API", async ({
   );
   expect(productResponse.ok()).toBe(true);
   const products = (await productResponse.json()) as { items: Product[] };
-  expect(products.items).toHaveLength(1);
+  const matches = products.items.filter(
+    (item) => item.slug === `packaging-${suffix}`,
+  );
+  expect(matches).toHaveLength(1);
+  const product = matches[0];
   const { usedByProducts: _usage, ...definition } = packaging;
-  expect(products.items[0].packages[0]).toMatchObject({
+  expect(product.packages[0]).toMatchObject({
     packagingId: packaging.id,
     packaging: definition,
     netGrams: 500,
@@ -113,11 +117,12 @@ test("staff packaging and new product persist through the real API", async ({
     "۱ محصول و پیش‌نویس‌های مرتبط به‌روز شدند.",
   );
   const refreshed = await page.request.get(
-    `/api/v1/staff/products?q=packaging-${suffix}&page=1`,
+    `/api/v1/staff/products?q=${product.id}&page=1`,
   );
   expect(refreshed.ok()).toBe(true);
   const updated = (await refreshed.json()) as { items: Product[] };
-  expect(updated.items[0].packages[0]).toMatchObject({
+  const refreshedProduct = updated.items.find((item) => item.id === product.id);
+  expect(refreshedProduct?.packages[0]).toMatchObject({
     shippingGrams: 700,
     widthMm: 90,
     packaging: { emptyGrams: 200, widthMm: 90, volumeCm3: 720 },
