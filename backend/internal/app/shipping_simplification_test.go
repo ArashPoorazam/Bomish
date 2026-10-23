@@ -79,7 +79,7 @@ func TestPostalAcceptancePreservesExactQuote(t *testing.T) {
 	}
 }
 
-func TestPackageEditorConfirmationIsExplicit(t *testing.T) {
+func TestLegacyMeasurementConfirmationCannotRestoreManualData(t *testing.T) {
 	a, owner, _, _ := shippingFixture(t)
 	var p domain.Product
 	owner.ok(t, "GET", "/products/turmeric", nil, &p)
@@ -104,14 +104,16 @@ func TestPackageEditorConfirmationIsExplicit(t *testing.T) {
 	json.Unmarshal(raw, &body)
 	body["confirmMeasurements"] = []string{p.Packages[0].ID}
 	owner.ok(t, "PUT", "/staff/products/"+p.ID, body, nil)
-	if !read().Packages[0].ShippingVerified {
-		t.Fatal("explicit valid measurements not recorded")
+	pack := read().Packages[0]
+	if pack.ShippingVerified || pack.ShippingGrams != 0 || pack.LengthMm != 0 || pack.WidthMm != 0 || pack.HeightMm != 0 {
+		t.Fatal("old client restored manual measurements", pack)
 	}
 	p.Packages[0].LengthMm = 0
 	raw, _ = json.Marshal(p)
 	json.Unmarshal(raw, &body)
-	if status, _ := owner.call("PUT", "/staff/products/"+p.ID, body); status != 400 {
-		t.Fatal("incomplete measurements confirmed", status)
+	owner.ok(t, "PUT", "/staff/products/"+p.ID, body, nil)
+	if status, _ := owner.call("POST", "/staff/products/"+p.ID+"/publish", nil); status != 422 {
+		t.Fatal("manual data allowed publication", status)
 	}
 }
 

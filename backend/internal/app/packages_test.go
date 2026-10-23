@@ -22,6 +22,7 @@ func TestPackagesOperations(t *testing.T) {
 	c.ok(t, "GET", "/products/turmeric", nil, &p)
 	p.Packages = measuredPackages([]domain.Package{{ID: "small", Amount: 200, Unit: "g", PriceRials: 2000000, MaxQuantity: 5}, {ID: "large", Amount: .5, Unit: "kg", PriceRials: 4000000, MaxQuantity: 5}})
 	p.Sections = []domain.Section{{Title: "عنوان سفارشی", Body: "**متن**"}}
+	assignTestPackaging(t, owner, &p)
 	owner.ok(t, "PUT", "/staff/products/turmeric", p, nil)
 	owner.ok(t, "POST", "/staff/products/turmeric/publish", nil, nil)
 	c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "small", "quantity": 2}, nil)
@@ -149,6 +150,7 @@ func TestPackagesOperations(t *testing.T) {
 	p.Slug = "oil"
 	p.Name = "روغن"
 	p.Packages = measuredPackages([]domain.Package{{ID: "bottle", Amount: 1.5, Unit: "l", PriceRials: 3000000, MaxQuantity: 5, ShippingGrams: 1450}})
+	assignTestPackaging(t, owner, &p)
 	owner.ok(t, "PUT", "/staff/products/oil", p, nil)
 	owner.ok(t, "POST", "/staff/products/oil/publish", nil, nil)
 }

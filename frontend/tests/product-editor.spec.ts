@@ -133,6 +133,12 @@ test("packaging selector calculates gross weight and requires measured liquid we
   );
   await page.getByRole("button", { name: "ویرایش", exact: true }).click();
   await step(page, "بسته‌ها");
+  await expect(
+    page.getByRole("region", { name: "اندازه و وزن ارسال" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByLabel("وزن بسته آماده ارسال (گرم)", { exact: true }),
+  ).toHaveCount(0);
   await page.getByLabel("بسته‌بندی محصول", { exact: true }).selectOption("jar");
   await expect(page.getByText("وزن ارسال:")).toContainText("۲۵۰");
   await page.getByLabel("مقدار محتویات", { exact: true }).fill("500");
@@ -164,6 +170,33 @@ test("packaging selector calculates gross weight and requires measured liquid we
       },
     ],
   });
+  await page.getByRole("button", { name: "ادامه ویرایش" }).click();
+  await page.getByLabel("بسته‌بندی محصول", { exact: true }).selectOption("");
+  await expect(page.getByText("وزن ارسال:")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "ذخیره پیش‌نویس", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "پیش‌نویس ذخیره شد" }),
+  ).toBeVisible();
+  expect(saved[1]).toMatchObject({
+    packages: [
+      {
+        packagingId: "",
+        shippingGrams: 0,
+        lengthMm: 0,
+        widthMm: 0,
+        heightMm: 0,
+        shippingVerified: false,
+      },
+    ],
+  });
+  expect(
+    (saved[1].packages as Record<string, unknown>[])[0],
+  ).not.toHaveProperty("packaging");
+  expect(
+    (saved[1].packages as Record<string, unknown>[])[0],
+  ).not.toHaveProperty("netGrams");
 });
 
 test("staff define and edit reusable packaging under store management", async ({
@@ -424,18 +457,27 @@ test("publication failure reports the saved draft and preserves edits", async ({
   page,
 }) => {
   const saved = await workspace(page);
+  await page.route("**/api/v1/staff/product-packaging", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "jar",
+          name: "شیشه",
+          emptyGrams: 150,
+          lengthMm: 80,
+          widthMm: 80,
+          heightMm: 100,
+          volumeCm3: 640,
+        },
+      ],
+    }),
+  );
   await page.route("**/api/v1/staff/products/*/publish", (route) =>
     route.fulfill({ status: 500, json: { error: "انتشار ناموفق" } }),
   );
   await page.getByRole("button", { name: "ویرایش", exact: true }).click();
   await step(page, "بسته‌ها");
-  for (const [label, value] of [
-    ["طول (سانتی‌متر)", "8"],
-    ["عرض (سانتی‌متر)", "8"],
-    ["ارتفاع (سانتی‌متر)", "10"],
-    ["وزن بسته آماده ارسال (گرم)", "1500"],
-  ])
-    await page.getByLabel(label, { exact: true }).fill(value);
+  await page.getByLabel("بسته‌بندی محصول", { exact: true }).selectOption("jar");
   await step(page, "بررسی و انتشار");
   await page
     .getByRole("button", { name: "ذخیره و انتشار", exact: true })
@@ -501,47 +543,100 @@ test("manual availability is independent of editor drafts and stock fields are g
   expect(availability).toEqual([{ outOfStock: true }, { outOfStock: false }]);
 });
 
-test("shipping measurements preserve variants, Persian decimals and incomplete drafts", async ({
+test("legacy manual data is cleared and packaging is required before publication", async ({
   page,
 }) => {
   const saved = await workspace(page);
+  await page.route("**/api/v1/staff/products?**", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            ...legacy,
+            packages: [
+              {
+                ...legacy.packages[0],
+                shippingGrams: 150,
+                lengthMm: 80,
+                widthMm: 80,
+                heightMm: 100,
+                shippingVerified: true,
+              },
+            ],
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 25,
+      },
+    }),
+  );
+  await page.reload();
   await page.getByRole("button", { name: "ویرایش", exact: true }).click();
   await step(page, "بسته‌ها");
-  await page.getByRole("button", { name: "افزودن بسته", exact: true }).click();
-  const lengths = page.getByLabel("طول (سانتی‌متر)", { exact: true }),
-    widths = page.getByLabel("عرض (سانتی‌متر)", { exact: true }),
-    heights = page.getByLabel("ارتفاع (سانتی‌متر)", { exact: true }),
-    weights = page.getByLabel("وزن بسته آماده ارسال (گرم)", { exact: true });
-  await lengths.first().fill("۱۲٫۵");
-  await widths.first().fill("۸");
-  await heights.first().fill("۱۰");
-  await weights.first().fill("۱۵۰");
-  await lengths.nth(1).fill("۱۲٫۵");
-  await widths.nth(1).fill("۸");
-  await heights.nth(1).fill("۱۰");
-  await weights.nth(1).fill("۱۵۰");
-  await lengths.nth(1).press("Tab");
-  await expect(lengths.nth(1)).toHaveValue("12.5");
-  await lengths.first().fill("۱۴");
-  await lengths.first().press("Tab");
-  await expect(lengths.nth(1)).toHaveValue("12.5");
-  await heights.nth(1).fill("");
+  await expect(page.getByLabel("طول (سانتی‌متر)", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByText("اندازه و وزن ارسال", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("ابتدا در مدیریت فروشگاه", { exact: false }),
+  ).toBeVisible();
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    const selling = await page.locator(".package-selling-fields").boundingBox();
+    const packaging = await page
+      .getByRole("region", { name: "انتخاب بسته‌بندی" })
+      .boundingBox();
+    const footer = await page.locator(".package-footer").boundingBox();
+    expect(packaging!.y - selling!.y - selling!.height).toBeGreaterThanOrEqual(
+      23,
+    );
+    expect(footer!.y - packaging!.y - packaging!.height).toBeGreaterThanOrEqual(
+      23,
+    );
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: "test-results/packaging-only-" + width + ".png",
+      fullPage: true,
+    });
+  }
   await page
     .getByRole("button", { name: "ذخیره پیش‌نویس", exact: true })
     .click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  const packs = saved.at(-1)!.packages as {
-    id: string;
-    lengthMm: number;
-    heightMm: number;
-  }[];
-  expect(packs).toHaveLength(2);
-  expect(packs[0].lengthMm).toBe(140);
-  expect(packs[1].lengthMm).toBe(125);
-  expect(packs[1].heightMm).toBe(0);
+  await expect(
+    page.getByRole("dialog", { name: "پیش‌نویس ذخیره شد" }),
+  ).toBeVisible();
+  expect(saved[0]).toMatchObject({
+    packages: [
+      {
+        ...legacy.packages[0],
+        shippingGrams: 0,
+        lengthMm: 0,
+        widthMm: 0,
+        heightMm: 0,
+        shippingVerified: false,
+      },
+    ],
+  });
+  expect(saved[0]).not.toHaveProperty("confirmMeasurements");
+  await page.getByRole("button", { name: "ادامه ویرایش" }).click();
+  await step(page, "بررسی و انتشار");
+  await page
+    .getByRole("button", { name: "ذخیره و انتشار", exact: true })
+    .click();
+  await expect(
+    page.locator(".product-wizard").getByRole("alert"),
+  ).toContainText("بسته‌بندی محصول را برای بسته 1 انتخاب کنید.");
+  expect(saved).toHaveLength(1);
 });
 
-test("removing a middle package retains the other packages and their numeric drafts", async ({
+test("removing a middle variant preserves content amounts and numeric drafts", async ({
   page,
 }) => {
   const saved = await workspace(page);
@@ -549,23 +644,23 @@ test("removing a middle package retains the other packages and their numeric dra
   await step(page, "بسته‌ها");
   await page.getByRole("button", { name: "افزودن بسته", exact: true }).click();
   await page.getByRole("button", { name: "افزودن بسته", exact: true }).click();
-  const lengths = page.getByLabel("طول (سانتی‌متر)", { exact: true });
-  await lengths.nth(0).fill("١٢٫٥");
-  await lengths.nth(1).fill("۲۰");
-  await lengths.nth(2).fill("۳۰");
+  const amounts = page.getByLabel("مقدار محتویات", { exact: true });
+  await amounts.nth(0).fill("١٢٫٥");
+  await amounts.nth(1).fill("۲۰");
+  await amounts.nth(2).fill("۳۰");
   await page
     .getByRole("button", { name: "حذف بسته", exact: true })
     .nth(1)
     .click();
-  await expect(lengths).toHaveCount(2);
-  await expect(lengths.nth(0)).toHaveValue("12.5");
-  await expect(lengths.nth(1)).toHaveValue("30");
+  await expect(amounts).toHaveCount(2);
+  await expect(amounts.nth(0)).toHaveValue("12.5");
+  await expect(amounts.nth(1)).toHaveValue("30");
   await page
     .getByRole("button", { name: "ذخیره پیش‌نویس", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  const packages = saved.at(-1)!.packages as { id: string; lengthMm: number }[];
-  expect(packages.map((p) => p.lengthMm)).toEqual([125, 300]);
+  const packages = saved.at(-1)!.packages as { id: string; amount: number }[];
+  expect(packages.map((pack) => pack.amount)).toEqual([12.5, 30]);
   expect(packages[0].id).toBe("legacy");
 });
 

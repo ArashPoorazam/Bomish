@@ -1,6 +1,7 @@
 import { measurementIssues } from "@/lib/shipping";
 import type { Product } from "@/lib/types";
 import { packageWeight } from "@/lib/format";
+import { withoutProductPackaging } from "@/lib/product-packaging";
 
 export function normalizeProduct(product: Product): Product {
   return {
@@ -10,7 +11,9 @@ export function normalizeProduct(product: Product): Product {
     aliases: product.aliases ?? [],
     relatedIds: product.relatedIds ?? [],
     nutrients: product.nutrients ?? [],
-    packages: product.packages ?? [],
+    packages: (product.packages ?? []).map((pack) =>
+      pack.packagingId ? pack : withoutProductPackaging(pack),
+    ),
     sections: product.sections ?? [],
   };
 }
@@ -33,7 +36,8 @@ export const productSteps = [
   {
     id: "packages",
     title: "بسته‌ها",
-    description: "محتویات، قیمت و اندازه‌های هر بسته را یک‌جا وارد کنید.",
+    description:
+      "محتویات و قیمت هر بسته را وارد و بسته‌بندی آن را انتخاب کنید.",
   },
   {
     id: "details",
@@ -76,6 +80,12 @@ export function productIssues(p: Product, publish: boolean) {
       text: "برای انتشار، دست‌کم یک بسته اضافه کنید.",
     });
   p.packages.forEach((pack, i) => {
+    if (publish && !pack.packagingId) {
+      issues.push({
+        step: "packages",
+        text: `بسته‌بندی محصول را برای بسته ${i + 1} انتخاب کنید.`,
+      });
+    }
     if (
       pack.packagingId &&
       (!pack.netGrams || pack.netGrams < 1 || !Number.isInteger(pack.netGrams))
@@ -105,6 +115,7 @@ export function productIssues(p: Product, publish: boolean) {
       });
   });
   p.packages.forEach((pack, i) => {
+    if (!pack.packagingId) return;
     const incomplete = measurementIssues(pack);
     const enteredInvalid =
       [pack.lengthMm ?? 0, pack.widthMm ?? 0, pack.heightMm ?? 0].some(

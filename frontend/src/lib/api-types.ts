@@ -1828,7 +1828,10 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": components["schemas"]["Product"] & {
-                        /** @description Package IDs explicitly reviewed in the merged package editor. Complete measurements are verified by the server. */
+                        /**
+                         * @deprecated
+                         * @description Ignored for compatibility with older clients. Shipping measurements are derived exclusively from the selected product packaging.
+                         */
                         confirmMeasurements?: string[];
                     };
                 };
@@ -8015,7 +8018,7 @@ export interface components {
             volumeCm3: number;
         };
         Package: {
-            /** @description Optional reusable packaging ID. Empty for legacy/manual shipping measurements. */
+            /** @description Reusable packaging ID, required for publication. Unassigned drafts have no shipping measurements; legacy manual values are cleared on save. */
             packagingId?: string;
             /** @description Server-resolved packaging measurements refreshed when either product or packaging is saved. */
             packaging?: components["schemas"]["ProductPackaging"];

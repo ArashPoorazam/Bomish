@@ -1,5 +1,19 @@
 import type { Package, ProductPackaging } from "./types";
 
+export function withoutProductPackaging(pack: Package): Package {
+  return {
+    ...pack,
+    packagingId: "",
+    packaging: undefined,
+    netGrams: undefined,
+    shippingGrams: 0,
+    lengthMm: 0,
+    widthMm: 0,
+    heightMm: 0,
+    shippingVerified: false,
+  };
+}
+
 export function withProductPackaging(
   pack: Package,
   packaging: ProductPackaging,

@@ -1,8 +1,10 @@
 import type { Package, ProductPackaging } from "@/lib/types";
 import { fa } from "@/lib/format";
-import { withProductPackaging } from "@/lib/product-packaging";
+import {
+  withProductPackaging,
+  withoutProductPackaging,
+} from "@/lib/product-packaging";
 import { MeasurementNumber } from "./measurement-number";
-import { PackageMeasurements } from "./product-measurements";
 
 export function ProductPackagingFields({
   pack,
@@ -16,7 +18,10 @@ export function ProductPackagingFields({
   onChange: (patch: Partial<Package>) => void;
 }) {
   return (
-    <div className="stack">
+    <section
+      className="product-packaging-fields stack"
+      aria-label="انتخاب بسته‌بندی"
+    >
       <label>
         بسته‌بندی محصول
         <select
@@ -30,15 +35,15 @@ export function ProductPackagingFields({
             onChange(
               selected
                 ? withProductPackaging(pack, selected)
-                : {
-                    packagingId: "",
-                    packaging: undefined,
-                    netGrams: undefined,
-                  },
+                : withoutProductPackaging(pack),
             );
           }}
         >
-          <option value="">بدون انتخاب — اندازه‌گیری دستی</option>
+          <option value="">
+            {loading
+              ? "در حال دریافت بسته‌بندی‌ها…"
+              : "بسته‌بندی را انتخاب کنید"}
+          </option>
           {pack.packagingId &&
             !options.some((item) => item.id === pack.packagingId) && (
               <option value={pack.packagingId}>
@@ -52,8 +57,9 @@ export function ProductPackagingFields({
           ))}
         </select>
         <small className="muted">
-          بسته‌بندی‌ها را در مدیریت فروشگاه ← بسته‌بندی‌ها تعریف کنید. انتخاب
-          برای محصولات قبلی اختیاری است.
+          ابعاد و وزن ظرف از بسته‌بندی انتخاب‌شده دریافت می‌شود؛ نیازی به ورود
+          دوباره نیست. ویرایش مشخصات در بخش بسته‌بندی‌ها، همه محصولات مرتبط را
+          به‌روز می‌کند.
         </small>
       </label>
       {pack.packagingId && pack.packaging ? (
@@ -86,8 +92,12 @@ export function ProductPackagingFields({
           </small>
         </>
       ) : (
-        <PackageMeasurements pack={pack} onChange={onChange} />
+        <p className="notice">
+          {!loading && options.length === 0
+            ? "ابتدا در مدیریت فروشگاه ← بسته‌بندی‌ها یک بسته‌بندی تعریف کنید، سپس آن را اینجا انتخاب کنید."
+            : "برای انتشار و فروش این محصول، بسته‌بندی هر بسته را انتخاب کنید. تا آن زمان می‌توانید پیش‌نویس را ذخیره کنید."}
+        </p>
       )}
-    </div>
+    </section>
   );
 }

@@ -113,6 +113,11 @@ func resolveProductPackaging(r *http.Request, tx pgx.Tx, product *domain.Product
 		pack.Packaging = nil
 		if pack.PackagingID == "" {
 			pack.NetGrams = 0
+			pack.ShippingGrams = 0
+			pack.LengthMm = 0
+			pack.WidthMm = 0
+			pack.HeightMm = 0
+			pack.ShippingVerified = false
 			continue
 		}
 		packaging, found := cache[pack.PackagingID]

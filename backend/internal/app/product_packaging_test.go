@@ -2,6 +2,7 @@ package app
 
 import (
 	"bomish/internal/domain"
+	"bomish/migrations"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -9,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestProductPackagingShippingAndLegacyCompatibility(t *testing.T) {
+func TestProductPackagingReplacesLegacyMeasurements(t *testing.T) {
 	app, owner, customer, address := shippingFixture(t)
 	packaging := domain.ProductPackaging{ID: "glass", Name: "شیشه", EmptyGrams: 150, LengthMm: 80, WidthMm: 80, HeightMm: 100, VolumeCm3: 640}
 	var original domain.Product
@@ -21,10 +22,8 @@ func TestProductPackagingShippingAndLegacyCompatibility(t *testing.T) {
 		t.Fatal("adding packaging changed legacy product")
 	}
 	owner.ok(t, "PUT", "/staff/products/turmeric", original, nil)
-	owner.ok(t, "POST", "/staff/products/turmeric/publish", nil, nil)
-	owner.ok(t, "GET", "/products/turmeric", nil, &unchanged)
-	if !reflect.DeepEqual(original.Packages, unchanged.Packages) {
-		t.Fatal("legacy measurements changed on save/publish")
+	if status, _ := owner.call("POST", "/staff/products/turmeric/publish", nil); status != 422 {
+		t.Fatal("unassigned packaging published", status)
 	}
 	product := original
 	product.Packages = append([]domain.Package(nil), original.Packages...)
@@ -82,6 +81,92 @@ func TestProductPackagingShippingAndLegacyCompatibility(t *testing.T) {
 	product.Packages[0].PackagingID = "missing"
 	if status, _ := owner.call("PUT", "/staff/products/turmeric", product); status != 400 {
 		t.Fatal("unknown packaging accepted", status)
+	}
+}
+
+func TestManualMeasurementCleanupMigration(t *testing.T) {
+	app, owner, customer, address := shippingFixture(t)
+	ctx := context.Background()
+	orderID, quote, _ := quoteAndCheckout(t, customer, address, "post")
+	var orderBefore, quoteBefore, deliveryBefore []byte
+	for _, snapshot := range []struct {
+		query       string
+		id          string
+		destination *[]byte
+	}{
+		{"SELECT to_jsonb(orders) FROM orders WHERE id=$1", orderID, &orderBefore},
+		{"SELECT snapshot FROM shipping_quotes WHERE id=$1", quote.ShippingQuoteID, &quoteBefore},
+		{"SELECT to_jsonb(order_shipping) FROM order_shipping WHERE order_id=$1", orderID, &deliveryBefore},
+	} {
+		if err := app.Pool.QueryRow(ctx, snapshot.query, snapshot.id).Scan(snapshot.destination); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var original domain.Product
+	owner.ok(t, "GET", "/products/turmeric", nil, &original)
+	assigned := original.Packages[0]
+	assigned.ID = "assigned"
+	definition := domain.ProductPackaging{ID: "kept", Name: "Keep", EmptyGrams: 100, LengthMm: 80, WidthMm: 80, HeightMm: 100, VolumeCm3: 640}
+	owner.ok(t, "PUT", "/staff/product-packaging/kept", definition, nil)
+	if err := assigned.ApplyPackaging(definition); err != nil {
+		t.Fatal(err)
+	}
+	original.Packages = append(original.Packages, assigned)
+	original.Packages[0].NetGrams = 500
+	original.Packages[0].Packaging = &definition
+	raw, _ := json.Marshal(original)
+	if _, err := app.Pool.Exec(ctx, `UPDATE products SET content=$1 WHERE id='turmeric';`, raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.Pool.Exec(ctx, `INSERT INTO product_drafts(product_id,content) VALUES('turmeric',$1)`, raw); err != nil {
+		t.Fatal(err)
+	}
+	cleanup, err := migrations.Files.ReadFile("024_remove_manual_product_measurements.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = app.Pool.Exec(ctx, string(cleanup)); err != nil {
+		t.Fatal(err)
+	}
+	expected := original
+	expected.Packages = append([]domain.Package(nil), original.Packages...)
+	expected.Packages[0].LengthMm, expected.Packages[0].WidthMm, expected.Packages[0].HeightMm = 0, 0, 0
+	expected.Packages[0].ShippingGrams, expected.Packages[0].NetGrams = 0, 0
+	expected.Packages[0].ShippingVerified, expected.Packages[0].Packaging = false, nil
+	for _, query := range []string{"SELECT content FROM products WHERE id='turmeric'", "SELECT content FROM product_drafts WHERE product_id='turmeric'"} {
+		var result domain.Product
+		if err = app.Pool.QueryRow(ctx, query).Scan(&raw); err != nil {
+			t.Fatal(err)
+		}
+		if err = json.Unmarshal(raw, &result); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(expected, result) {
+			t.Fatalf("cleanup changed unrelated product data: %+v", result)
+		}
+	}
+	var ready bool
+	if err = app.Pool.QueryRow(ctx, "SELECT shipping_measurements_complete(content) FROM products WHERE id='turmeric'").Scan(&ready); err != nil || ready {
+		t.Fatal("unassigned product still purchasable", ready, err)
+	}
+	if status, _ := customer.call("POST", "/checkout/quote", shippingQuoteInput{Address: address, Method: "post"}); status == 200 {
+		t.Fatal("unassigned product quoted")
+	}
+	for _, snapshot := range []struct {
+		query    string
+		id       string
+		expected []byte
+	}{
+		{"SELECT to_jsonb(orders) FROM orders WHERE id=$1", orderID, orderBefore},
+		{"SELECT snapshot FROM shipping_quotes WHERE id=$1", quote.ShippingQuoteID, quoteBefore},
+		{"SELECT to_jsonb(order_shipping) FROM order_shipping WHERE order_id=$1", orderID, deliveryBefore},
+	} {
+		if err = app.Pool.QueryRow(ctx, snapshot.query, snapshot.id).Scan(&raw); err != nil || !bytes.Equal(raw, snapshot.expected) {
+			t.Fatal("historical record changed", err)
+		}
+	}
+	if _, err = app.Pool.Exec(ctx, string(cleanup)); err != nil {
+		t.Fatal("cleanup not repeatable", err)
 	}
 }
 

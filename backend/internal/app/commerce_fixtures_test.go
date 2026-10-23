@@ -28,6 +28,21 @@ func measuredPackages(p []domain.Package) []domain.Package {
 	}
 	return p
 }
+
+func assignTestPackaging(t *testing.T, staff *client, product *domain.Product) {
+	t.Helper()
+	packaging := domain.ProductPackaging{ID: "test-container", Name: "Test container", EmptyGrams: 100, LengthMm: 80, WidthMm: 80, HeightMm: 100, VolumeCm3: 640}
+	staff.ok(t, "PUT", "/staff/product-packaging/test-container", packaging, nil)
+	for index := range product.Packages {
+		pack := &product.Packages[index]
+		if pack.Unit == "ml" || pack.Unit == "l" {
+			pack.NetGrams = pack.ShippingGrams - packaging.EmptyGrams
+		}
+		if err := pack.ApplyPackaging(packaging); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
 func setupCommerce(t *testing.T) *App {
 	t.Helper()
 	a := setup(t)

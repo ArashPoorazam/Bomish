@@ -1654,11 +1654,12 @@
                     "type": "object",
                     "properties": {
                       "confirmMeasurements": {
+                        "deprecated": true,
                         "type": "array",
                         "items": {
                           "type": "string"
                         },
-                        "description": "Package IDs explicitly reviewed in the merged package editor. Complete measurements are verified by the server."
+                        "description": "Ignored for compatibility with older clients. Shipping measurements are derived exclusively from the selected product packaging."
                       }
                     }
                   }
@@ -8143,7 +8144,7 @@
         "properties": {
           "packagingId": {
             "type": "string",
-            "description": "Optional reusable packaging ID. Empty for legacy/manual shipping measurements."
+            "description": "Reusable packaging ID, required for publication. Unassigned drafts have no shipping measurements; legacy manual values are cleared on save."
           },
           "packaging": {
             "$ref": "#/components/schemas/ProductPackaging",

@@ -275,25 +275,16 @@
   border-radius: 14px;
   min-width: 0;
 }
-.package-measurements {
-  margin-top: 20px;
-  padding-top: 20px;
+.product-packaging-fields {
+  margin-block: 24px;
+  padding-block-start: 24px;
   border-top: 1px solid #dbe2d4;
+  gap: 16px;
+  min-width: 0;
 }
-.package-measurements h4,
-.package-measurements p {
+.product-packaging-fields p {
   margin: 0;
 }
-.package-help {
-  border-radius: 12px;
-  background: #f5f7f0;
-  padding: 0 14px;
-  margin-top: 12px;
-}
-.package-help > div {
-  padding: 12px 0 18px;
-}
-.package-help summary,
 .shipping-section summary {
   cursor: pointer;
   min-height: 44px;

@@ -23,6 +23,7 @@ func TestStorefrontPublicationAndDiscountOrdering(t *testing.T) {
 	p.Name = "محصول تازه"
 	p.DiscountPercent = 10
 	p.Packages = measuredPackages([]domain.Package{{ID: "small", Amount: 100, Unit: "g", PriceRials: 470000, MaxQuantity: 5}})
+	assignTestPackaging(t, owner, &p)
 	owner.ok(t, "PUT", "/staff/products/"+p.ID, p, nil)
 	owner.ok(t, "POST", "/staff/products/"+p.ID+"/publish", nil, nil)
 	c.ok(t, "GET", "/products/"+p.ID, nil, &p)
@@ -42,6 +43,10 @@ func TestStorefrontPublicationAndDiscountOrdering(t *testing.T) {
 		t.Fatalf("newest order: %+v", rows)
 	}
 	// A pricing operation does not make a legacy product newly published.
+	var existing domain.Product
+	owner.ok(t, "GET", "/products/turmeric", nil, &existing)
+	assignTestPackaging(t, owner, &existing)
+	owner.ok(t, "PUT", "/staff/products/turmeric", existing, nil)
 	owner.ok(t, "POST", "/staff/products/turmeric/publish", nil, nil)
 	var legacy domain.Product
 	c.ok(t, "GET", "/products/turmeric", nil, &legacy)

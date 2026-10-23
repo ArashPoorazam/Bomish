@@ -43,17 +43,6 @@ func (a *App) saveProduct(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, message)
 		return
 	}
-	for i := range p.Packages {
-		for _, id := range in.ConfirmMeasurements {
-			if p.Packages[i].ID == id {
-				p.Packages[i].ShippingVerified = true
-				if err := p.Packages[i].ValidateMeasurements(true); err != nil {
-					fail(w, 400, err.Error())
-					return
-				}
-			}
-		}
-	}
 	p.ID = r.PathValue("id")
 	p.Status = "draft"
 	for i := range p.Packages {
@@ -163,6 +152,10 @@ func (a *App) publishProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, v := range p.Packages {
+		if v.PackagingID == "" {
+			shippingError(w, 422, "missing_measurements", "بسته‌بندی محصول را برای همه بسته‌ها انتخاب کنید")
+			return
+		}
 		if err = v.ValidateMeasurements(true); err != nil {
 			shippingError(w, 422, "missing_measurements", err.Error())
 			return

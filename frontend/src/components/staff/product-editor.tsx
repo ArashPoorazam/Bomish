@@ -15,7 +15,6 @@ import {
   X,
 } from "lucide-react";
 import { productSections } from "@/lib/product-sections";
-import { measurementIssues } from "@/lib/shipping";
 import { api } from "@/lib/api";
 import type { Product, Category } from "@/lib/types";
 import { RichText } from "@/components/rich-text";
@@ -92,21 +91,7 @@ export function ProductEditor({
       ? "packages"
       : "basics",
   );
-  const [packagesReviewed, setPackagesReviewed] = useState(step === "packages");
   const stepIndex = productSteps.findIndex((item) => item.id === step);
-  const editorProduct = {
-    ...p,
-    packages: p.packages.map((pack) =>
-      packagesReviewed
-        ? {
-            ...pack,
-            shippingVerified:
-              measurementIssues({ ...pack, shippingVerified: true }).length ===
-              0,
-          }
-        : pack,
-    ),
-  };
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -123,7 +108,7 @@ export function ProductEditor({
   const locked = !!busy || uploading;
   const existing = products.find((x) => x.id === p.id);
   const writable = can(existing ? "products.edit" : "products.create");
-  const issues = productIssues(editorProduct, true);
+  const issues = productIssues(p, true);
   useEffect(() => {
     onStateChange({ dirty, busy: locked });
   }, [dirty, locked, onStateChange]);
@@ -147,14 +132,13 @@ export function ProductEditor({
   }
   function go(next: ProductStep) {
     setStep(next);
-    if (next === "packages") setPackagesReviewed(true);
     setError("");
     requestAnimationFrame(() => heading.current?.focus());
   }
   async function save(publish: boolean) {
     if (locked || !writable) return;
     feedbackTrigger.current = document.activeElement as HTMLElement;
-    const invalid = productIssues(editorProduct, publish);
+    const invalid = productIssues(p, publish);
     if (invalid.length) {
       setStep(invalid[0].step);
       setError(invalid[0].text);
@@ -163,27 +147,14 @@ export function ProductEditor({
     setBusy(publish ? "publish" : "draft");
     setError("");
     let draftSaved = false;
-    let savedProduct = editorProduct;
+    let savedProduct = p;
     try {
       const result = await api<{ product?: Product }>(
         "/staff/products/" + p.id,
         "PUT",
-        {
-          ...p,
-          confirmMeasurements: packagesReviewed
-            ? p.packages
-                .filter(
-                  (pack) =>
-                    measurementIssues({ ...pack, shippingVerified: true })
-                      .length === 0,
-                )
-                .map((pack) => pack.id)
-            : [],
-        },
+        p,
       );
-      savedProduct = result.product
-        ? normalizeProduct(result.product)
-        : editorProduct;
+      savedProduct = result.product ? normalizeProduct(result.product) : p;
       draftSaved = true;
       setSaved(JSON.stringify(savedProduct));
       if (publish) await api("/staff/products/" + p.id + "/publish", "POST");
@@ -385,7 +356,7 @@ export function ProductEditor({
           {step === "review" && (
             <div className="stack">
               <MeasurementReview
-                packages={editorProduct.packages}
+                packages={p.packages}
                 onFix={() => go("packages")}
               />
 

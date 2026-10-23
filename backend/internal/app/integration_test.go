@@ -224,6 +224,10 @@ func TestStoreIntegration(t *testing.T) {
 				t.Fatalf("%s %d", test.path, code)
 			}
 		}
+		var product domain.Product
+		editor.ok(t, "GET", "/products/turmeric", nil, &product)
+		assignTestPackaging(t, editor, &product)
+		editor.ok(t, "PUT", "/staff/products/turmeric", product, nil)
 		if code, _ := editor.call("POST", "/staff/products/turmeric/publish", nil); code != 200 {
 			t.Fatal(code)
 		}
@@ -236,6 +240,7 @@ func TestStoreIntegration(t *testing.T) {
 		}
 		p.PriceRials = 1200000
 		p.Packages = measuredPackages([]domain.Package{{ID: "small", Amount: 100, Unit: "g", PriceRials: 120000, MaxQuantity: 5}})
+		assignTestPackaging(t, owner, &p)
 		if code, _ := editor.call("PUT", "/staff/products/test-spice", p); code != 200 {
 			t.Fatal("editor could not set price", code)
 		}
