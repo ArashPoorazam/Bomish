@@ -35,3 +35,10 @@ tls:
   options:
     default:
       minVersion: VersionTLS12
+      {{ if ne (env "ORIGIN_AUTH_MODE" | default "off") "off" }}
+      clientAuth:
+        caFiles:
+          - /certs/cloudflare-origin-pull-ca.pem
+          - /certs/local-probe-ca.pem
+        clientAuthType: {{ if eq (env "ORIGIN_AUTH_MODE") "verify" }}VerifyClientCertIfGiven{{ else }}RequireAndVerifyClientCert{{ end }}
+      {{ end }}

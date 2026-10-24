@@ -18,6 +18,7 @@ Migration 022 creates `seeds` (دانه‌های خوراکی), `herbs` (سبز�
 - Source files for the exact release commit. GitHub Actions publishes API, web and backup images to GHCR only after the verification workflow succeeds. Automatic delivery transfers that commit's source and `images.env` artifact; manual installation can download them from the publishing run. If packages are private, authenticate the VPS deployment account to GHCR with a read-packages credential.
 - Cloudflare DNS for `bomish.ir` pointing at the VPS with proxying enabled. Use **Full (strict)** TLS with an origin certificate/key covering `bomish.ir`. This setup uses your supplied certificate; it does not automatically obtain or renew one. Track its expiry. Add a separate Cloudflare redirect for `www` if wanted; the repository routes only `SITE_HOST`.
 - Restrict origin HTTP/HTTPS ingress to current Cloudflare address ranges; restrict SSH to your administrative access. Account for Docker's firewall chains as well as the host firewall. Database, API, metrics, Loki and the Traefik dashboard are not publicly published. Grafana binds to loopback only.
+- Add [Authenticated Origin Pulls](origin-auth.md) after initial HTTPS works. The staged `ORIGIN_AUTH_MODE` setting and host-only client certificate preserve local deployment checks while enforcing origin mTLS.
 - An off-VPS S3-compatible bucket and dedicated credentials scoped to its backup prefix (list/read/write/delete for restic retention). Retain an independently protected copy or bucket version history against compromise of those credentials. Backup success on the VPS alone does not establish disaster recovery.
 - Separate production and staging secrets, networks, volumes and backup prefixes. Run staging on a separate host, or use a reviewed Compose override for published ports/subnets. The supplied files bind 80/443 and are intended for one deployment per host.
 
@@ -107,6 +108,7 @@ Edit `/srv/bomish/deployment.env`:
 - `CLOUDFLARE_CIDRS`: current IPv4 and IPv6 ranges, comma-separated.
 - `TRUSTED_PROXY_CIDRS`: the `EDGE_SUBNET` plus those same Cloudflare ranges. Never trust all addresses. This is used for login rate limiting behind the proxy chain.
 - Leave `SITE_INDEXABLE=false` until content is approved. Image assignments come from the second env file (`images.env`) and override the blank placeholders.
+- Leave `ORIGIN_AUTH_MODE=off` until [AOP credentials and Cloudflare](origin-auth.md) are configured. Use `verify` only for staging, then `required` for enforcement. Keep the probe identity outside the mounted TLS directory and monitor its expiry.
 - Review/pin infrastructure image digests before rollout. PostgreSQL major-version upgrades require a separate migration plan, not a tag replacement.
 
 After saving the configuration, secrets, TLS files and verified image manifest, run this **in an interactive SSH session on the VPS**, from the prepared release:

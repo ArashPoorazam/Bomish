@@ -15,6 +15,7 @@ from production import (
     ROOT, certificate_pin, compose_command, load_model, require_tools, run,
     site_host, tls_directory,
 )
+from origin_auth import validate_origin_auth
 
 
 def validate_configuration(model, images):
@@ -98,6 +99,7 @@ def main():
     validate_configuration(model, args.images)
     validate_secrets(model)
     certificate_pin(tls_directory(model), site_host(model))
+    validate_origin_auth(model)
     server = json.loads(run(["docker", "info", "--format", "{{json .}}"],
                             label="Docker access (check group membership)"))
     if server["OSType"] != "linux" or server["Architecture"] not in ("x86_64", "amd64"):

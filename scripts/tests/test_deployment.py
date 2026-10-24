@@ -27,7 +27,7 @@ class DeploymentTest(unittest.TestCase):
         self.source = self.root / "source"
         (self.source / "scripts").mkdir(parents=True)
         for name in ("deploy.sh", "validate-release.py", "production.py", "preflight.py",
-                     "verify-site.py", "first-install.sh"):
+                     "verify-site.py", "first-install.sh", "origin_auth.py"):
             shutil.copy2(REPO / "scripts" / name, self.source / "scripts" / name)
         shutil.copy2(REPO / "compose.production.yaml", self.source / "compose.production.yaml")
         self.host = self.root / "host"
@@ -58,7 +58,7 @@ class DeploymentTest(unittest.TestCase):
         clean_env = {k: v for k, v in os.environ.items() if k not in (
             "API_IMAGE", "WEB_IMAGE", "BACKUP_IMAGE", "SECRETS_DIR", "SITE_HOST",
             "CLOUDFLARE_CIDRS", "TRUSTED_PROXY_CIDRS", "RESTIC_REPOSITORY",
-            "COMPOSE_PROJECT_NAME", "EDGE_SUBNET", "SITE_INDEXABLE",
+            "COMPOSE_PROJECT_NAME", "EDGE_SUBNET", "SITE_INDEXABLE", "ORIGIN_AUTH_MODE",
         )}
         self.model = self.root / "model.json"
         self.model.write_bytes(subprocess.check_output([

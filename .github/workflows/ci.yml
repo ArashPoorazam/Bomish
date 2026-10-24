@@ -72,7 +72,7 @@ jobs:
           RESTIC_REPOSITORY: s3:https://example.invalid/bucket
         run: |
           docker compose -f compose.production.yaml -f compose.observability.yaml config --quiet
-          bash -n scripts/deploy.sh scripts/first-install.sh scripts/deploy-over-ssh.sh scripts/deploy-received.sh scripts/backup.sh scripts/restore-check.sh
+          bash -n scripts/deploy.sh scripts/first-install.sh scripts/deploy-over-ssh.sh scripts/deploy-received.sh scripts/backup.sh scripts/restore-check.sh scripts/verify-origin-auth.sh scripts/verify-production-containers.sh
           sh -n deploy/backup/backup.sh deploy/postgres/init.sh
           python3 -m unittest discover -s scripts/tests -v
       - run: npx playwright install --with-deps chromium
@@ -108,6 +108,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Production container and restore smoke test
         run: bash scripts/verify-production-containers.sh
+      - name: Origin client authentication modes
+        run: bash scripts/verify-origin-auth.sh
       - name: Scan API image
         uses: aquasecurity/trivy-action@v0.36.0
         with:

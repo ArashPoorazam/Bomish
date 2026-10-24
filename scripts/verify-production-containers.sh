@@ -14,7 +14,11 @@ cp deploy/monitoring/alertmanager.example.yaml "$SECRETS_DIR/alertmanager.yaml"
 chmod 644 "$SECRETS_DIR/alertmanager.yaml"
 openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj /CN=bomish.test \
   -addext subjectAltName=DNS:bomish.test \
+  -addext basicConstraints=critical,CA:TRUE \
   -keyout "$SECRETS_DIR/tls/origin.key" -out "$SECRETS_DIR/tls/origin.crt" 2>/dev/null
+# A disposable CA stands in for Cloudflare; no production key enters CI.
+python3 scripts/init-origin-auth.py "$SECRETS_DIR" --cloudflare-ca "$SECRETS_DIR/tls/origin.crt"
+export ORIGIN_AUTH_MODE=required
 cat > "$work/override.yaml" <<'YAML'
 services:
   backup:
@@ -56,14 +60,24 @@ import importlib
 import os
 from pathlib import Path
 from production import certificate_pin
+from origin_auth import validate_origin_auth
 pin = certificate_pin(Path(os.environ["SECRETS_DIR"]) / "tls", "bomish.test")
-importlib.import_module("verify-site").verify("bomish.test", [
+options = [
     "--insecure", "--pinnedpubkey", pin,
     "--resolve", "bomish.test:80:127.0.0.1",
     "--resolve", "bomish.test:443:127.0.0.1",
-])
+]
+model = {"services": {"traefik": {
+    "environment": {"ORIGIN_AUTH_MODE": "required"},
+    "volumes": [{"source": str(Path(os.environ["SECRETS_DIR"]) / "tls"), "target": "/certs"}],
+}}}
+site = importlib.import_module("verify-site")
+site.verify("bomish.test", options + validate_origin_auth(model))
+site.verify_client_required("bomish.test", options)
 PY
-fetch() { curl --noproxy '*' --cacert "$SECRETS_DIR/tls/origin.crt" -sS --resolve bomish.test:443:127.0.0.1 "$@"; }
+fetch() { curl --noproxy '*' --cacert "$SECRETS_DIR/tls/origin.crt" \
+  --cert "$SECRETS_DIR/origin-probe/client.crt" --key "$SECRETS_DIR/origin-probe/client.key" \
+  -sS --resolve bomish.test:443:127.0.0.1 "$@"; }
 fetch -f https://bomish.test/api/v1/health >/dev/null
 fetch -f https://bomish.test/ > "$work/home.html"
 python3 - "$work/home.html" <<'PY'

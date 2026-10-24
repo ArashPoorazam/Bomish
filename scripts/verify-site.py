@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from production import certificate_pin, load_model, require_tools, site_host, tls_directory
+from origin_auth import origin_auth_mode, validate_origin_auth
 
 
 def fetch(url, options):
@@ -65,6 +66,22 @@ def verify(host, options, *, cloudflare=False):
                 raise ValueError(f"{path} returned an unexpected application response")
 
 
+def verify_client_required(host, options):
+    """A working authenticated origin must reject a fresh unauthenticated handshake.
+
+    Only TLS peer-rejection errors count: a timeout, DNS or pinning failure is not
+    evidence of client authentication. Call this after the positive probe passes.
+    """
+    result = subprocess.run([
+        "curl", "--silent", "--show-error", "--noproxy", "*",
+        "--connect-timeout", "5", "--max-time", "10", "--output", "/dev/null",
+        *options, f"https://{host}/api/v1/health",
+    ], capture_output=True, check=False)
+    # curl/OpenSSL versions report TLS alert failures at handshake, send or read.
+    if result.returncode not in (35, 55, 56) or b"alert" not in result.stderr.lower():
+        raise ValueError("Origin did not demonstrably reject a client without a certificate")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config")
@@ -74,6 +91,7 @@ def main():
     args = parser.parse_args()
     require_tools("curl")
     options = []
+    unauthenticated_options = None
     if args.public_url:
         url = urlsplit(args.public_url)
         host = url.hostname
@@ -92,9 +110,14 @@ def main():
             options = ["--insecure", "--pinnedpubkey", pin,
                        "--resolve", f"{host}:80:127.0.0.1",
                        "--resolve", f"{host}:443:127.0.0.1"]
+            if origin_auth_mode(model) == "required":
+                unauthenticated_options = options.copy()
+            options += validate_origin_auth(model)
     for attempt in range(5):
         try:
             verify(host, options, cloudflare=not args.origin)
+            if unauthenticated_options is not None:
+                verify_client_required(host, unauthenticated_options)
             print(f"{'Origin Traefik' if args.origin else 'Public Cloudflare'} checks passed: redirect, HTTPS homepage, API and catalog mode.")
             return
         except ValueError:
