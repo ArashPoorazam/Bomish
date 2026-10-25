@@ -7,7 +7,9 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"regexp"
 	"time"
 
 	"bomish/internal/app"
@@ -27,7 +29,7 @@ func run(ctx context.Context, args []string) error {
 		command = args[0]
 	}
 	switch command {
-	case "serve", "migrate", "bootstrap-owner", "recover-owner", "refresh-demo-catalog", "export-shipping-config", "apply-shipping-config", "totp":
+	case "serve", "migrate", "bootstrap-owner", "recover-owner", "refresh-demo-catalog", "prepare-local-copy", "export-shipping-config", "apply-shipping-config", "totp":
 	default:
 		return errors.New("unknown command")
 	}
@@ -40,6 +42,14 @@ func run(ctx context.Context, args []string) error {
 	}
 	if !cfg.Dev && (command == "refresh-demo-catalog" || command == "totp") {
 		return errors.New("development command forbidden")
+	}
+	if command == "prepare-local-copy" {
+		// Check before connecting or migrating. Only the launcher's disposable,
+		// loopback staging databases may have their authentication data replaced.
+		u, parseErr := url.Parse(cfg.DatabaseURL)
+		if parseErr != nil || !cfg.Dev || u.Scheme != "postgres" || u.Hostname() != "127.0.0.1" || u.Port() != "55432" || u.RawQuery != "sslmode=disable" || !regexp.MustCompile(`^/bomish_dev_[a-f0-9]{32}$`).MatchString(u.Path) {
+			return errors.New("prepare-local-copy requires a launcher-created local staging database")
+		}
 	}
 	if command == "totp" {
 		fmt.Println(security.TOTP(app.DemoTOTP, time.Now().Unix()/30))
@@ -69,6 +79,9 @@ func run(ctx context.Context, args []string) error {
 	}
 	uploads := storage.Local{Root: cfg.UploadDir}
 	a := &app.App{Pool: pool, Queries: db.New(pool), Dev: cfg.Dev, CatalogOnly: cfg.CatalogOnly, TrustedProxies: cfg.TrustedProxies, TOTPKey: cfg.TOTPKey, Origin: cfg.Origin, Uploads: uploads, UploadHandler: uploads.Handler()}
+	if command == "prepare-local-copy" {
+		return a.PrepareLocalCopy(ctx)
+	}
 	if command == "bootstrap-owner" || command == "recover-owner" {
 		return setupOwner(ctx, a, command == "recover-owner")
 	}

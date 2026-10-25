@@ -21,9 +21,24 @@ On a machine with Go, Node and PostgreSQL tools installed, the one-command local
 ./scripts/dev-local.sh
 ```
 
-Press Ctrl+C to stop the application processes; the development database stays running. Data lives in the ignored `.data/` folder. Alternatively, use the manual setup below.
+The launcher asks whether to **fetch fresh production data** or **start offline** (the default). You can also choose directly:
 
-Requirements: Go 1.27.3+, Node 26, PostgreSQL with `pg_trgm`, and optionally sqlc 1.31+.
+```sh
+./scripts/dev-local.sh --refresh-production
+./scripts/dev-local.sh --offline
+```
+
+Configure `BOMISH_PRODUCTION_SSH` and `BOMISH_PRODUCTION_PORT` in `.env` using your existing SSH access (see `.env.example`). The SSH user needs Docker access; the host key must already be verified in `known_hosts`, and your key must be available through SSH or your agent. Refresh uses noninteractive SSH and never opens the production database port. An optional `BOMISH_PRODUCTION_IDENTITY_FILE` selects a specific private key. The production Compose project defaults to `bomish-production`.
+
+A refresh copies PostgreSQL and uploaded files, restores into a new local database, applies local migrations, and switches the saved database/uploads selection only after validation succeeds. It refuses production schemas newer than this checkout. Failed downloads or restores leave the previous selection intact. Stop the local app before refreshing. Each successful refresh starts from production again: edits in the previously selected local copy will no longer appear. Older databases and uploads are retained under `.data/production-copies/` for recovery and consume disk space; the original `bomish` development database is also retained.
+
+Production copies run in **catalog mode**, with production sessions/OTP challenges and queued SMS/report work removed, copied staff credentials disabled, and the five local test accounts listed below created. Production encryption keys are never downloaded. Real SMS, maps and carrier credentials are disabled by the native launcher. Products, prices, articles and other production data are retained; this is **not an anonymized copy** of customer/order/audit data. Keep `.data/` private. Copied shipping settings are preserved rather than overwritten with the local shipping configuration.
+
+Offline mode reuses the last selected copy, including local changes, and prints its fetch time. Without a production copy, it uses the existing demo database. It does not fetch production or download dependencies; Node dependencies and the Go toolchain/modules must already be installed/cached from an online setup. With noninteractive stdin, omitting a flag selects offline mode. Refresh happens only on an explicit launcher start, never on a code reload.
+
+Press Ctrl+C to stop the application processes; the development database stays running. Data lives in the ignored `.data/` folder. These options apply to the native launcher; Docker Compose remains a separate local environment. Alternatively, use the manual setup below.
+
+Requirements: Go 1.27.3+, Node 26, PostgreSQL 18 with `pg_trgm`, a security-patched Python 3.10+ with `tarfile` extraction filters, Bash and `flock`. Production refresh also needs OpenSSH and PostgreSQL 18 client tools (`pg_restore`). Optionally install sqlc 1.31+.
 
 The app uses TypeScript 7. API type generation runs in the isolated `frontend/tools/api-types` package with TypeScript 5 because `openapi-typescript` still requires its JavaScript compiler API. `npm run api:generate` installs the generator from its own lockfile and regenerates the contract; the app's compiler remains TypeScript 7.
 
