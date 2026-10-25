@@ -7,6 +7,7 @@ import {
   ChartNoAxesCombined,
   History,
   Truck,
+  Server,
 } from "lucide-react";
 import { Workspace, Stats, Feedback, useLoad } from "./shared";
 export function OmnisireHome() {
@@ -50,6 +51,12 @@ export function OmnisireHome() {
       )}
       <div className="omni-launch-grid">
         {[
+          {
+            href: "monitoring",
+            label: "پایش سرور",
+            text: "سلامت سرویس‌ها، منابع و ترافیک سرور.",
+            Icon: Server,
+          },
           {
             href: "members",
             label: "همکاران",

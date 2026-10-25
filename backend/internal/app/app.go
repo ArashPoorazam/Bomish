@@ -5,15 +5,21 @@ package app
 import (
 	"net/http"
 	"net/netip"
+	"sync"
+	"time"
 
 	"bomish/internal/carrier"
 	"bomish/internal/db"
+	"bomish/internal/httpx"
 	"bomish/internal/storage"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type App struct {
+	monitorOnce      sync.Once
+	startedAt        time.Time
+	requestMetrics   httpx.RequestMetrics
 	ShippingProvider carrier.Courier
 	Pool             *pgxpool.Pool
 	Queries          *db.Queries

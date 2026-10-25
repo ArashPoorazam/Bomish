@@ -7258,6 +7258,32 @@
         },
         "summary": "Change own staff password and revoke other staff sessions"
       }
+    },
+    "/omnisire/monitoring": {
+      "get": {
+        "summary": "Live process-local server metrics (verified owner only). Traffic covers up to 30 minute buckets and resets on restart.",
+        "responses": {
+          "200": {
+            "description": "Monitoring snapshot; attention indicates failed checks or thresholds exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerMonitoring"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner required"
+          },
+          "428": {
+            "description": "Omnisire verification required"
+          },
+          "503": {
+            "description": "Session database unavailable; server health cannot be verified"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10456,6 +10482,160 @@
           "phone"
         ],
         "additionalProperties": false
+      },
+      "ServerMonitoring": {
+        "type": "object",
+        "required": [
+          "status",
+          "checkedAt",
+          "startedAt",
+          "uptimeSeconds",
+          "environment",
+          "catalogOnly",
+          "database",
+          "runtime",
+          "disk",
+          "traffic"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "attention"
+            ]
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uptimeSeconds": {
+            "type": "integer"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "production",
+              "development"
+            ]
+          },
+          "catalogOnly": {
+            "type": "boolean"
+          },
+          "database": {
+            "type": "object",
+            "required": [
+              "status",
+              "latencyMs",
+              "activeConnections",
+              "idleConnections",
+              "maxConnections"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "healthy",
+                  "unavailable"
+                ]
+              },
+              "latencyMs": {
+                "type": "number"
+              },
+              "activeConnections": {
+                "type": "integer"
+              },
+              "idleConnections": {
+                "type": "integer"
+              },
+              "maxConnections": {
+                "type": "integer"
+              }
+            }
+          },
+          "runtime": {
+            "type": "object",
+            "required": [
+              "version",
+              "os",
+              "arch",
+              "cpuCount",
+              "goroutines",
+              "heapBytes",
+              "reservedBytes"
+            ],
+            "properties": {
+              "version": {
+                "type": "string"
+              },
+              "os": {
+                "type": "string"
+              },
+              "arch": {
+                "type": "string"
+              },
+              "cpuCount": {
+                "type": "integer"
+              },
+              "goroutines": {
+                "type": "integer"
+              },
+              "heapBytes": {
+                "type": "integer"
+              },
+              "reservedBytes": {
+                "type": "integer"
+              }
+            }
+          },
+          "disk": {
+            "type": "object",
+            "required": [
+              "totalBytes",
+              "availableBytes"
+            ],
+            "properties": {
+              "totalBytes": {
+                "type": "integer"
+              },
+              "availableBytes": {
+                "type": "integer"
+              }
+            },
+            "nullable": true
+          },
+          "traffic": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "at",
+                "requests",
+                "errors",
+                "averageMs"
+              ],
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "requests": {
+                  "type": "integer"
+                },
+                "errors": {
+                  "type": "integer"
+                },
+                "averageMs": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "securitySchemes": {

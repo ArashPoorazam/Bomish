@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"bomish/internal/security"
@@ -17,7 +18,7 @@ type responseStatus struct {
 
 type requestIDKey struct{}
 
-func Observe(next http.Handler, mux *http.ServeMux) http.Handler {
+func Observe(next http.Handler, mux *http.ServeMux, metrics ...*RequestMetrics) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		id := security.Token()[:24]
@@ -28,6 +29,10 @@ func Observe(next http.Handler, mux *http.ServeMux) http.Handler {
 		status := wrapped.status
 		if status == 0 {
 			status = 200
+		}
+		// Monitoring and health probes must not inflate application traffic.
+		if len(metrics) > 0 && metrics[0] != nil && strings.HasPrefix(r.URL.Path, "/api/v1/") && r.URL.Path != "/api/v1/health" && r.URL.Path != "/api/v1/omnisire/monitoring" {
+			metrics[0].Record(time.Now(), status, time.Since(started))
 		}
 		// Route patterns omit user IDs and queries. No cookies, bodies, authorization,
 		// phone numbers, addresses, OTPs or IP addresses are recorded in access logs.

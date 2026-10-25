@@ -2,11 +2,13 @@ package app
 
 import (
 	"net/http"
+	"time"
 
 	"bomish/internal/httpx"
 )
 
 func (a *App) Handler() http.Handler {
+	a.monitorOnce.Do(func() { a.startedAt = time.Now().UTC() })
 	m := http.NewServeMux()
 	a.publicRoutes(m)
 	a.identityRoutes(m)
@@ -20,7 +22,7 @@ func (a *App) Handler() http.Handler {
 	if a.UploadHandler != nil {
 		m.Handle("GET /uploads/", a.UploadHandler)
 	}
-	return httpx.Observe(a.middleware(m), m)
+	return httpx.Observe(a.middleware(m), m, &a.requestMetrics)
 }
 
 func (a *App) publicRoutes(m *http.ServeMux) {

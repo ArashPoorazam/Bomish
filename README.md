@@ -176,3 +176,11 @@ thickness from external dimensions; usable dimensions additionally subtract twic
 the protective margin. Staff enter external dimensions and empty-carton weight.
 Filler weight is zero and cartons have no individual gross-weight limit
 (`maxGrams: 0`). Carrier weight limits and actual product/carton weight still apply.
+
+### Owner server monitoring
+
+Open **Omnisire → پایش سرور** (`/omnisire/monitoring`) for API uptime, database connectivity and pool usage, Go heap/reserved memory, local upload filesystem capacity, and up to 30 minutes of API request counts, 5xx errors and mean processing latency. The endpoint requires an owner session with Omnisire verification and returns uncached measurements. The page refreshes every 15 seconds while visible, supports pause/manual refresh, and marks failed or older-than-45-second observations as unknown.
+
+Metrics belong to the serving API process, reset on restart, and exclude the health/monitoring endpoints and static uploads. They are not fleet-wide metrics or browser/network latency. Disk capacity uses the filesystem containing local uploads on Linux; unsupported/unavailable storage reports unknown. The overview flags database check failures, less than 15% free disk space, or more than 5% 5xx responses in the displayed window. Authentication also depends on PostgreSQL, so a full database outage can prevent a snapshot entirely; the UI then reports unknown health. Existing independent Prometheus/Alertmanager monitoring remains the source for outage alerts, host RAM/CPU, backups and longer-term history.
+
+Focused browser coverage: `CHROMIUM_PATH=/usr/bin/chromium npx playwright test monitoring.spec.ts` from `frontend`. Set `MONITORING_LIVE=true` against a disposable seeded local API to include the real owner-session journey.

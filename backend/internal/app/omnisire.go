@@ -11,6 +11,7 @@ import (
 )
 
 func (a *App) omnisireRoutes(m *http.ServeMux) {
+	m.HandleFunc("GET /api/v1/omnisire/monitoring", withPermission(a.monitoring, "monitoring"))
 	reports := &reporting.Service{Pool: a.Pool}
 	m.HandleFunc("GET /api/v1/omnisire/summary", withPermission(a.summary, "overview"))
 	m.HandleFunc("GET /api/v1/omnisire/members", withPermission(a.listMembers, "members"))

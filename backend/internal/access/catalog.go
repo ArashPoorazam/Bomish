@@ -29,6 +29,7 @@ var sections = []Section{
 	{"members", "همکاران و حساب‌ها", []string{"create", "edit", "delete"}, true},
 	{"analytics", "تحلیل داده‌ها", []string{"export"}, true},
 	{"events", "رویدادها", []string{}, true},
+	{"monitoring", "پایش سرور", []string{}, true},
 }
 
 var roleSections = map[string][]string{

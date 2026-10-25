@@ -15,6 +15,7 @@ import {
   History,
   UserRound,
   ChevronDown,
+  Server,
 } from "lucide-react";
 import type { NotificationCounts } from "../requests/notifications";
 export const sectionLabels: Record<string, string> = {
@@ -57,6 +58,12 @@ const managementLinks = [
   },
   { id: "shipping", href: "/omnisire/shipping", label: "ارسال", Icon: Truck },
   { id: "events", href: "/omnisire/events", label: "رویدادها", Icon: History },
+  {
+    id: "monitoring",
+    href: "/omnisire/monitoring",
+    label: "پایش سرور",
+    Icon: Server,
+  },
 ];
 export function WorkspaceNavigation({
   owner,

@@ -21,9 +21,13 @@ test("public catalog browses stable categories and blocks customer transactions"
   await expect(
     page.getByRole("button", { name: "باز کردن سبد خرید" }),
   ).toHaveCount(0);
-  await page
-    .locator('.category-tile[href="/products?category=spices"]')
-    .click();
+  // Next.js streaming can briefly keep a second copy in a hidden container.
+  // Role locators exclude that copy and target the category a visitor can use.
+  const spices = page
+    .getByRole("region", { name: "دسته‌های محصولات", exact: true })
+    .getByRole("link", { name: "ادویه‌ها یک چاشنی، هزار طعم", exact: true });
+  await expect(spices).toHaveAttribute("href", "/products?category=spices");
+  await spices.click();
   await expect(page).toHaveURL(/category=spices/);
   await page.goto("/products/pantry-turmeric");
   await expect(
