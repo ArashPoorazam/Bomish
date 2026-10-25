@@ -23,7 +23,7 @@ On a machine with Go, Node and PostgreSQL tools installed, the one-command local
 
 Press Ctrl+C to stop the application processes; the development database stays running. Data lives in the ignored `.data/` folder. Alternatively, use the manual setup below.
 
-Requirements: Go 1.27+, Node 26, PostgreSQL with `pg_trgm`, and optionally sqlc 1.31+.
+Requirements: Go 1.27.3+, Node 26, PostgreSQL with `pg_trgm`, and optionally sqlc 1.31+.
 
 The app uses TypeScript 7. API type generation runs in the isolated `frontend/tools/api-types` package with TypeScript 5 because `openapi-typescript` still requires its JavaScript compiler API. `npm run api:generate` installs the generator from its own lockfile and regenerates the contract; the app's compiler remains TypeScript 7.
 
@@ -101,6 +101,8 @@ The old five-product fixture is retained only in backend test files for historic
 - OpenAPI contract, generated TypeScript types, sqlc queries, migrations, containers, CI, and backup/restore helpers.
 
 ## Verify
+
+See [Backend architecture](docs/backend-architecture.md) for package responsibilities, transaction boundaries, worker lifecycle, and backend verification.
 
 ```sh
 cd backend

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bomish/internal/app"
 	"bufio"
 	"context"
 	"errors"
@@ -9,6 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"bomish/internal/app"
+	"bomish/internal/security"
 )
 
 func setupOwner(ctx context.Context, a *app.App, recoverOwner bool) error {
@@ -49,7 +51,7 @@ func setupOwner(ctx context.Context, a *app.App, recoverOwner bool) error {
 	if err = echo("echo"); err != nil {
 		return err
 	}
-	secret := app.NewOwnerSecret()
+	secret := security.NewTOTPSecret()
 	fmt.Printf("Add this key to your authenticator for Bomish / %s:\n%s\n", username, secret)
 	code, err := ask("Current authenticator code: ")
 	if err != nil {

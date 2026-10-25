@@ -1,13 +1,15 @@
 package app
 
 import (
-	"bomish/internal/domain"
-	"bomish/migrations"
 	"bytes"
 	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"bomish/internal/domain"
+	"bomish/internal/security"
+	"bomish/migrations"
 )
 
 func TestProductPackagingReplacesLegacyMeasurements(t *testing.T) {
@@ -75,7 +77,7 @@ func TestProductPackagingReplacesLegacyMeasurements(t *testing.T) {
 	if err := app.Pool.QueryRow(context.Background(), "SELECT snapshot FROM shipping_quotes WHERE id=$1", quote.ShippingQuoteID).Scan(&preserved); err != nil || !bytes.Equal(raw, preserved) {
 		t.Fatal("existing shipping snapshot changed", err)
 	}
-	if status, _ := customer.call("POST", "/checkout", map[string]any{"address": address, "shippingQuoteId": pending.ShippingQuoteID, "method": pending.Method, "expectedTotalRials": pending.TotalRials, "idempotencyKey": token()}); status != 409 {
+	if status, _ := customer.call("POST", "/checkout", map[string]any{"address": address, "shippingQuoteId": pending.ShippingQuoteID, "method": pending.Method, "expectedTotalRials": pending.TotalRials, "idempotencyKey": security.Token()}); status != 409 {
 		t.Fatal("stale shipping quote accepted", status)
 	}
 	product.Packages[0].PackagingID = "missing"

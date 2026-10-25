@@ -111,9 +111,9 @@ Traefik already supplies nosniff, frame denial, referrer policy, permissions pol
 
 ### Authenticated Origin Pulls: useful, but requires project changes first
 
-Update, 2026-10-24: the project changes and server credentials are prepared, with activation pending the owner's commit, push and deployment. Follow the current [AOP rollout and handoff](origin-auth.md), including the instruction to skip credential generation on this VPS.
+Update, 2026-10-24: AOP is active. Cloudflare Global AOP is On and production Traefik requires a trusted client certificate. Public traffic and authenticated local probes passed; connections without a client certificate were rejected. Follow the current [AOP activation record and maintenance guide](origin-auth.md), including the instruction to skip credential generation on this VPS. The checklist below records the original rollout plan.
 
-Origin CA verifies the server to Cloudflare. AOP verifies Cloudflare's client connection to the server. The current Traefik config does not require that client certificate.
+Origin CA verifies the server to Cloudflare. AOP verifies Cloudflare's client connection to the server. At the initial audit, Traefik did not require that client certificate; enforcement is now enabled.
 
 1. Choose global AOP or a custom zone-level certificate. Global AOP's shared certificate proves Cloudflare-network origin; a custom zone certificate provides a narrower identity.
 2. Install the appropriate AOP trust CA in the existing private TLS directory, mounted into Traefik under `/certs`. This is different from `origin.crt`.

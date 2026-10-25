@@ -1,13 +1,17 @@
 package app
 
 import (
+	"context"
+	"errors"
+	"net/http"
+
+	"bomish/internal/database"
 	"bomish/internal/db"
 	"bomish/internal/domain"
-	"context"
-	"net/http"
+	"bomish/internal/httpx"
 )
 
-func loadCart(ctx context.Context, q querier, s string) (domain.Cart, error) {
+func loadCart(ctx context.Context, q database.Querier, s string) (domain.Cart, error) {
 	out := domain.Cart{Items: []domain.CartItem{}}
 	rows, e := q.Query(ctx, `SELECT p.id,p.slug,p.name,p.category_id,p.status,p.price_rials,p.min_grams,p.step_grams,p.max_grams,p.content,coalesce((p.content->>'outOfStock')::boolean,false),c.package_id,c.quantity FROM carts c JOIN products p ON p.id=c.product_id WHERE c.session_hash=$1 ORDER BY p.id,c.package_id`, s)
 	if e != nil {
@@ -33,45 +37,47 @@ func loadCart(ctx context.Context, q querier, s string) (domain.Cart, error) {
 	}
 	return out, rows.Err()
 }
+
 func (a *App) getCart(w http.ResponseWriter, r *http.Request) {
 	v, e := loadCart(r.Context(), a.Pool, current(r).Hash)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	write(w, 200, v)
+	httpx.JSON(w, 200, v)
 }
+
 func (a *App) setCartItem(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		PackageID string `json:"packageId"`
 		Quantity  int64  `json:"quantity"`
 	}
-	if !decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) {
 		return
 	}
 	tx, e := a.Pool.Begin(r.Context())
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	defer tx.Rollback(r.Context())
 	if _, e = tx.Exec(r.Context(), "SELECT token_hash FROM sessions WHERE token_hash=$1 FOR UPDATE", current(r).Hash); e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	p, e := db.New(tx).GetPublicProduct(r.Context(), r.PathValue("id"))
 	if e != nil {
-		fail(w, 404, "محصول در دسترس نیست")
+		httpx.Error(w, 404, "محصول در دسترس نیست")
 		return
 	}
 	v := productFrom(p.Product, p.OutOfStock)
 	pack, ok := v.Package(in.PackageID)
 	if !ok || in.Quantity < 1 || in.Quantity > pack.MaxQuantity {
-		fail(w, 400, "بسته یا تعداد انتخاب‌شده مجاز نیست")
+		httpx.Error(w, 400, "بسته یا تعداد انتخاب‌شده مجاز نیست")
 		return
 	}
 	if v.OutOfStock {
-		fail(w, 409, "این محصول ناموجود است")
+		httpx.Error(w, 409, "این محصول ناموجود است")
 		return
 	}
 	_, e = tx.Exec(r.Context(), `INSERT INTO carts(session_hash,product_id,package_id,quantity,grams) VALUES($1,$2,$3,$4,$5) ON CONFLICT(session_hash,product_id,package_id) DO UPDATE SET quantity=excluded.quantity,grams=excluded.grams`, current(r).Hash, v.ID, pack.ID, in.Quantity, pack.Weight()*in.Quantity)
@@ -79,19 +85,20 @@ func (a *App) setCartItem(w http.ResponseWriter, r *http.Request) {
 		e = tx.Commit(r.Context())
 	}
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	a.getCart(w, r)
 }
+
 func (a *App) removeCartItem(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("packageId") == "" {
-		fail(w, 400, "بسته را مشخص کنید")
+		httpx.Error(w, 400, "بسته را مشخص کنید")
 		return
 	}
 	tx, e := a.Pool.Begin(r.Context())
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	defer tx.Rollback(r.Context())
@@ -103,52 +110,10 @@ func (a *App) removeCartItem(w http.ResponseWriter, r *http.Request) {
 		e = tx.Commit(r.Context())
 	}
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	a.getCart(w, r)
 }
 
-func (a *App) addresses(w http.ResponseWriter, r *http.Request) {
-	if !requireCustomer(w, r) {
-		return
-	}
-	rows, e := a.Pool.Query(r.Context(), "SELECT id,recipient,phone,province,city,street,postal_code,latitude,longitude,province_id,city_id,pin_confirmed FROM addresses WHERE user_id=$1", current(r).UserID)
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	defer rows.Close()
-	out := []domain.Address{}
-	for rows.Next() {
-		var v domain.Address
-		if e = rows.Scan(&v.ID, &v.Recipient, &v.Phone, &v.Province, &v.City, &v.Street, &v.PostalCode, &v.Latitude, &v.Longitude, &v.ProvinceID, &v.CityID, &v.PinConfirmed); e != nil {
-			a.dbError(w, e)
-			return
-		}
-		out = append(out, v)
-	}
-	write(w, 200, out)
-}
-func (a *App) saveAddress(w http.ResponseWriter, r *http.Request) {
-	if !requireCustomer(w, r) {
-		return
-	}
-	var in domain.Address
-	if !decode(w, r, &in) {
-		return
-	}
-	in.Phone = domain.Phone(in.Phone)
-	in.PostalCode = domain.Normalize(in.PostalCode)
-	if e := in.Validate(); e != nil {
-		fail(w, 400, e.Error())
-		return
-	}
-	in.ID = token()
-	_, e := a.Pool.Exec(r.Context(), "INSERT INTO addresses(id,user_id,recipient,phone,province,city,street,postal_code,latitude,longitude,province_id,city_id,pin_confirmed) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)", in.ID, current(r).UserID, in.Recipient, in.Phone, in.Province, in.City, in.Street, in.PostalCode, in.Latitude, in.Longitude, in.ProvinceID, in.CityID, in.PinConfirmed)
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	write(w, 201, in)
-}
+var errUnavailable = errors.New("وضعیت محصول، بسته یا سقف خرید تغییر کرده است؛ سبد را بررسی کنید")

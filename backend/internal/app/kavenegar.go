@@ -1,17 +1,19 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"bomish/internal/domain"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -47,9 +49,10 @@ func ValidateSMSConfig(origin string) error {
 	return nil
 }
 
-func validSMSTemplate(s string) bool {
-	return regexp.MustCompile(`^[A-Za-z][A-Za-z0-9-]*$`).MatchString(s)
-}
+var smsTemplatePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9-]*$`)
+var smsTokenPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,100}$`)
+
+func validSMSTemplate(s string) bool { return smsTemplatePattern.MatchString(s) }
 
 func orderSMSTemplate(stage, method string) string {
 	setting := map[string]string{
@@ -103,13 +106,11 @@ func sendSMSTokens(ctx context.Context, phone, template, value string, extra url
 		return rejected("configuration")
 	}
 	// Tokens are either the six digit OTP or Bomish's opaque order identifier.
-	if !regexp.MustCompile(`^[A-Za-z0-9-]{1,100}$`).MatchString(value) {
+	if !smsTokenPattern.MatchString(value) {
 		return rejected("invalid_token")
 	}
 	form := url.Values{"receptor": {phone}, "template": {template}, "token": {value}, "type": {"sms"}}
-	for k, v := range extra {
-		form[k] = v
-	}
+	maps.Copy(form, extra)
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.kavenegar.com/v1/"+url.PathEscape(key)+"/verify/lookup.json", strings.NewReader(form.Encode()))
 	if err != nil {
 		return rejected("configuration")

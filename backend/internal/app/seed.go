@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"bomish/internal/security"
+
 	"github.com/jackc/pgx/v5"
 )
 
@@ -44,7 +46,7 @@ func writeDemoStaff(ctx context.Context, tx pgx.Tx) error {
 		{"owner", "آرمان رضایی"}, {"manager", "سارا احمدی"}, {"editor", "نیلوفر کریمی"}, {"operator", "امیر محمدی"}, {"salesperson", "مریم حسینی"},
 	} {
 		// Fresh IDs prevent historical commissions or activity being assigned to new people.
-		if _, err := tx.Exec(ctx, `INSERT INTO staff(id,username,full_name,password_hash,totp_secret,role) VALUES($1,$2,$3,$4,$5,$2)`, token(), s.role, s.name, PasswordHash(DemoPassword), DemoTOTP); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO staff(id,username,full_name,password_hash,totp_secret,role) VALUES($1,$2,$3,$4,$5,$2)`, security.Token(), s.role, s.name, security.PasswordHash(DemoPassword), DemoTOTP); err != nil {
 			return err
 		}
 	}

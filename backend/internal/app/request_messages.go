@@ -2,11 +2,15 @@ package app
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"bomish/internal/database"
+	"bomish/internal/httpx"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func (a *App) customerMessages(w http.ResponseWriter, r *http.Request) {
@@ -29,11 +33,11 @@ func (a *App) requestAccess(w http.ResponseWriter, r *http.Request, staff bool) 
 	var found bool
 	e := a.Pool.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM customer_requests WHERE id=$1 AND kind='support' AND ($2='' OR user_id=$2))`, r.PathValue("id"), uid).Scan(&found)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return false
 	}
 	if !found {
-		fail(w, 404, "گفتگو پیدا نشد")
+		httpx.Error(w, 404, "گفتگو پیدا نشد")
 		return false
 	}
 	return true
@@ -46,14 +50,14 @@ func (a *App) messages(w http.ResponseWriter, r *http.Request, staff bool) {
 	q := r.URL.Query()
 	latest := q.Get("latest") == "true"
 	if (q.Has("latest") && !latest) || (q.Has("after") && (q.Has("before") || q.Has("latest"))) || (q.Has("before") && q.Has("latest")) {
-		fail(w, 400, "نشانگر معتبر نیست")
+		httpx.Error(w, 400, "نشانگر معتبر نیست")
 		return
 	}
 	for name, target := range map[string]*int64{"after": &after, "before": &before} {
 		if q.Has(name) {
 			value, err := strconv.ParseInt(q.Get(name), 10, 64)
 			if err != nil || value < 0 || (name == "before" && value == 0) {
-				fail(w, 400, "نشانگر معتبر نیست")
+				httpx.Error(w, 400, "نشانگر معتبر نیست")
 				return
 			}
 			*target = value
@@ -73,12 +77,12 @@ func (a *App) messages(w http.ResponseWriter, r *http.Request, staff bool) {
 	if !latest {
 		args = append(args, cursor)
 	}
-	rows, e := queryMaps(r.Context(), a.Pool, query, args...)
+	rows, e := database.QueryMaps(r.Context(), a.Pool, query, args...)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	write(w, 200, rows)
+	httpx.JSON(w, 200, rows)
 }
 func (a *App) sendMessage(w http.ResponseWriter, r *http.Request, staff bool) {
 	if !a.requestAccess(w, r, staff) {
@@ -97,7 +101,7 @@ func (a *App) sendMessage(w http.ResponseWriter, r *http.Request, staff bool) {
 		in.Body = "تصویر"
 	}
 	if !validText(in.Body, 4000) || !validRequestKey(in.Key) {
-		fail(w, 400, "پیام باید بین ۱ و ۴۰۰۰ نویسه باشد")
+		httpx.Error(w, 400, "پیام باید بین ۱ و ۴۰۰۰ نویسه باشد")
 		return
 	}
 	identity := current(r).UserID
@@ -107,33 +111,33 @@ func (a *App) sendMessage(w http.ResponseWriter, r *http.Request, staff bool) {
 		staffID = identity
 	}
 	if !a.limit(r, "chat:"+identity, 60, time.Minute) {
-		fail(w, 429, "پیام‌ها زیاد است؛ کمی صبر کنید")
+		httpx.Error(w, 429, "پیام‌ها زیاد است؛ کمی صبر کنید")
 		return
 	}
 	tx, e := a.Pool.Begin(r.Context())
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	defer tx.Rollback(r.Context())
 	// Thread lock gives message IDs commit order, so incremental polling never skips a message.
 	if _, e = tx.Exec(r.Context(), `SELECT id FROM customer_requests WHERE id=$1 FOR UPDATE`, r.PathValue("id")); e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	id, e := saveRequestMessage(r.Context(), tx, r.PathValue("id"), staffID, in.Body, in.Key, picture)
 	if e == pgx.ErrNoRows {
-		fail(w, 409, "شناسه پیام قبلاً استفاده شده است")
+		httpx.Error(w, 409, "شناسه پیام قبلاً استفاده شده است")
 		return
 	}
 	if e == nil {
 		e = tx.Commit(r.Context())
 	}
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	write(w, 201, map[string]int64{"id": id})
+	httpx.JSON(w, 201, map[string]int64{"id": id})
 }
 
 // The caller holds the thread lock. Retries must match both sender and body;

@@ -1,25 +1,28 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"bomish/internal/database"
+	"bomish/internal/domain"
+	"bomish/internal/httpx"
 )
 
 func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 	q := r.URL.Query()
-	page, size := pageArgs(r)
+	page, size := httpx.PageArgs(r)
 	query := domain.Normalize(strings.TrimSpace(q.Get("q")))
 	if len(query) > 500 {
-		fail(w, 400, "جستجو بیش از حد طولانی است")
+		httpx.Error(w, 400, "جستجو بیش از حد طولانی است")
 		return
 	}
 	max, _ := strconv.ParseInt(domain.Normalize(q.Get("max")), 10, 64)
 	if max < 0 || max > 10000000000 {
-		fail(w, 400, "سقف قیمت معتبر نیست")
+		httpx.Error(w, 400, "سقف قیمت معتبر نیست")
 		return
 	}
 	// Read draft content only in authenticated catalog tools. Filtering and sorting happen before pagination.
@@ -59,7 +62,7 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 	args := []any{query, q.Get("category"), q.Get("status"), q.Get("available"), max * 10, ids}
 	var total int64
 	if e := a.Pool.QueryRow(r.Context(), "SELECT count(*) FROM ("+base+") x", args...).Scan(&total); e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	sort := "name,id"
@@ -84,9 +87,9 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 		sort = "sold_quantity DESC,id"
 	}
 
-	rows, e := queryMaps(r.Context(), a.Pool, base+" ORDER BY "+sort+" LIMIT $7 OFFSET $8", append(args, size, (page-1)*size)...)
+	rows, e := database.QueryMaps(r.Context(), a.Pool, base+" ORDER BY "+sort+" LIMIT $7 OFFSET $8", append(args, size, (page-1)*size)...)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	out := []domain.Product{}
@@ -114,24 +117,24 @@ func (a *App) catalogPage(w http.ResponseWriter, r *http.Request, staff bool) {
 		p.EnsurePackages()
 		out = append(out, p)
 	}
-	listResponse(w, r, out, total)
+	httpx.List(w, r, out, total)
 }
 func (a *App) productOptions(w http.ResponseWriter, r *http.Request) {
 	if !(can(r, "products") || can(r, "articles") || can(r, "categories") || can(r, "pricing") || can(r, "home")) {
-		fail(w, 403, "به این بخش دسترسی ندارید")
+		httpx.Error(w, 403, "به این بخش دسترسی ندارید")
 		return
 	}
 	a.catalogPage(w, r, can(r, "products") || can(r, "pricing"))
 }
 func (a *App) categoryCounts(w http.ResponseWriter, r *http.Request) {
-	rows, e := queryMaps(r.Context(), a.Pool, `SELECT c.id,count(DISTINCT p.id) AS count FROM categories c LEFT JOIN products p ON p.category_id=c.id OR EXISTS(SELECT 1 FROM product_drafts d WHERE d.product_id=p.id AND d.content->>'categoryId'=c.id) GROUP BY c.id`)
+	rows, e := database.QueryMaps(r.Context(), a.Pool, `SELECT c.id,count(DISTINCT p.id) AS count FROM categories c LEFT JOIN products p ON p.category_id=c.id OR EXISTS(SELECT 1 FROM product_drafts d WHERE d.product_id=p.id AND d.content->>'categoryId'=c.id) GROUP BY c.id`)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	out := map[string]any{}
 	for _, row := range rows {
 		out[row["id"].(string)] = row["count"]
 	}
-	write(w, 200, out)
+	httpx.JSON(w, 200, out)
 }

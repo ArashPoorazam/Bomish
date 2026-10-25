@@ -1,13 +1,14 @@
 package carrier
 
 import (
-	"bomish/internal/domain"
-	"bomish/internal/packing"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"bomish/internal/domain"
+	"bomish/internal/packing"
 )
 
 func TestMoneyAndThreshold(t *testing.T) {

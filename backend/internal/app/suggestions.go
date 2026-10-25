@@ -1,68 +1,73 @@
 package app
 
-import "net/http"
+import (
+	"net/http"
+
+	"bomish/internal/database"
+	"bomish/internal/httpx"
+)
 
 func (a *App) suggestions(w http.ResponseWriter, r *http.Request) {
-	rows, e := queryMaps(r.Context(), a.Pool, `SELECT s.product_id AS id,p.name,p.status,s.position,coalesce(p.content->'images'->>0,'/images/spices.png') AS image,coalesce((p.content->>'outOfStock')::boolean,false) AS "outOfStock" FROM product_suggestions s JOIN products p ON p.id=s.product_id ORDER BY position`)
+	rows, e := database.QueryMaps(r.Context(), a.Pool, `SELECT s.product_id AS id,p.name,p.status,s.position,coalesce(p.content->'images'->>0,'/images/spices.png') AS image,coalesce((p.content->>'outOfStock')::boolean,false) AS "outOfStock" FROM product_suggestions s JOIN products p ON p.id=s.product_id ORDER BY position`)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	write(w, 200, rows)
+	httpx.JSON(w, 200, rows)
 }
 func (a *App) saveSuggestions(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		IDs []string `json:"productIds"`
 	}
-	if !decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) {
 		return
 	}
 	if in.IDs == nil || len(in.IDs) > 12 {
-		fail(w, 400, "حداکثر ۱۲ محصول انتخاب کنید")
+		httpx.Error(w, 400, "حداکثر ۱۲ محصول انتخاب کنید")
 		return
 	}
 	seen := map[string]bool{}
 	for _, id := range in.IDs {
 		if id == "" || seen[id] {
-			fail(w, 400, "محصول تکراری یا نامعتبر است")
+			httpx.Error(w, 400, "محصول تکراری یا نامعتبر است")
 			return
 		}
 		seen[id] = true
 	}
 	tx, e := a.Pool.Begin(r.Context())
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	defer tx.Rollback(r.Context())
 	// Serialize replacements, including empty lists.
 	if _, e = tx.Exec(r.Context(), `SELECT id FROM settings WHERE id=true FOR UPDATE`); e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	var valid int
 	if e = tx.QueryRow(r.Context(), `SELECT count(*) FROM products WHERE id=ANY($1::text[]) AND (status='published' OR id IN (SELECT product_id FROM product_suggestions))`, in.IDs).Scan(&valid); e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	if valid != len(in.IDs) {
-		fail(w, 400, "فقط محصولات منتشرشده را انتخاب کنید")
+		httpx.Error(w, 400, "فقط محصولات منتشرشده را انتخاب کنید")
 		return
 	}
 	if _, e = tx.Exec(r.Context(), `DELETE FROM product_suggestions`); e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	if _, e = tx.Exec(r.Context(), `INSERT INTO product_suggestions(product_id,position) SELECT id,position-1 FROM unnest($1::text[]) WITH ORDINALITY AS selected(id,position)`, in.IDs); e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	if e = auditDetail(r.Context(), tx, current(r).StaffID, "store.suggestions", "home", in); e == nil {
 		e = tx.Commit(r.Context())
 	}
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	write(w, 200, map[string]bool{"ok": true})
+	httpx.JSON(w, 200, map[string]bool{"ok": true})
 }

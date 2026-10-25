@@ -77,7 +77,7 @@ func TestPackingSupportPaddingAndBounds(t *testing.T) {
 		t.Fatal("unbounded units")
 	}
 	many := []Item{}
-	for i := 0; i < 21; i++ {
+	for i := range 21 {
 		v := item("a", 100, 100, 100, 100)
 		v.Unit = i
 		many = append(many, v)

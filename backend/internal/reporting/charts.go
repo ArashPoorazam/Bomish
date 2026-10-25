@@ -1,9 +1,12 @@
-package app
+package reporting
 
 import (
 	"net/http"
 	"strings"
 	"time"
+
+	"bomish/internal/database"
+	"bomish/internal/httpx"
 )
 
 // Each fact is assigned to its Tehran calendar day before aggregation.
@@ -18,25 +21,25 @@ var chartFacts = map[string]string{
 	"searches":   `SELECT query id,query name,created_at at,0::bigint revenue,0::bigint quantity,count(*)::bigint orders,0::bigint clicks,0::bigint views FROM analytics_events WHERE kind='search' AND created_at >= $1 AND created_at < $2 GROUP BY query,created_at`,
 }
 
-func (a *App) reportCharts(w http.ResponseWriter, r *http.Request) {
+func (s *Service) Charts(w http.ResponseWriter, r *http.Request) {
 	section := r.URL.Query().Get("section")
 	if section == "" {
 		section = "overview"
 	}
-	from, to := reportDates(r)
+	from, to := Dates(r.URL.Query())
 	if r.URL.Query().Get("from") == "" {
 		from = to.AddDate(0, 0, -7)
 	}
 	for _, key := range []string{"from", "to"} {
 		if value := r.URL.Query().Get(key); value != "" {
 			if _, e := time.Parse("2006-01-02", value); e != nil {
-				fail(w, 400, "تاریخ معتبر نیست")
+				httpx.Error(w, 400, "تاریخ معتبر نیست")
 				return
 			}
 		}
 	}
 	if !from.Before(to) || to.Sub(from) > 366*24*time.Hour {
-		fail(w, 400, "بازه باید بین ۱ تا ۳۶۶ روز باشد")
+		httpx.Error(w, 400, "بازه باید بین ۱ تا ۳۶۶ روز باشد")
 		return
 	}
 	ids := r.URL.Query()["id"]
@@ -44,12 +47,12 @@ func (a *App) reportCharts(w http.ResponseWriter, r *http.Request) {
 		ids = strings.Split(s, ",")
 	}
 	if len(ids) > 12 {
-		fail(w, 400, "حداکثر ۱۲ مورد را هم‌زمان مقایسه کنید")
+		httpx.Error(w, 400, "حداکثر ۱۲ مورد را هم‌زمان مقایسه کنید")
 		return
 	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if len(q) > 500 {
-		fail(w, 400, "جستجو بیش از حد طولانی است")
+		httpx.Error(w, 400, "جستجو بیش از حد طولانی است")
 		return
 	}
 	days := []string{}
@@ -57,12 +60,12 @@ func (a *App) reportCharts(w http.ResponseWriter, r *http.Request) {
 		days = append(days, d.Format("2006-01-02"))
 	}
 	if section == "prices" {
-		a.priceCharts(w, r, from, to, days, ids, q)
+		s.priceCharts(w, r, from, to, days, ids, q)
 		return
 	}
 	facts, ok := chartFacts[section]
 	if !ok {
-		fail(w, 400, "گزارش معتبر نیست")
+		httpx.Error(w, 400, "گزارش معتبر نیست")
 		return
 	}
 	// Include inactive-in-period entities so a zero-sales product can still be compared.
@@ -87,20 +90,20 @@ func (a *App) reportCharts(w http.ResponseWriter, r *http.Request) {
 	switch metric {
 	case "revenue", "quantity", "orders", "clicks", "views":
 	default:
-		fail(w, 400, "شاخص معتبر نیست")
+		httpx.Error(w, 400, "شاخص معتبر نیست")
 		return
 	}
 	// Aggregate in PostgreSQL; never transfer every entity's daily history to Go.
 	totalSQL := `WITH facts AS (` + facts + `) SELECT id,max(name) name,sum(revenue)::float8 revenue,sum(quantity)::float8 quantity,sum(orders)::float8 orders,sum(clicks)::float8 clicks,sum(views)::float8 views FROM facts WHERE ($3='' OR name ILIKE '%'||$3||'%' OR id ILIKE '%'||$3||'%') GROUP BY id`
-	summary, e := queryMaps(r.Context(), a.Pool, `SELECT count(*)::float8 AS "entityCount",count(*) FILTER(WHERE revenue>0 OR quantity>0 OR orders>0)::float8 AS "activeCount",coalesce(sum(revenue),0)::float8 revenue,coalesce(sum(quantity),0)::float8 quantity,coalesce(sum(orders),0)::float8 orders,coalesce(sum(clicks),0)::float8 clicks,coalesce(sum(views),0)::float8 views FROM (`+totalSQL+`) t`, from, to, q)
+	summary, e := database.QueryMaps(r.Context(), s.Pool, `SELECT count(*)::float8 AS "entityCount",count(*) FILTER(WHERE revenue>0 OR quantity>0 OR orders>0)::float8 AS "activeCount",coalesce(sum(revenue),0)::float8 revenue,coalesce(sum(quantity),0)::float8 quantity,coalesce(sum(orders),0)::float8 orders,coalesce(sum(clicks),0)::float8 clicks,coalesce(sum(views),0)::float8 views FROM (`+totalSQL+`) t`, from, to, q)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	// Rankings and denominators always cover the whole period, regardless of selected series.
-	totals, e := queryMaps(r.Context(), a.Pool, `SELECT * FROM (`+totalSQL+`) t ORDER BY `+metric+` DESC,id LIMIT 8`, from, to, q)
+	totals, e := database.QueryMaps(r.Context(), s.Pool, `SELECT * FROM (`+totalSQL+`) t ORDER BY `+metric+` DESC,id LIMIT 8`, from, to, q)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	selected := append([]string{}, ids...)
@@ -112,14 +115,14 @@ func (a *App) reportCharts(w http.ResponseWriter, r *http.Request) {
 			selected = append(selected, t["id"].(string))
 		}
 	}
-	lines, e := queryMaps(r.Context(), a.Pool, `SELECT * FROM (`+base+`) d WHERE id=ANY($4::text[]) ORDER BY id,"day"`, from, to, q, selected)
+	lines, e := database.QueryMaps(r.Context(), s.Pool, `SELECT * FROM (`+base+`) d WHERE id=ANY($4::text[]) ORDER BY id,"day"`, from, to, q, selected)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	packages := []map[string]any{}
 	if section == "products" || section == "packages" {
-		packages, e = queryMaps(r.Context(), a.Pool, `WITH current_packages AS (
+		packages, e = database.QueryMaps(r.Context(), s.Pool, `WITH current_packages AS (
  SELECT p.id product_id,x->>'id' package_id,p.name,(x->>'amount')||' '||CASE x->>'unit' WHEN 'g' THEN 'گرم' WHEN 'kg' THEN 'کیلوگرم' WHEN 'ml' THEN 'میلی‌لیتر' ELSE 'لیتر' END label
  FROM products p CROSS JOIN LATERAL jsonb_array_elements(coalesce(nullif(p.content->'packages','null'::jsonb),'[]')) x
 ), sold AS (
@@ -130,24 +133,24 @@ func (a *App) reportCharts(w http.ResponseWriter, r *http.Request) {
  FROM current_packages c FULL JOIN sold s ON s.product_id=c.product_id AND s.package_id=c.package_id
 ) SELECT * FROM packages WHERE ($3='' OR name ILIKE '%'||$3||'%') AND ($4::text[]='{}' OR "productId"=ANY($4::text[]) OR "productId"||':'||"packageId"=ANY($4::text[])) ORDER BY name,package LIMIT 100`, from, to, q, selected)
 		if e != nil {
-			a.dbError(w, e)
+			httpx.DatabaseError(w, e)
 			return
 		}
 	}
-	write(w, 200, map[string]any{"days": days, "points": lines, "totals": totals, "summary": summary[0], "packages": packages})
+	httpx.JSON(w, 200, map[string]any{"days": days, "points": lines, "totals": totals, "summary": summary[0], "packages": packages})
 }
 
-func (a *App) priceCharts(w http.ResponseWriter, r *http.Request, from, to time.Time, days, ids []string, q string) {
+func (s *Service) priceCharts(w http.ResponseWriter, r *http.Request, from, to time.Time, days, ids []string, q string) {
 	// Rank and compare packages: prices of different package sizes must not be summed.
 	packs := `SELECT h.product_id||':'||h.package_id id,h.product_id,h.package_id,max(p.name||' · '||h.package_label) name,count(*) FILTER(WHERE h.created_at>=$1 AND NOT h.baseline AND (h.old_rials IS DISTINCT FROM h.new_rials OR h.old_discount IS DISTINCT FROM h.new_discount))::float8 changes FROM price_history h JOIN products p ON p.id=h.product_id WHERE h.created_at<$2 AND ($3='' OR p.name ILIKE '%'||$3||'%') GROUP BY h.product_id,h.package_id`
-	summary, e := queryMaps(r.Context(), a.Pool, `SELECT count(*)::float8 AS "entityCount",count(*) FILTER(WHERE changes>0)::float8 AS "activeCount",coalesce(sum(changes),0)::float8 changes FROM (`+packs+`) t`, from, to, q)
+	summary, e := database.QueryMaps(r.Context(), s.Pool, `SELECT count(*)::float8 AS "entityCount",count(*) FILTER(WHERE changes>0)::float8 AS "activeCount",coalesce(sum(changes),0)::float8 changes FROM (`+packs+`) t`, from, to, q)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	totals, e := queryMaps(r.Context(), a.Pool, `SELECT * FROM (`+packs+`) t ORDER BY changes DESC,id LIMIT 8`, from, to, q)
+	totals, e := database.QueryMaps(r.Context(), s.Pool, `SELECT * FROM (`+packs+`) t ORDER BY changes DESC,id LIMIT 8`, from, to, q)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	if len(ids) == 0 {
@@ -160,10 +163,10 @@ func (a *App) priceCharts(w http.ResponseWriter, r *http.Request, from, to time.
 	}
 	// Limit before generating dates. Support legacy product IDs, with a hard series cap.
 	base := `WITH packs AS (SELECT * FROM (` + packs + `) t WHERE id=ANY($4::text[]) OR product_id=ANY($4::text[]) ORDER BY changes DESC,id LIMIT 12) SELECT p.id,p.product_id AS "productId",p.name,to_char(d,'YYYY-MM-DD') AS "day",h.price::float8 price FROM packs p CROSS JOIN generate_series(($1::timestamptz AT TIME ZONE 'Asia/Tehran')::date,($2::timestamptz AT TIME ZONE 'Asia/Tehran')::date-1,interval '1 day') d LEFT JOIN LATERAL (SELECT CASE WHEN new_discount>0 THEN least(new_rials,ceil(new_rials::numeric*(100-new_discount)/1000000)*10000) ELSE new_rials END price FROM price_history WHERE product_id=p.product_id AND package_id=p.package_id AND created_at < ((d+interval '1 day') AT TIME ZONE 'Asia/Tehran') ORDER BY created_at DESC,id DESC LIMIT 1) h ON true ORDER BY p.id,d`
-	rows, e := queryMaps(r.Context(), a.Pool, base, from, to, q, ids)
+	rows, e := database.QueryMaps(r.Context(), s.Pool, base, from, to, q, ids)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	write(w, 200, map[string]any{"days": days, "points": rows, "totals": totals, "summary": summary[0], "packages": []any{}})
+	httpx.JSON(w, 200, map[string]any{"days": days, "points": rows, "totals": totals, "summary": summary[0], "packages": []any{}})
 }

@@ -3,8 +3,9 @@ package migrations
 import (
 	"context"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"strings"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func Apply(ctx context.Context, pool *pgxpool.Pool) error {
@@ -30,7 +31,7 @@ func Apply(ctx context.Context, pool *pgxpool.Pool) error {
 		if !strings.HasSuffix(entry.Name(), ".sql") {
 			continue
 		}
-		version := strings.SplitN(entry.Name(), "_", 2)[0]
+		version, _, _ := strings.Cut(entry.Name(), "_")
 		var exists bool
 		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)", version).Scan(&exists); err != nil {
 			return err

@@ -14,7 +14,7 @@ func TestStaffRequestFiltersPaginationAndDetails(t *testing.T) {
 	staff, _ := testStaff(t, a, "operator", nil)
 	restricted, _ := testStaff(t, a, "operator", []string{"requests"})
 	var firstID string
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		var created map[string]string
 		customer.ok(t, "POST", "/requests", map[string]any{"kind": "custom", "description": fmt.Sprintf("ترکیب ویژه %d", i), "quantity": "۲ کیلو", "budgetRials": 1000000, "idempotencyKey": fmt.Sprintf("filtered-custom-%03d", i)}, &created)
 		if i == 0 {

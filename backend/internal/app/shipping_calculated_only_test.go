@@ -1,11 +1,12 @@
 package app
 
 import (
-	"bomish/internal/domain"
-	"bomish/internal/packing"
 	"context"
 	"errors"
 	"testing"
+
+	"bomish/internal/domain"
+	"bomish/internal/packing"
 )
 
 func TestShippingWithoutSetupDoesNotUseTariffs(t *testing.T) {

@@ -1,12 +1,14 @@
 package app
 
 import (
-	"bomish/internal/db"
-	"bomish/internal/domain"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
+
+	"bomish/internal/db"
+	"bomish/internal/domain"
+	"bomish/internal/httpx"
 )
 
 func productFrom(p db.Product, outOfStock bool) domain.Product {
@@ -50,22 +52,22 @@ func productFrom(p db.Product, outOfStock bool) domain.Product {
 func (a *App) categories(w http.ResponseWriter, r *http.Request) {
 	v, e := a.Queries.ListCategories(r.Context())
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	if v == nil {
 		v = []db.Category{}
 	}
-	write(w, 200, v)
+	httpx.JSON(w, 200, v)
 }
 func (a *App) products(w http.ResponseWriter, r *http.Request) { a.catalogPage(w, r, false) }
 func (a *App) product(w http.ResponseWriter, r *http.Request) {
 	p, e := a.Queries.GetPublicProduct(r.Context(), r.PathValue("slug"))
 	if e != nil {
-		fail(w, 404, "محصول پیدا نشد")
+		httpx.Error(w, 404, "محصول پیدا نشد")
 		return
 	}
-	write(w, 200, productFrom(p.Product, p.OutOfStock))
+	httpx.JSON(w, 200, productFrom(p.Product, p.OutOfStock))
 }
 func articleFrom(p db.Article) domain.Article {
 	var v domain.Article
@@ -83,28 +85,28 @@ func articleFrom(p db.Article) domain.Article {
 func (a *App) articles(w http.ResponseWriter, r *http.Request) {
 	rows, e := a.Queries.ListPublicArticles(r.Context())
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	v := []domain.Article{}
 	for _, p := range rows {
 		v = append(v, articleFrom(p))
 	}
-	write(w, 200, v)
+	httpx.JSON(w, 200, v)
 }
 func (a *App) article(w http.ResponseWriter, r *http.Request) {
 	rows, e := a.Queries.ListPublicArticles(r.Context())
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	for _, p := range rows {
 		if p.Slug == r.PathValue("slug") {
-			write(w, 200, articleFrom(p))
+			httpx.JSON(w, 200, articleFrom(p))
 			return
 		}
 	}
-	fail(w, 404, "مقاله پیدا نشد")
+	httpx.Error(w, 404, "مقاله پیدا نشد")
 }
 func searchText(p domain.Product) string {
 	return domain.Normalize(strings.Join(append([]string{p.Name}, append(p.Aliases, p.Tags...)...), " "))

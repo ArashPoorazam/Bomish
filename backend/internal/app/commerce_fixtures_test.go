@@ -1,11 +1,12 @@
 package app
 
 import (
-	"bomish/internal/domain"
-	"bomish/internal/packing"
 	"context"
 	"encoding/json"
 	"testing"
+
+	"bomish/internal/domain"
+	"bomish/internal/packing"
 )
 
 // Older commerce scenarios use the same calculated-shipping contract as the

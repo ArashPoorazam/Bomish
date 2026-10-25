@@ -1,15 +1,18 @@
 package app
 
 import (
-	"bomish/internal/carrier"
-	"bomish/internal/domain"
 	"context"
 	"encoding/json"
+
+	"bomish/internal/carrier"
+	"bomish/internal/database"
+	"bomish/internal/domain"
+
 	"github.com/jackc/pgx/v5"
 )
 
 // Only the assigned courier's public contact is exposed, never the staff ID or carrier response.
-func orderCourierContact(ctx context.Context, q querier, orderID string) (*domain.CourierContact, error) {
+func orderCourierContact(ctx context.Context, q database.Querier, orderID string) (*domain.CourierContact, error) {
 	var contact domain.CourierContact
 	var assigned bool
 	err := q.QueryRow(ctx, "SELECT courier_staff_id IS NOT NULL,courier_name,courier_phone FROM order_shipping WHERE order_id=$1", orderID).Scan(&assigned, &contact.Name, &contact.Phone)

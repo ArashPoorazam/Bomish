@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -9,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"bomish/internal/domain"
 )
 
 func TestRequestsOwnershipRetriesDecisionsAndNotifications(t *testing.T) {
@@ -246,7 +247,7 @@ func TestConcurrentSupportCreationAndMessageRetry(t *testing.T) {
 		}(clone)
 	}
 	var first map[string]string
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		r := <-results
 		if r.code != 201 {
 			t.Fatalf("concurrent creation %d %s", r.code, r.body)
@@ -265,7 +266,7 @@ func TestConcurrentSupportCreationAndMessageRetry(t *testing.T) {
 			results <- result{status, body}
 		}(clone)
 	}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		r := <-results
 		if r.code != 201 {
 			t.Fatalf("concurrent message %d %s", r.code, r.body)

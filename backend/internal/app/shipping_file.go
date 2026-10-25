@@ -10,6 +10,8 @@ import (
 	"os"
 	"reflect"
 	"strings"
+
+	"bomish/internal/database"
 )
 
 // Only integration settings belong in the file. Merchant settings stay in the UI.
@@ -47,7 +49,7 @@ func applyPostalBoxSizes(c *calculatedConfig, sizes map[string]string) error {
 	return nil
 }
 
-func readShippingTechnical(ctx context.Context, q querier, c calculatedConfig) (shippingTechnical, error) {
+func readShippingTechnical(ctx context.Context, q database.Querier, c calculatedConfig) (shippingTechnical, error) {
 	return shippingTechnical{Localities: c.Localities, Snapp: c.Snapp, Tapin: c.Tapin, PostalBoxSizes: postalBoxSizes(c)}, nil
 }
 

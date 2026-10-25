@@ -1,11 +1,12 @@
 package app
 
 import (
-	"bomish/internal/domain"
-	"bomish/migrations"
 	"context"
 	"testing"
 	"time"
+
+	"bomish/internal/domain"
+	"bomish/migrations"
 )
 
 func TestStorefrontPublicationAndDiscountOrdering(t *testing.T) {

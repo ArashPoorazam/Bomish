@@ -1,15 +1,19 @@
 package app
 
 import (
-	"bomish/internal/carrier"
-	"bomish/internal/domain"
-	"bomish/internal/packing"
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/jackc/pgx/v5"
 	"net/http"
 	"time"
+
+	"bomish/internal/carrier"
+	"bomish/internal/domain"
+	"bomish/internal/httpx"
+	"bomish/internal/packing"
+	"bomish/internal/security"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type shippingSnapshot struct {
@@ -57,7 +61,7 @@ func quoteBinding(c domain.Cart, d domain.Address, code, method string, version 
 		Code, Method string
 		Version      int64
 	}{lines, normalizedDestination(d), domain.Normalize(code), method, version})
-	return hash(string(raw))
+	return security.Hash(string(raw))
 }
 func cartUnits(c domain.Cart) ([]packing.Item, error) {
 	out := []packing.Item{}
@@ -288,14 +292,13 @@ func (a *App) calculatedQuote(w http.ResponseWriter, r *http.Request, c domain.C
 	s, e := a.calculateShipping(r.Context(), c, in, cfg, current(r).UserID)
 	if e != nil {
 		code := "provider_unavailable"
-		var f *packing.Failure
-		if errors.As(e, &f) {
+		if f, ok := errors.AsType[*packing.Failure](e); ok {
 			code = f.Code
 		}
 		shippingError(w, 422, code, e.Error())
 		return
 	}
-	id := token()
+	id := security.Token()
 	expires := time.Now().Add(5 * time.Minute)
 	if !s.CarrierQuote.ExpiresAt.IsZero() && s.CarrierQuote.ExpiresAt.Before(expires) {
 		expires = s.CarrierQuote.ExpiresAt
@@ -311,10 +314,10 @@ func (a *App) calculatedQuote(w http.ResponseWriter, r *http.Request, c domain.C
 	raw, _ := json.Marshal(s)
 	_, e = a.Pool.Exec(r.Context(), "INSERT INTO shipping_quotes(id,user_id,binding,config_version,snapshot,expires_at) VALUES($1,$2,$3,$4,$5,$6)", id, current(r).UserID, quoteBinding(c, in.Address, in.DiscountCode, s.Method, cfg.Version), cfg.Version, raw, expires)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	write(w, 200, s.Totals)
+	httpx.JSON(w, 200, s.Totals)
 }
 func validateCheckoutQuote(ctx context.Context, tx pgx.Tx, user, id, method string, c domain.Cart, d domain.Address, code string, cfg calculatedConfig) (shippingSnapshot, error) {
 	var s shippingSnapshot
@@ -347,7 +350,7 @@ func (a *App) shippingPreview(w http.ResponseWriter, r *http.Request) {
 		} `json:"items"`
 		Address domain.Address `json:"address"`
 	}
-	if !decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) {
 		return
 	}
 	c := domain.Cart{}
@@ -356,7 +359,7 @@ func (a *App) shippingPreview(w http.ResponseWriter, r *http.Request) {
 		var status string
 		e := a.Pool.QueryRow(r.Context(), "SELECT content,status FROM products WHERE id=$1", v.ProductID).Scan(&raw, &status)
 		if e != nil {
-			fail(w, 400, "محصول پیدا نشد")
+			httpx.Error(w, 400, "محصول پیدا نشد")
 			return
 		}
 		var p domain.Product
@@ -365,7 +368,7 @@ func (a *App) shippingPreview(w http.ResponseWriter, r *http.Request) {
 		p.Status = status
 		pack, ok := p.Package(v.PackageID)
 		if !ok {
-			fail(w, 400, "بسته پیدا نشد")
+			httpx.Error(w, 400, "بسته پیدا نشد")
 			return
 		}
 		total := p.PackagePrice(pack) * v.Quantity
@@ -374,7 +377,7 @@ func (a *App) shippingPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	cfg, e := readShippingConfig(r.Context(), a.Pool, false)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	s, e := a.calculateShipping(r.Context(), c, shippingQuoteInput{Address: in.Address}, cfg, "")
@@ -382,5 +385,5 @@ func (a *App) shippingPreview(w http.ResponseWriter, r *http.Request) {
 		shippingError(w, 422, "preview_unavailable", e.Error())
 		return
 	}
-	write(w, 200, s)
+	httpx.JSON(w, 200, s)
 }

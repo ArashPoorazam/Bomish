@@ -1,14 +1,16 @@
 package app
 
 import (
-	"bomish/internal/carrier"
-	"bomish/internal/domain"
-	"bomish/internal/packing"
 	"context"
 	"encoding/json"
 	"net/http"
 	"slices"
 	"testing"
+
+	"bomish/internal/carrier"
+	"bomish/internal/domain"
+	"bomish/internal/packing"
+	"bomish/internal/security"
 )
 
 func TestCourierCheckoutWithoutCartons(t *testing.T) {
@@ -109,7 +111,7 @@ func TestSnappSMSWaitsForContactAndRetainsIt(t *testing.T) {
 	id, _, _ := quoteAndCheckout(t, customer, address, "snapp")
 	d := prepareShipping(t, customer, owner, id)
 	owner.ok(t, "POST", "/staff/orders/"+id+"/dispatch-quote", map[string]any{"version": d.Version}, &d)
-	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()}, &d)
+	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()}, &d)
 	ctx := context.Background()
 	var attempt, ref string
 	if err := a.Pool.QueryRow(ctx, "SELECT id,reference FROM shipment_attempts WHERE order_id=$1", id).Scan(&attempt, &ref); err != nil {
@@ -214,7 +216,7 @@ func TestLegacyCourierBookingRetainsHistoricalPackages(t *testing.T) {
 	}
 	d := prepareShipping(t, customer, owner, id)
 	owner.ok(t, "POST", "/staff/orders/"+id+"/dispatch-quote", map[string]any{"version": d.Version}, &d)
-	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()}, &d)
+	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()}, &d)
 	var raw []byte
 	if err := a.Pool.QueryRow(context.Background(), "SELECT request FROM shipment_attempts WHERE order_id=$1", id).Scan(&raw); err != nil {
 		t.Fatal(err)

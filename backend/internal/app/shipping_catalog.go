@@ -1,9 +1,10 @@
 package app
 
 import (
-	"bomish/internal/packing"
 	_ "embed"
 	"encoding/json"
+
+	"bomish/internal/packing"
 )
 
 type boxCatalogEntry struct {

@@ -1,13 +1,14 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
+
+	"bomish/internal/domain"
 )
 
 func couponOwner(t *testing.T, a *App) *client {

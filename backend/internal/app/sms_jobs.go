@@ -1,11 +1,12 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"context"
 	"encoding/json"
 	"errors"
 	"time"
+
+	"bomish/internal/domain"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -198,7 +199,7 @@ func (a *App) ProcessSMS(ctx context.Context) error {
 	if !smsEnabled() {
 		return nil
 	}
-	for n := 0; n < 10; n++ {
+	for range 10 {
 		job, err := a.claimSMS(ctx)
 		if err == pgx.ErrNoRows {
 			return nil

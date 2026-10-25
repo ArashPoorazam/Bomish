@@ -11,10 +11,12 @@ import (
 )
 
 type Config struct {
-	Dev, CatalogOnly bool
-	Origin           string
-	TOTPKey          []byte
-	TrustedProxies   []netip.Prefix
+	DatabaseURL, UploadDir, ListenAddr, ShippingConfigFile string
+	SeedDemo                                               bool
+	Dev, CatalogOnly                                       bool
+	Origin                                                 string
+	TOTPKey                                                []byte
+	TrustedProxies                                         []netip.Prefix
 }
 
 func LoadSecrets() error {
@@ -35,7 +37,18 @@ func LoadSecrets() error {
 	return nil
 }
 func Read() (Config, error) {
-	c := Config{Dev: os.Getenv("APP_ENV") == "development", Origin: os.Getenv("APP_ORIGIN")}
+	c := Config{
+		Dev: os.Getenv("APP_ENV") == "development", Origin: os.Getenv("APP_ORIGIN"),
+		DatabaseURL: os.Getenv("DATABASE_URL"), UploadDir: os.Getenv("UPLOAD_DIR"),
+		ListenAddr: os.Getenv("LISTEN_ADDR"), ShippingConfigFile: os.Getenv("SHIPPING_CONFIG_FILE"),
+		SeedDemo: os.Getenv("SEED_DEMO") == "true",
+	}
+	if c.UploadDir == "" {
+		c.UploadDir = "../.data/uploads"
+	}
+	if c.ListenAddr == "" {
+		c.ListenAddr = "127.0.0.1:8080"
+	}
 	if !c.Dev && os.Getenv("APP_ENV") != "production" {
 		return c, errors.New("APP_ENV must be development or production")
 	}
@@ -54,7 +67,7 @@ func Read() (Config, error) {
 			return c, errors.New("TOTP_ENCRYPTION_KEY must be 64 hexadecimal characters")
 		}
 	}
-	for _, value := range strings.Split(os.Getenv("TRUSTED_PROXY_CIDRS"), ",") {
+	for value := range strings.SplitSeq(os.Getenv("TRUSTED_PROXY_CIDRS"), ",") {
 		if strings.TrimSpace(value) == "" {
 			continue
 		}

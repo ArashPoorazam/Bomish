@@ -1,9 +1,10 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"context"
 	"testing"
+
+	"bomish/internal/domain"
 )
 
 func TestOrderPackingChecklist(t *testing.T) {

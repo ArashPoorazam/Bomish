@@ -4,72 +4,49 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"bomish/internal/database"
+	"bomish/internal/httpx"
+	"bomish/internal/reporting"
 )
 
 func (a *App) omnisireRoutes(m *http.ServeMux) {
-	routes := map[string]http.HandlerFunc{
-		"GET /api/v1/omnisire/summary":                                a.summary,
-		"GET /api/v1/omnisire/members":                                a.listMembers,
-		"POST /api/v1/omnisire/members":                               a.createMember,
-		"GET /api/v1/omnisire/members/{id}":                           a.memberDetail,
-		"PATCH /api/v1/omnisire/members/{id}":                         a.editMember,
-		"DELETE /api/v1/omnisire/members/{id}":                        a.archiveMember,
-		"POST /api/v1/omnisire/members/{id}/credentials":              a.resetMemberCredentials,
-		"GET /api/v1/omnisire/members/{id}/sales":                     a.ownerSales,
-		"POST /api/v1/omnisire/members/{id}/payments":                 a.recordMemberPayment,
-		"POST /api/v1/omnisire/members/{id}/payments/{entry}/reverse": a.reverseMemberPayment,
-		"POST /api/v1/omnisire/members/{id}/refunds":                  a.refundCommission,
-		"GET /api/v1/omnisire/events":                                 a.listEvents,
-		"GET /api/v1/omnisire/analytics":                              a.report,
-		"GET /api/v1/omnisire/analytics/charts":                       a.reportCharts,
-		"GET /api/v1/omnisire/analytics/series":                       a.reportSeries,
-		"POST /api/v1/omnisire/exports":                               a.createExport,
-		"GET /api/v1/omnisire/exports/{id}":                           a.getExport,
-		"GET /api/v1/omnisire/exports/{id}/download":                  a.downloadExport,
-		"POST /api/v1/omnisire/exports/{id}/retry":                    a.retryExport,
-	}
-	for route, h := range routes {
-		section, action := "overview", "view"
-		switch {
-		case strings.Contains(route, "/members"):
-			section = "members"
-			if strings.HasPrefix(route, "POST ") {
-				action = "edit"
-				if route == "POST /api/v1/omnisire/members" {
-					action = "create"
-				}
-			}
-			if strings.HasPrefix(route, "PATCH ") {
-				action = "edit"
-			}
-			if strings.HasPrefix(route, "DELETE ") {
-				action = "delete"
-			}
-		case strings.Contains(route, "/events"):
-			section = "events"
-		case strings.Contains(route, "/analytics"):
-			section = "analytics"
-		case strings.Contains(route, "/exports"):
-			section, action = "analytics", "export"
-		}
-		m.HandleFunc(route, a.permit(h, section, action))
-	}
-	m.HandleFunc("GET /api/v1/omnisire/permission-options", a.permit(a.permissionOptions, "members"))
+	reports := &reporting.Service{Pool: a.Pool}
+	m.HandleFunc("GET /api/v1/omnisire/summary", withPermission(a.summary, "overview"))
+	m.HandleFunc("GET /api/v1/omnisire/members", withPermission(a.listMembers, "members"))
+	m.HandleFunc("POST /api/v1/omnisire/members", withPermission(a.createMember, "members.create"))
+	m.HandleFunc("GET /api/v1/omnisire/members/{id}", withPermission(a.memberDetail, "members"))
+	m.HandleFunc("PATCH /api/v1/omnisire/members/{id}", withPermission(a.editMember, "members.edit"))
+	m.HandleFunc("DELETE /api/v1/omnisire/members/{id}", withPermission(a.archiveMember, "members.delete"))
+	m.HandleFunc("POST /api/v1/omnisire/members/{id}/credentials", withPermission(a.resetMemberCredentials, "members.edit"))
+	m.HandleFunc("GET /api/v1/omnisire/members/{id}/sales", withPermission(a.ownerSales, "members"))
+	m.HandleFunc("POST /api/v1/omnisire/members/{id}/payments", withPermission(a.recordMemberPayment, "members.edit"))
+	m.HandleFunc("POST /api/v1/omnisire/members/{id}/payments/{entry}/reverse", withPermission(a.reverseMemberPayment, "members.edit"))
+	m.HandleFunc("POST /api/v1/omnisire/members/{id}/refunds", withPermission(a.refundCommission, "members.edit"))
+	m.HandleFunc("GET /api/v1/omnisire/events", withPermission(a.listEvents, "events"))
+	m.HandleFunc("GET /api/v1/omnisire/analytics", withPermission(reports.Report, "analytics"))
+	m.HandleFunc("GET /api/v1/omnisire/analytics/charts", withPermission(reports.Charts, "analytics"))
+	m.HandleFunc("GET /api/v1/omnisire/analytics/series", withPermission(reports.Series, "analytics"))
+	m.HandleFunc("POST /api/v1/omnisire/exports", withPermission(a.createExport, "analytics.export"))
+	m.HandleFunc("GET /api/v1/omnisire/exports/{id}", withPermission(a.getExport, "analytics.export"))
+	m.HandleFunc("GET /api/v1/omnisire/exports/{id}/download", withPermission(a.downloadExport, "analytics.export"))
+	m.HandleFunc("POST /api/v1/omnisire/exports/{id}/retry", withPermission(a.retryExport, "analytics.export"))
+	m.HandleFunc("GET /api/v1/omnisire/permission-options", withPermission(a.permissionOptions, "members"))
 }
 
 func (a *App) summary(w http.ResponseWriter, r *http.Request) {
-	from, to := reportDates(r)
-	out, e := queryMaps(r.Context(), a.Pool, `SELECT (SELECT coalesce(sum(subtotal_rials-discount_rials),0)::bigint FROM orders WHERE paid_at>=$1 AND paid_at<$2 AND status IN ('paid','packing','shipped','received')) AS revenue,(SELECT count(*) FROM orders WHERE paid_at>=$1 AND paid_at<$2 AND status IN ('paid','packing','shipped','received')) AS orders,(SELECT count(*) FROM staff WHERE active AND archived_at IS NULL) AS members,(SELECT coalesce(sum(balance),0)::bigint FROM (SELECT sum(amount_rials) balance FROM member_ledger GROUP BY staff_id HAVING sum(amount_rials)>0) b) AS payable`, from, to)
+	from, to := reporting.Dates(r.URL.Query())
+	out, e := database.QueryMaps(r.Context(), a.Pool, `SELECT (SELECT coalesce(sum(subtotal_rials-discount_rials),0)::bigint FROM orders WHERE paid_at>=$1 AND paid_at<$2 AND status IN ('paid','packing','shipped','received')) AS revenue,(SELECT count(*) FROM orders WHERE paid_at>=$1 AND paid_at<$2 AND status IN ('paid','packing','shipped','received')) AS orders,(SELECT count(*) FROM staff WHERE active AND archived_at IS NULL) AS members,(SELECT coalesce(sum(balance),0)::bigint FROM (SELECT sum(amount_rials) balance FROM member_ledger GROUP BY staff_id HAVING sum(amount_rials)>0) b) AS payable`, from, to)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	write(w, 200, out[0])
+	httpx.JSON(w, 200, out[0])
 }
 
 func (a *App) listEvents(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	from, to := reportDates(r)
+	from, to := reporting.Dates(r.URL.Query())
 	if q.Get("from") == "" {
 		from = time.Unix(0, 0)
 	}

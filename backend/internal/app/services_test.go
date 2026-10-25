@@ -208,7 +208,7 @@ func TestSMSWorker(t *testing.T) {
 	if _, err := a.Pool.Exec(ctx, "UPDATE jobs SET available_at=now() WHERE kind='order_sms'"); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if err := a.ProcessSMS(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -247,7 +247,7 @@ func TestSMSUnknownPermanentAndRetryCap(t *testing.T) {
 				}
 				return smsResponse(tc.body), nil
 			})
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				if err := a.ProcessSMS(ctx); err != nil {
 					t.Fatal(err)
 				}
@@ -272,9 +272,8 @@ func TestSMSConcurrentWorkersAndCrash(t *testing.T) {
 	})
 	var wg sync.WaitGroup
 	errs := make(chan error, 4)
-	for i := 0; i < 4; i++ {
-		wg.Add(1)
-		go func() { defer wg.Done(); errs <- a.ProcessSMS(ctx) }()
+	for range 4 {
+		wg.Go(func() { errs <- a.ProcessSMS(ctx) })
 	}
 	wg.Wait()
 	close(errs)

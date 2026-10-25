@@ -1,19 +1,23 @@
 package app
 
 import (
-	"bomish/internal/carrier"
-	"bomish/internal/domain"
 	"context"
 	"encoding/json"
-	"github.com/jackc/pgx/v5"
 	"net/http"
 	"time"
+
+	"bomish/internal/carrier"
+	"bomish/internal/domain"
+	"bomish/internal/httpx"
+	"bomish/internal/security"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // Claim and commit before crossing the network boundary. Expired leases always do
 // a lookup after create_started_at: creation is never retried automatically.
 func (a *App) ProcessShipments(ctx context.Context) error {
-	for n := 0; n < 10; n++ {
+	for range 10 {
 		tx, e := a.Pool.Begin(ctx)
 		if e != nil {
 			return e
@@ -31,7 +35,7 @@ func (a *App) ProcessShipments(ctx context.Context) error {
 			tx.Rollback(ctx)
 			return e
 		}
-		lease := token()
+		lease := security.Token()
 		create := started == nil
 		cancel := cancelRequested != nil && cancelInvoked == nil
 		_, e = tx.Exec(ctx, `UPDATE shipment_attempts SET lease_until=now()+interval '45 seconds',lease_token=$2,create_started_at=coalesce(create_started_at,now()),cancel_invoked_at=CASE WHEN $3 THEN now() ELSE cancel_invoked_at END,updated_at=now() WHERE id=$1`, id, lease, cancel)
@@ -212,26 +216,26 @@ func (a *App) snappWebhook(w http.ResponseWriter, r *http.Request) {
 		EventID    string    `json:"eventId"`
 		OccurredAt time.Time `json:"occurredAt"`
 	}
-	if !decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) {
 		return
 	}
 	if len(in.Reference) != 64 || len(in.EventID) < 1 || len(in.EventID) > 200 || in.OccurredAt.IsZero() {
-		fail(w, 400, "رویداد معتبر نیست")
+		httpx.Error(w, 400, "رویداد معتبر نیست")
 		return
 	}
 	tx, e := a.Pool.Begin(r.Context())
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	defer tx.Rollback(r.Context())
 	var id string
 	e = tx.QueryRow(r.Context(), "SELECT id FROM shipment_attempts WHERE reference=$1", in.Reference).Scan(&id)
 	if e != nil {
-		write(w, 202, map[string]bool{"accepted": true})
+		httpx.JSON(w, 202, map[string]bool{"accepted": true})
 		return
 	}
-	tag, e := tx.Exec(r.Context(), "INSERT INTO shipping_webhooks(event_key,reference,occurred_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING", hash(in.Reference+":"+in.EventID), in.Reference, in.OccurredAt)
+	tag, e := tx.Exec(r.Context(), "INSERT INTO shipping_webhooks(event_key,reference,occurred_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING", security.Hash(in.Reference+":"+in.EventID), in.Reference, in.OccurredAt)
 	if e == nil && tag.RowsAffected() == 1 {
 		_, e = tx.Exec(r.Context(), "UPDATE shipment_attempts SET available_at=least(available_at,now()) WHERE id=$1", id)
 	}
@@ -239,31 +243,31 @@ func (a *App) snappWebhook(w http.ResponseWriter, r *http.Request) {
 		e = tx.Commit(r.Context())
 	}
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	write(w, 202, map[string]bool{"accepted": true})
+	httpx.JSON(w, 202, map[string]bool{"accepted": true})
 }
 func (a *App) simulateShipment(w http.ResponseWriter, r *http.Request) {
 	if !a.simulatedShipping() {
-		fail(w, 404, "یافت نشد")
+		httpx.Error(w, 404, "یافت نشد")
 		return
 	}
 	var in struct {
 		Status string `json:"status"`
 	}
-	if !decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) {
 		return
 	}
 	switch in.Status {
 	case "awaiting_courier", "accepted", "picked_up", "delivered", "allocation_cancelled", "returning", "failed":
 	default:
-		fail(w, 400, "وضعیت معتبر نیست")
+		httpx.Error(w, 400, "وضعیت معتبر نیست")
 		return
 	}
 	_, e := a.Pool.Exec(r.Context(), "UPDATE simulated_shipments SET status=$2,updated_at=now() WHERE reference=(SELECT reference FROM shipment_attempts WHERE order_id=$1 ORDER BY created_at DESC LIMIT 1)", r.PathValue("id"), in.Status)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	a.refreshShipment(w, r)

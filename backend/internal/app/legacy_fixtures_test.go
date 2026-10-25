@@ -1,9 +1,11 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"context"
 	"encoding/json"
+
+	"bomish/internal/domain"
+	"bomish/internal/security"
 )
 
 func (a *App) seedLegacyTestData(ctx context.Context) error {
@@ -62,13 +64,13 @@ func (a *App) seedLegacyTestData(ctx context.Context) error {
 		}
 	}
 	for _, role := range []string{"owner", "editor", "operator"} {
-		if _, e = tx.Exec(ctx, "INSERT INTO staff(id,username,password_hash,totp_secret,role) VALUES($1,$1,$2,$3,$1)", role, PasswordHash("Bomish-demo-2026!"), DemoTOTP); e != nil {
+		if _, e = tx.Exec(ctx, "INSERT INTO staff(id,username,password_hash,totp_secret,role) VALUES($1,$1,$2,$3,$1)", role, security.PasswordHash("Bomish-demo-2026!"), DemoTOTP); e != nil {
 			return e
 		}
 	}
 	for _, province := range []string{"تهران", "البرز", "اصفهان", "فارس", "خراسان رضوی", "گیلان", "مازندران", "آذربایجان شرقی"} {
 		for _, band := range [][2]int64{{2200, 650000}, {5200, 950000}, {25200, 1800000}} {
-			if _, e = tx.Exec(ctx, "INSERT INTO shipping_rules(id,province,max_grams,fee_rials) VALUES($1,$2,$3,$4)", token(), province, band[0], band[1]); e != nil {
+			if _, e = tx.Exec(ctx, "INSERT INTO shipping_rules(id,province,max_grams,fee_rials) VALUES($1,$2,$3,$4)", security.Token(), province, band[0], band[1]); e != nil {
 				return e
 			}
 		}

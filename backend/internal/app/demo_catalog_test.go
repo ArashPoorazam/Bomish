@@ -49,7 +49,7 @@ func TestDemoRefreshPreservesHistoryAndRevokesStaff(t *testing.T) {
 	if _, err := a.Pool.Exec(ctx, `INSERT INTO users(id,phone) VALUES('demo-history','09121112222'); INSERT INTO orders(id,user_id,idempotency_key,status,address,subtotal_rials,shipping_rials,total_rials,reservation_expires_at) VALUES('demo-history','demo-history','history','paid','{}',100000,0,100000,now()); INSERT INTO order_items(order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity) VALUES('demo-history','turmeric','زردچوبه',100,100000,100000,'old','100 g',1)`); err != nil {
 		t.Fatal(err)
 	}
-	for run := 0; run < 2; run++ {
+	for range 2 {
 		if err := a.RefreshDemoCatalog(ctx); err != nil {
 			t.Fatal(err)
 		}

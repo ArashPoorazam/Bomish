@@ -1,10 +1,12 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"errors"
 	"net/http"
 	"strings"
+
+	"bomish/internal/domain"
+	"bomish/internal/httpx"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -19,7 +21,7 @@ type staffCourier struct {
 func (a *App) shippingCouriers(w http.ResponseWriter, r *http.Request) {
 	rows, err := a.Pool.Query(r.Context(), `SELECT id,full_name,phone FROM staff WHERE role='courier' AND active AND archived_at IS NULL ORDER BY full_name,id`)
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	defer rows.Close()
@@ -27,16 +29,16 @@ func (a *App) shippingCouriers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var c staffCourier
 		if err = rows.Scan(&c.ID, &c.FullName, &c.Phone); err != nil {
-			a.dbError(w, err)
+			httpx.DatabaseError(w, err)
 			return
 		}
 		couriers = append(couriers, c)
 	}
 	if err = rows.Err(); err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
-	write(w, 200, couriers)
+	httpx.JSON(w, 200, couriers)
 }
 
 func (a *App) dispatchOwnCourier(w http.ResponseWriter, r *http.Request) {
@@ -44,11 +46,11 @@ func (a *App) dispatchOwnCourier(w http.ResponseWriter, r *http.Request) {
 		Version   int64  `json:"version"`
 		CourierID string `json:"courierId"`
 	}
-	if !decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) {
 		return
 	}
 	if strings.TrimSpace(in.CourierID) == "" {
-		fail(w, 400, "همکار پیک را انتخاب کنید")
+		httpx.Error(w, 400, "همکار پیک را انتخاب کنید")
 		return
 	}
 	a.deliveryMutation(w, r, in.Version, func(tx pgx.Tx, d *deliveryRecord, status string) error {
@@ -89,7 +91,7 @@ func (a *App) deliverOwnCourier(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Version int64 `json:"version"`
 	}
-	if !decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) {
 		return
 	}
 	a.deliveryMutation(w, r, in.Version, func(tx pgx.Tx, d *deliveryRecord, status string) error {

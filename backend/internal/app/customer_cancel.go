@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"bomish/internal/httpx"
+
 	"github.com/jackc/pgx/v5"
 )
 
@@ -15,7 +17,7 @@ func (a *App) cancelOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	tx, err := a.Pool.Begin(ctx)
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	defer tx.Rollback(ctx)
@@ -23,35 +25,35 @@ func (a *App) cancelOrder(w http.ResponseWriter, r *http.Request) {
 	var status string
 	err = tx.QueryRow(ctx, "SELECT status FROM orders WHERE id=$1 AND user_id=$2 FOR UPDATE", id, current(r).UserID).Scan(&status)
 	if err == pgx.ErrNoRows {
-		fail(w, 404, "سفارش پیدا نشد")
+		httpx.Error(w, 404, "سفارش پیدا نشد")
 		return
 	}
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	if status == "cancelled" {
-		write(w, 200, map[string]bool{"ok": true})
+		httpx.JSON(w, 200, map[string]bool{"ok": true})
 		return
 	}
 	if status != "pending" && status != "paid" && status != "packing" && status != "review" {
-		fail(w, 409, "این سفارش دیگر قابل لغو نیست")
+		httpx.Error(w, 409, "این سفارش دیگر قابل لغو نیست")
 		return
 	}
 	var shipped bool
 	err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM order_shipping WHERE order_id=$1 AND delivery_status IN ('picked_up','delivered','returning'))", id).Scan(&shipped)
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	if shipped {
-		fail(w, 409, "سفارش ارسال‌شده قابل لغو نیست")
+		httpx.Error(w, 409, "سفارش ارسال‌شده قابل لغو نیست")
 		return
 	}
 	// Serialize with dispatch and confirm carrier cancellation before accepting a refund obligation.
 	rows, err := tx.Query(ctx, "SELECT id,reference,status FROM shipment_attempts WHERE order_id=$1 AND status NOT IN ('cancelled','failed') FOR UPDATE", id)
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	type attempt struct{ id, reference, status string }
@@ -68,23 +70,23 @@ func (a *App) cancelOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	rows.Close()
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	for _, v := range attempts {
 		if v.status != "awaiting_courier" && v.status != "accepted" {
-			fail(w, 409, "وضعیت ارسال در حال بررسی است؛ لطفاً کمی بعد دوباره تلاش کنید یا با پشتیبانی تماس بگیرید")
+			httpx.Error(w, 409, "وضعیت ارسال در حال بررسی است؛ لطفاً کمی بعد دوباره تلاش کنید یا با پشتیبانی تماس بگیرید")
 			return
 		}
 		networkCtx, stop := context.WithTimeout(ctx, 10*time.Second)
 		booking, cancelErr := a.courier().Cancel(networkCtx, v.reference)
 		stop()
 		if cancelErr != nil || booking.Reference != v.reference || booking.Status != "cancelled" {
-			fail(w, 409, "لغو ارسال هنوز تأیید نشده است؛ لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید")
+			httpx.Error(w, 409, "لغو ارسال هنوز تأیید نشده است؛ لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید")
 			return
 		}
 		if _, err = tx.Exec(ctx, "UPDATE shipment_attempts SET status='cancelled',cancel_started_at=now(),cancel_invoked_at=now(),lease_until=NULL,lease_token=NULL,updated_at=now() WHERE id=$1", v.id); err != nil {
-			a.dbError(w, err)
+			httpx.DatabaseError(w, err)
 			return
 		}
 	}
@@ -102,8 +104,8 @@ func (a *App) cancelOrder(w http.ResponseWriter, r *http.Request) {
 		err = tx.Commit(ctx)
 	}
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
-	write(w, 200, map[string]bool{"ok": true})
+	httpx.JSON(w, 200, map[string]bool{"ok": true})
 }

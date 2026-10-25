@@ -4,6 +4,7 @@ package packing
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 )
 
@@ -155,7 +156,7 @@ func coordinates(placed []Placement, size Size, item Size) ([]int64, []int64, []
 		zs = append(zs, v.Z+s.Height)
 	}
 	uniq := func(v []int64) []int64 {
-		sort.Slice(v, func(i, j int) bool { return v[i] < v[j] })
+		slices.Sort(v)
 		out := v[:0]
 		for _, n := range v {
 			if n >= 0 && (len(out) == 0 || n != out[len(out)-1]) {

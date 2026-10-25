@@ -1,5 +1,7 @@
 # Architecture and invariants
 
+The implemented Go package layout, dependency rules, request/worker lifecycle, performance changes, and verification commands are documented in [Backend architecture](backend-architecture.md). This document describes the cross-system business invariants.
+
 ## Boundaries
 
 `frontend/` contains the Next.js App Router storefront, customer area and staff interface. Public catalog/article pages render on the server; interactive cart, authentication, checkout and editor components run in the browser. There is no browser-to-database access. `backend/` is a modular Go HTTP application with pgx pooling, sqlc-generated catalog queries and versioned SQL migrations. `api/openapi.json` defines API shapes and generates `frontend/src/lib/api-types.ts`.
@@ -18,7 +20,7 @@ Package quantities are integers. Gram/kilogram sizes and the explicit weight of 
 
 Product availability is a manual `outOfStock` flag. Authorized staff and owners can change it immediately, independently of content drafts. Unavailable products stay visible but cannot be added to a cart or checked out. Archived products are hidden. Migration 005 preserves the former unavailable state and retains old stock records for history; no running inventory logic uses those records.
 
-Checkout locks the customer, cart session and product rows, checks availability, and snapshots item prices and quantities. A per-user idempotency key returns the same order on retry. Payment clears matching purchased cart lines once. A worker expires unpaid orders after 15 minutes. Late successful payments remain valid unless discount capacity cannot be reclaimed, which requires review. Shipping uses the first matching province/weight ceiling after adding packaging weight.
+Checkout locks the customer, cart session and product rows, checks availability, and snapshots item prices and quantities. A per-user idempotency key returns the same order on retry. Payment clears matching purchased cart lines once. A worker expires unpaid orders after 15 minutes. Late successful payments remain valid unless discount capacity cannot be reclaimed, which requires review. Shipping uses a bound calculated quote with the selected provider and current package measurements; historical orders preserve their original snapshots.
 
 ## Identity and permissions
 

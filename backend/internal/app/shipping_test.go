@@ -1,9 +1,6 @@
 package app
 
 import (
-	"bomish/internal/carrier"
-	"bomish/internal/domain"
-	"bomish/internal/packing"
 	"context"
 	"encoding/json"
 	"net/http/httptest"
@@ -14,6 +11,11 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"bomish/internal/carrier"
+	"bomish/internal/domain"
+	"bomish/internal/packing"
+	"bomish/internal/security"
 )
 
 func shippingFixture(t *testing.T) (*App, *client, *client, domain.Address) {
@@ -51,7 +53,7 @@ func quoteAndCheckout(t *testing.T, c *client, addr domain.Address, method strin
 	if q.RequiresAcceptance {
 		c.ok(t, "POST", "/checkout/quote", shippingQuoteInput{Address: addr, Method: "post", AcceptFallback: true, AcceptedQuoteID: q.ShippingQuoteID}, &q)
 	}
-	body := map[string]any{"address": addr, "shippingQuoteId": q.ShippingQuoteID, "method": q.Method, "expectedTotalRials": q.TotalRials, "idempotencyKey": token()}
+	body := map[string]any{"address": addr, "shippingQuoteId": q.ShippingQuoteID, "method": q.Method, "expectedTotalRials": q.TotalRials, "idempotencyKey": security.Token()}
 	var result map[string]string
 	c.ok(t, "POST", "/checkout", body, &result)
 	return result["orderId"], q, body
@@ -87,7 +89,7 @@ func TestCalculatedShippingLifecycle(t *testing.T) {
 	}
 	d = prepareShipping(t, c, owner, id)
 	owner.ok(t, "POST", "/staff/orders/"+id+"/dispatch-quote", map[string]any{"version": d.Version}, &d)
-	book := map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()}
+	book := map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()}
 	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", book, &d)
 	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", book, &d)
 	var count int
@@ -149,7 +151,7 @@ func TestCalculatedQuoteBindingsAndFallback(t *testing.T) {
 	if q.Method != "post" || !q.RequiresAcceptance {
 		t.Fatal("missing pin did not require fallback", q)
 	}
-	body := map[string]any{"address": addr, "shippingQuoteId": q.ShippingQuoteID, "method": "post", "expectedTotalRials": q.TotalRials, "idempotencyKey": token()}
+	body := map[string]any{"address": addr, "shippingQuoteId": q.ShippingQuoteID, "method": "post", "expectedTotalRials": q.TotalRials, "idempotencyKey": security.Token()}
 	if code, _ := c.call("POST", "/checkout", body); code != 409 {
 		t.Fatal("fallback not accepted", code)
 	}
@@ -222,17 +224,15 @@ func TestShippingUnknownReconciliationAndCancellation(t *testing.T) {
 	id, _, _ := quoteAndCheckout(t, c, addr, "")
 	d := prepareShipping(t, c, owner, id)
 	owner.ok(t, "POST", "/staff/orders/"+id+"/dispatch-quote", map[string]any{"version": d.Version}, &d)
-	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()}, &d)
+	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()}, &d)
 	ctx := context.Background()
 	var wg sync.WaitGroup
-	for i := 0; i < 4; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 4 {
+		wg.Go(func() {
 			if e := a.ProcessShipments(ctx); e != nil {
 				t.Error(e)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	owner.ok(t, "GET", "/staff/orders/"+id+"/delivery", nil, &d)
@@ -252,7 +252,7 @@ func TestShippingUnknownReconciliationAndCancellation(t *testing.T) {
 		t.Fatal("cancellation", d.Status)
 	}
 	owner.ok(t, "POST", "/staff/orders/"+id+"/dispatch-quote", map[string]any{"version": d.Version}, &d)
-	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()}, &d)
+	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()}, &d)
 	if e := a.ProcessShipments(ctx); e != nil {
 		t.Fatal(e)
 	}
@@ -270,14 +270,14 @@ func TestShippingWebhookHintsAndStateOrdering(t *testing.T) {
 	id, _, _ := quoteAndCheckout(t, c, addr, "")
 	d := prepareShipping(t, c, owner, id)
 	owner.ok(t, "POST", "/staff/orders/"+id+"/dispatch-quote", map[string]any{"version": d.Version}, &d)
-	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()}, &d)
+	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()}, &d)
 	if e := a.ProcessShipments(context.Background()); e != nil {
 		t.Fatal(e)
 	}
 	var ref string
 	a.Pool.QueryRow(context.Background(), "SELECT reference FROM shipment_attempts WHERE order_id=$1", id).Scan(&ref)
 	payload, _ := json.Marshal(map[string]any{"reference": ref, "eventId": "event-1", "occurredAt": time.Now()})
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("POST", "/api/v1/webhooks/snapp", strings.NewReader(string(payload)))
 		a.Handler().ServeHTTP(w, r)
@@ -409,7 +409,7 @@ func TestShippingMeasurementDraftPublicationAndRollback(t *testing.T) {
 		t.Fatal("rollback changed pending order")
 	}
 	c.ok(t, "PUT", "/cart/items/turmeric", map[string]any{"packageId": "test500", "quantity": 1}, nil)
-	if code, raw := c.call("POST", "/checkout", map[string]any{"address": addr, "shippingQuoteId": q.ShippingQuoteID, "expectedTotalRials": q.TotalRials, "idempotencyKey": token()}); code != 409 || !strings.Contains(string(raw), "stale_quote") {
+	if code, raw := c.call("POST", "/checkout", map[string]any{"address": addr, "shippingQuoteId": q.ShippingQuoteID, "expectedTotalRials": q.TotalRials, "idempotencyKey": security.Token()}); code != 409 || !strings.Contains(string(raw), "stale_quote") {
 		t.Fatalf("rollback reused calculated quote: %d %s", code, raw)
 	}
 	var d deliveryRecord
@@ -454,7 +454,7 @@ func TestShippingUnknownDoesNotForgetPickup(t *testing.T) {
 	id, _, _ := quoteAndCheckout(t, c, addr, "")
 	d := prepareShipping(t, c, owner, id)
 	owner.ok(t, "POST", "/staff/orders/"+id+"/dispatch-quote", map[string]any{"version": d.Version}, &d)
-	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()}, &d)
+	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()}, &d)
 	ctx := context.Background()
 	if e := a.ProcessShipments(ctx); e != nil {
 		t.Fatal(e)

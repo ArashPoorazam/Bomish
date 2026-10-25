@@ -2,7 +2,6 @@ package app
 
 import (
 	"archive/zip"
-	"bomish/internal/domain"
 	"bytes"
 	"context"
 	"encoding/xml"
@@ -13,6 +12,11 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"bomish/internal/access"
+	"bomish/internal/domain"
+	"bomish/internal/reporting"
+	"bomish/internal/security"
 )
 
 func TestCommissionRounding(t *testing.T) {
@@ -24,7 +28,7 @@ func TestCommissionRounding(t *testing.T) {
 }
 func testStaff(t *testing.T, a *App, role string, restricted []string) (*client, string) {
 	t.Helper()
-	id := token()
+	id := security.Token()
 	if restricted == nil {
 		restricted = []string{}
 	}
@@ -34,7 +38,7 @@ func testStaff(t *testing.T, a *App, role string, restricted []string) (*client,
 	}
 	c := newClient(t, a.Handler())
 	c.cookies[0].Name = "bomish_staff_session"
-	_, e = a.Pool.Exec(context.Background(), "UPDATE sessions SET staff_id=$1,omnisire_verified=true WHERE token_hash=$2", id, hash(c.cookies[0].Value))
+	_, e = a.Pool.Exec(context.Background(), "UPDATE sessions SET staff_id=$1,omnisire_verified=true WHERE token_hash=$2", id, security.Hash(c.cookies[0].Value))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -48,7 +52,7 @@ func TestOmnisirePermissionsAndProfiles(t *testing.T) {
 		c, id := testStaff(t, a, role, nil)
 		for permission, path := range paths {
 			want := 403
-			for _, p := range effectivePermissions(role, nil) {
+			for _, p := range access.Effective(role, nil) {
 				if p == permission {
 					want = 200
 				}
@@ -178,7 +182,7 @@ func TestReferralSettlementLedgerAndExport(t *testing.T) {
 	if balance != 0 {
 		t.Fatal("reversal balance", balance)
 	}
-	for section := range reportSpecs {
+	for section := range reporting.Sections() {
 		owner.ok(t, "GET", "/omnisire/analytics?section="+section, nil, nil)
 	}
 	owner.ok(t, "GET", "/omnisire/analytics/series?section=products&metric=revenue&ids=turmeric", nil, nil)
@@ -220,7 +224,7 @@ func TestReferralSettlementLedgerAndExport(t *testing.T) {
 }
 func fixtureCommission(t *testing.T, a *App, staff, user string, at time.Time) (string, error) {
 	t.Helper()
-	id := token()
+	id := security.Token()
 	tx, e := a.Pool.Begin(context.Background())
 	if e != nil {
 		return "", e
@@ -240,7 +244,7 @@ func TestReferralWindowSuspensionAndConcurrentPayments(t *testing.T) {
 	ctx := context.Background()
 	owner := couponOwner(t, a)
 	sales, id := testStaff(t, a, "salesperson", nil)
-	user := token()
+	user := security.Token()
 	start := time.Now().Add(-time.Hour)
 	end := start.Add(30 * 24 * time.Hour)
 	_, e := a.Pool.Exec(ctx, "INSERT INTO users(id,phone) VALUES($1,'09121113333')", user)
@@ -288,7 +292,7 @@ func TestReferralWindowSuspensionAndConcurrentPayments(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	codes := make(chan int, 2)
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -314,7 +318,7 @@ func TestReportPaginationAndPriceCapture(t *testing.T) {
 	a := setup(t)
 	ctx := context.Background()
 	owner := couponOwner(t, a)
-	for i := 0; i < 36; i++ {
+	for range 36 {
 		testStaff(t, a, "salesperson", nil)
 	}
 	var page pageResult
@@ -440,7 +444,7 @@ func TestPartialPaymentsRefundsAndSessionRevocation(t *testing.T) {
 	ctx := context.Background()
 	owner := couponOwner(t, a)
 	sales, id := testStaff(t, a, "salesperson", nil)
-	user := token()
+	user := security.Token()
 	if _, e := a.Pool.Exec(ctx, "INSERT INTO users(id,phone) VALUES($1,'09123334444')", user); e != nil {
 		t.Fatal(e)
 	}

@@ -1,9 +1,10 @@
 package domain
 
 import (
-	"bomish/internal/packing"
 	"fmt"
 	"strings"
+
+	"bomish/internal/packing"
 )
 
 func (p Package) MeasurementIssues() []string {

@@ -1,62 +1,33 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"testing"
+
+	"bomish/internal/access"
+	"bomish/internal/domain"
+	"bomish/internal/security"
 )
 
-func TestPermissionOverrides(t *testing.T) {
-	overrides := map[string]bool{"products": true, "products.create": true, "products.edit": false, "sales": false, "orders.edit": true}
-	for _, role := range []string{"salesperson", "editor", "manager"} {
-		got := effectivePermissions(role, nil, overrides)
-		for key, want := range map[string]bool{"products": true, "products.create": true, "products.edit": false, "sales": false, "orders.edit": role == "manager"} {
-			if slices.Contains(got, key) != want {
-				t.Errorf("%s %s: %v", role, key, got)
-			}
-		}
-	}
-	if got := effectivePermissions("", nil, overrides); len(got) != 0 {
-		t.Fatal("anonymous grant", got)
-	}
-	got := effectivePermissions("manager", []string{"requests", "products"})
-	for _, key := range []string{"support", "custom", "home", "products", "products.edit", "packaging", "packaging.edit"} {
-		if slices.Contains(got, key) {
-			t.Fatal("legacy restriction bypass", key)
-		}
-	}
-	if !slices.Contains(effectivePermissions("owner", nil, map[string]bool{"members": false}), "members.edit") {
-		t.Fatal("owner locked out")
-	}
-	if slices.Contains(effectivePermissions("salesperson", nil, map[string]bool{}), "products") {
-		t.Fatal("reset did not restore defaults")
-	}
-	if validPermission("omnisire") || validPermission("unknown.edit") {
-		t.Fatal("invalid override accepted")
-	}
-}
-
 func TestPermissionActionEnforcement(t *testing.T) {
-	a := &App{}
 	hit := func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) }
 	for _, tc := range []struct {
-		method, action string
-		want           int
-	}{{"GET", "", 204}, {"PATCH", "", 403}, {"POST", "create", 403}, {"DELETE", "delete", 403}, {"POST", "view", 204}} {
-		r := httptest.NewRequest(tc.method, "/", nil)
-		r = r.WithContext(context.WithValue(r.Context(), sessionKey{}, session{Permissions: []string{"products"}}))
-		w := httptest.NewRecorder()
-		if tc.action == "" {
-			a.permit(hit, "products")(w, r)
-		} else {
-			a.permit(hit, "products", tc.action)(w, r)
-		}
-		if w.Code != tc.want {
-			t.Fatalf("%s %s got %d", tc.method, tc.action, w.Code)
+		permission string
+		want       int
+	}{
+		{"products", 204}, {"products.edit", 403}, {"products.create", 403}, {"products.delete", 403},
+	} {
+		for _, method := range []string{"GET", "POST", "PATCH", "DELETE"} {
+			r := httptest.NewRequest(method, "/", nil)
+			r = r.WithContext(context.WithValue(r.Context(), sessionKey{}, session{Permissions: []string{"products"}}))
+			w := httptest.NewRecorder()
+			withPermission(hit, tc.permission)(w, r)
+			if w.Code != tc.want {
+				t.Fatalf("%s %s: %d", method, tc.permission, w.Code)
+			}
 		}
 	}
 }
@@ -70,7 +41,7 @@ func TestMemberPermissionOverridesIntegration(t *testing.T) {
 	attach := func() *client {
 		c := newClient(t, a.Handler())
 		c.cookies[0].Name = "bomish_staff_session"
-		if _, err := a.Pool.Exec(context.Background(), "UPDATE sessions SET staff_id=$1 WHERE token_hash=$2", created["id"], hash(c.cookies[0].Value)); err != nil {
+		if _, err := a.Pool.Exec(context.Background(), "UPDATE sessions SET staff_id=$1 WHERE token_hash=$2", created["id"], security.Hash(c.cookies[0].Value)); err != nil {
 			t.Fatal(err)
 		}
 		return c
@@ -166,52 +137,18 @@ func TestMemberPermissionOverridesIntegration(t *testing.T) {
 	}
 }
 
-func TestAssignablePermissionMatrix(t *testing.T) {
-	for _, section := range permissionSections {
-		t.Run(section.Key, func(t *testing.T) {
-			keys := []string{section.Key}
-			for _, action := range section.Actions {
-				keys = append(keys, section.Key+"."+action)
-			}
-			grants := map[string]bool{}
-			for _, key := range keys {
-				grants[key] = true
-				if validPermission(key) == section.OwnerOnly {
-					t.Fatalf("incorrect assignability for %s", key)
-				}
-			}
-			for role := range roleSections {
-				got := effectivePermissions(role, nil, grants)
-				for _, key := range keys {
-					if slices.Contains(got, key) == section.OwnerOnly {
-						t.Fatalf("%s grant %s: %v", role, key, got)
-					}
-				}
-				grants[section.Key] = false
-				got = effectivePermissions(role, nil, grants)
-				for _, key := range keys {
-					if slices.Contains(got, key) {
-						t.Fatalf("%s section denial left %s enabled", role, key)
-					}
-				}
-				grants[section.Key] = true
-			}
-		})
-	}
-}
-
 func TestPermissionOptionsMatchAssignableSections(t *testing.T) {
 	a := setup(t)
 	owner := couponOwner(t, a)
 	var options struct {
-		Sections []permissionSection `json:"sections"`
+		Sections []access.Section `json:"sections"`
 	}
 	owner.ok(t, "GET", "/omnisire/permission-options", nil, &options)
 	if len(options.Sections) != 11 {
 		t.Fatalf("unexpected assignable sections: %v", options.Sections)
 	}
 	for _, section := range options.Sections {
-		if !validPermission(section.Key) {
+		if !access.Valid(section.Key) {
 			t.Fatalf("non-assignable section offered: %s", section.Key)
 		}
 	}

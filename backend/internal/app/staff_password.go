@@ -3,50 +3,53 @@ package app
 import (
 	"net/http"
 	"time"
+
+	"bomish/internal/httpx"
+	"bomish/internal/security"
 )
 
 func (a *App) changeStaffPassword(w http.ResponseWriter, r *http.Request) {
 	s := current(r)
 	if s.StaffID == "" {
-		fail(w, 401, "ابتدا وارد حساب همکار شوید")
+		httpx.Error(w, 401, "ابتدا وارد حساب همکار شوید")
 		return
 	}
 	if !a.limit(r, "staff-password:"+s.StaffID, 10, time.Hour) {
-		fail(w, 429, "تعداد تلاش‌ها بیش از حد مجاز است")
+		httpx.Error(w, 429, "تعداد تلاش‌ها بیش از حد مجاز است")
 		return
 	}
 	var in struct {
 		Current string `json:"currentPassword"`
 		New     string `json:"newPassword"`
 	}
-	if !decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) {
 		return
 	}
 	if len(in.Current) > 256 || len(in.New) < 12 || len(in.New) > 256 {
-		fail(w, 400, "گذرواژه جدید باید بین ۱۲ تا ۲۵۶ نویسه باشد")
+		httpx.Error(w, 400, "گذرواژه جدید باید بین ۱۲ تا ۲۵۶ نویسه باشد")
 		return
 	}
 	tx, err := a.Pool.Begin(r.Context())
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	defer tx.Rollback(r.Context())
 	var stored string
 	err = tx.QueryRow(r.Context(), "SELECT password_hash FROM staff WHERE id=$1 AND active AND archived_at IS NULL FOR UPDATE", s.StaffID).Scan(&stored)
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
-	if !checkPassword(stored, in.Current) {
-		fail(w, 400, "گذرواژه فعلی نادرست است")
+	if !security.CheckPassword(stored, in.Current) {
+		httpx.Error(w, 400, "گذرواژه فعلی نادرست است")
 		return
 	}
 	if in.Current == in.New {
-		fail(w, 400, "گذرواژه جدید باید با گذرواژه فعلی متفاوت باشد")
+		httpx.Error(w, 400, "گذرواژه جدید باید با گذرواژه فعلی متفاوت باشد")
 		return
 	}
-	_, err = tx.Exec(r.Context(), "UPDATE staff SET password_hash=$2 WHERE id=$1", s.StaffID, PasswordHash(in.New))
+	_, err = tx.Exec(r.Context(), "UPDATE staff SET password_hash=$2 WHERE id=$1", s.StaffID, security.PasswordHash(in.New))
 	if err == nil {
 		_, err = tx.Exec(r.Context(), "DELETE FROM sessions WHERE staff_id=$1 AND token_hash<>$2", s.StaffID, s.Hash)
 	}
@@ -57,8 +60,8 @@ func (a *App) changeStaffPassword(w http.ResponseWriter, r *http.Request) {
 		err = tx.Commit(r.Context())
 	}
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
-	write(w, 200, map[string]bool{"ok": true})
+	httpx.JSON(w, 200, map[string]bool{"ok": true})
 }

@@ -1,9 +1,11 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"context"
 	"testing"
+
+	"bomish/internal/domain"
+	"bomish/internal/orderquery"
 )
 
 func TestStaffOrderPriorityBeforePagination(t *testing.T) {
@@ -38,7 +40,7 @@ func TestStaffOrderPriorityBeforePagination(t *testing.T) {
 	if result.Items[0].Status != "packing" || result.Items[1].Status != "paid" {
 		t.Fatalf("shipment did not reorder queue: %+v", result)
 	}
-	customer, err := loadOrderPage(ctx, a.Pool, "priority-customer", "", "", "", 20, 0)
+	customer, err := orderquery.Load(ctx, a.Pool, orderquery.Filter{CustomerID: "priority-customer", Limit: 20})
 	if err != nil {
 		t.Fatal(err)
 	}

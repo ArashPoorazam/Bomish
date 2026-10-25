@@ -1,20 +1,23 @@
 package app
 
 import (
-	"bomish/internal/carrier"
-	"bomish/internal/domain"
 	"context"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
+
+	"bomish/internal/access"
+	"bomish/internal/carrier"
+	"bomish/internal/domain"
+	"bomish/internal/security"
 )
 
 func createTestCourier(t *testing.T, owner *client, name string, active bool) string {
 	t.Helper()
 	var result map[string]string
 	owner.ok(t, "POST", "/omnisire/members", map[string]any{
-		"fullName": name, "username": "courier-" + token()[:12], "phone": "09123456789",
+		"fullName": name, "username": "courier-" + security.Token()[:12], "phone": "09123456789",
 		"bankCard": "5022291002696175", "role": "courier", "active": active,
 		"password": "test-courier-password", "restrictions": []string{},
 	}, &result)
@@ -35,7 +38,7 @@ func TestOwnCourierLifecycleAndRoster(t *testing.T) {
 	if len(couriers) != 1 || couriers[0].ID != courierID {
 		t.Fatalf("wrong courier roster: %+v", couriers)
 	}
-	if perms := effectivePermissions("courier", nil); slices.Contains(perms, "orders") || slices.Contains(perms, "members") {
+	if perms := access.Effective("courier", nil); slices.Contains(perms, "orders") || slices.Contains(perms, "members") {
 		t.Fatal("courier role gained administrative access", perms)
 	}
 	if code, _ := customer.call("GET", "/staff/shipping/couriers", nil); code != 403 {
@@ -63,7 +66,7 @@ func TestOwnCourierLifecycleAndRoster(t *testing.T) {
 	for _, action := range []string{"ready", "dispatch-quote", "shipments"} {
 		body := map[string]any{"version": d.Version}
 		if action == "shipments" {
-			body["idempotencyKey"] = token()
+			body["idempotencyKey"] = security.Token()
 		}
 		if code, _ := operator.call("POST", "/staff/orders/"+id+"/"+action, body); code != 409 {
 			t.Fatal("internal dispatch allowed", action, code)
@@ -158,7 +161,7 @@ func TestOwnCourierDispatchGuards(t *testing.T) {
 		t.Fatal(err)
 	}
 	owner.ok(t, "POST", "/staff/orders/"+id+"/dispatch-quote", map[string]any{"version": d.Version}, &d)
-	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()}, &d)
+	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()}, &d)
 	assertConflict("/own-courier", map[string]any{"version": d.Version, "courierId": courierID})
 	a.ShippingProvider = carrier.Disabled{}
 	if err := a.ProcessShipments(ctx); err != nil {
@@ -187,7 +190,7 @@ func TestOwnCourierPostalRejectionAndDispatchRace(t *testing.T) {
 	codes := make(chan int, 2)
 	for path, body := range map[string]map[string]any{
 		"own-courier": {"version": d.Version, "courierId": courierID},
-		"shipments":   {"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()},
+		"shipments":   {"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()},
 	} {
 		wg.Go(func() { code, _ := owner.call("POST", "/staff/orders/"+id+"/"+path, body); codes <- code })
 	}
@@ -210,7 +213,7 @@ func TestOwnCourierAfterConfirmedSnappCancellation(t *testing.T) {
 	id, _, _ := quoteAndCheckout(t, customer, addr, "")
 	d := prepareShipping(t, customer, owner, id)
 	owner.ok(t, "POST", "/staff/orders/"+id+"/dispatch-quote", map[string]any{"version": d.Version}, &d)
-	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()}, &d)
+	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()}, &d)
 	if err := a.ProcessShipments(ctx); err != nil {
 		t.Fatal(err)
 	}

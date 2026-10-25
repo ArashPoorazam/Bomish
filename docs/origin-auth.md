@@ -25,13 +25,13 @@ Preflight rejects invalid modes, missing or soon-expiring certificates, incorrec
 
 ## Initial rollout
 
-### Bomish handoff — 2026-10-24
+### Bomish activation — 2026-10-24
 
-The implementation is prepared locally, but has not been committed, pushed or deployed. The repository owner will commit and push it. The isolated Traefik test passed on the VPS for all three modes, and 26 local Python tests passed. The full production-container smoke test remains for CI.
+Activated on release `2975b7a94a0bd5d863c9258d2a621909cbb3d7da` after successful CI and production deployment. Cloudflare **Global AOP is On**, Full (strict) remains enabled, and `ORIGIN_AUTH_MODE=required` is persisted in `/srv/bomish/deployment.env` and present in the running Traefik container.
 
-Production credentials have already been generated on the VPS under `/srv/bomish/secrets` using the official Cloudflare AOP CA. **Skip credential generation in step 2 for this server**; the initializer intentionally refuses to overwrite them. The local probe certificate expires on 2027-10-24 and the Cloudflare AOP CA expires on 2029-11-01. No production mode change or service restart has been performed, and Cloudflare Global AOP remains off. Full (strict) was verified in the dashboard.
+Production credentials were generated on the VPS under `/srv/bomish/secrets` using the official Cloudflare AOP CA. **Skip credential generation in step 2 for this server**; the initializer intentionally refuses to overwrite them. The local probe certificate expires on 2027-10-24 and the Cloudflare AOP CA expires on 2029-11-01. Renew the local probe before 2027-09-24 to leave a 30-day margin.
 
-After the normal deployment completes, continue with step 3 and validate each stage before requiring client certificates.
+Activation progressed through `verify` before `required`, under the deployment lock with a saved environment rollback copy. Authenticated local origin probes and public Cloudflare checks passed; the origin probe also confirmed TLS rejection without a client certificate. All five production containers were healthy. Fresh external requests to API health, `/login` and `/staff` returned HTTP 200 through Cloudflare with DYNAMIC cache status. These entry-page checks do not constitute an authenticated staff workflow test. The next automatic deployment has not yet been observed, but it reads the persisted mode and uses the deployed AOP-aware probes.
 
 ### Procedure
 

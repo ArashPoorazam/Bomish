@@ -1,0 +1,447 @@
+{
+  "date": "2026-10-24",
+  "timezone": "Asia/Tehran",
+  "configuration_changed": false,
+  "notes": [
+    "Subscriber IPs, cookies and reporting URLs omitted.",
+    "Server curl lacks X25519MLKEM768 support; exit 59 entries are local capability failures, not network failures.",
+    "Tunneled remote_ip metrics would identify the SOCKS proxy; destination was explicitly pinned to 188.114.96.3."
+  ],
+  "controlled-hotspot": [
+    {
+      "utc": "2026-10-24T13:10:47.759263+00:00",
+      "repeat": 0,
+      "mode": "default",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 56,
+      "result": "ip=188.114.96.3 code=000 tcp=0.140319 tls=0.312149 first=0.000000 total=15.272258 verify=0",
+      "error": "curl: (56) OpenSSL SSL_read: OpenSSL/3.6.5: error:0A000126:SSL routines::unexpected eof while reading, errno 0\n"
+    },
+    {
+      "utc": "2026-10-24T13:10:33.224653+00:00",
+      "repeat": 0,
+      "mode": "tls13-x25519",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.124391 tls=0.277801 first=0.738474 total=0.738533 verify=0",
+      "error": ""
+    },
+    {
+      "utc": "2026-10-24T13:10:47.724133+00:00",
+      "repeat": 0,
+      "mode": "tls13-mlkem",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 56,
+      "result": "ip=188.114.96.3 code=000 tcp=0.119168 tls=0.277792 first=0.000000 total=15.237084 verify=0",
+      "error": "curl: (56) OpenSSL SSL_read: OpenSSL/3.6.5: error:0A000126:SSL routines::unexpected eof while reading, errno 0\n"
+    },
+    {
+      "utc": "2026-10-24T13:10:49.489003+00:00",
+      "repeat": 0,
+      "mode": "tls12",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 28,
+      "result": "ip=188.114.96.3 code=000 tcp=0.128833 tls=0.401502 first=0.000000 total=17.001402 verify=0",
+      "error": "curl: (28) Operation timed out after 17001 milliseconds with 0 bytes received\n"
+    },
+    {
+      "utc": "2026-10-24T13:10:47.756088+00:00",
+      "repeat": 1,
+      "mode": "default",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 56,
+      "result": "ip=188.114.96.3 code=000 tcp=0.139845 tls=0.293319 first=0.000000 total=15.268454 verify=0",
+      "error": "curl: (56) OpenSSL SSL_read: OpenSSL/3.6.5: error:0A000126:SSL routines::unexpected eof while reading, errno 0\n"
+    },
+    {
+      "utc": "2026-10-24T13:10:33.277245+00:00",
+      "repeat": 1,
+      "mode": "tls13-x25519",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.139590 tls=0.294008 first=0.790213 total=0.790273 verify=0",
+      "error": ""
+    },
+    {
+      "utc": "2026-10-24T13:10:47.742112+00:00",
+      "repeat": 1,
+      "mode": "tls13-mlkem",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 56,
+      "result": "ip=188.114.96.3 code=000 tcp=0.127929 tls=0.282266 first=0.000000 total=15.253898 verify=0",
+      "error": "curl: (56) OpenSSL SSL_read: OpenSSL/3.6.5: error:0A000126:SSL routines::unexpected eof while reading, errno 0\n"
+    },
+    {
+      "utc": "2026-10-24T13:10:49.490704+00:00",
+      "repeat": 1,
+      "mode": "tls12",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 28,
+      "result": "ip=188.114.96.3 code=000 tcp=0.137805 tls=0.423845 first=0.000000 total=17.001016 verify=0",
+      "error": "curl: (28) Operation timed out after 17000 milliseconds with 0 bytes received\n"
+    },
+    {
+      "utc": "2026-10-24T13:10:48.485729+00:00",
+      "repeat": 2,
+      "mode": "default",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 56,
+      "result": "ip=188.114.96.3 code=000 tcp=0.122172 tls=0.284170 first=0.000000 total=15.254147 verify=0",
+      "error": "curl: (56) OpenSSL SSL_read: OpenSSL/3.6.5: error:0A000126:SSL routines::unexpected eof while reading, errno 0\n"
+    },
+    {
+      "utc": "2026-10-24T13:10:33.787831+00:00",
+      "repeat": 2,
+      "mode": "tls13-x25519",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.142847 tls=0.290305 first=0.505317 total=0.505463 verify=0",
+      "error": ""
+    },
+    {
+      "utc": "2026-10-24T13:10:49.086839+00:00",
+      "repeat": 2,
+      "mode": "tls13-mlkem",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 56,
+      "result": "ip=188.114.96.3 code=000 tcp=0.153582 tls=0.336500 first=0.000000 total=15.292389 verify=0",
+      "error": "curl: (56) OpenSSL SSL_read: OpenSSL/3.6.5: error:0A000126:SSL routines::unexpected eof while reading, errno 0\n"
+    },
+    {
+      "utc": "2026-10-24T13:11:04.731830+00:00",
+      "repeat": 2,
+      "mode": "tls12",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 28,
+      "result": "ip=188.114.96.3 code=000 tcp=0.119229 tls=0.387128 first=0.000000 total=17.000992 verify=0",
+      "error": "curl: (28) Operation timed out after 17000 milliseconds with 0 bytes received\n"
+    },
+    {
+      "utc": "2026-10-24T13:11:04.750740+00:00",
+      "repeat": 0,
+      "mode": "tls13-x25519",
+      "host": "bomish.ir",
+      "path": "/",
+      "exit": 28,
+      "result": "ip=188.114.96.3 code=200 tcp=0.129215 tls=0.294492 first=0.461409 total=17.001849 verify=0",
+      "error": "curl: (28) Operation timed out after 17001 milliseconds with 57516 bytes received\n"
+    },
+    {
+      "utc": "2026-10-24T13:10:48.209272+00:00",
+      "repeat": 0,
+      "mode": "default",
+      "host": "www.cloudflare.com",
+      "path": "/cdn-cgi/trace",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.124100 tls=0.288728 first=0.447641 total=0.447720 verify=0",
+      "error": ""
+    },
+    {
+      "utc": "2026-10-24T13:10:48.369095+00:00",
+      "repeat": 0,
+      "mode": "tls12",
+      "host": "www.cloudflare.com",
+      "path": "/cdn-cgi/trace",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.139230 tls=0.444851 first=0.604337 total=0.604425 verify=0",
+      "error": ""
+    }
+  ],
+  "controlled-server": [
+    {
+      "utc": "2026-10-24T13:11:24.923945+00:00",
+      "repeat": 0,
+      "mode": "default",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 28,
+      "result": "ip=188.114.96.3 code=000 tcp=0.082567 tls=0.333697 first=0.000000 total=17.001599 verify=0",
+      "error": "curl: (28) Operation timed out after 17001 milliseconds with 0 bytes received\n"
+    },
+    {
+      "utc": "2026-10-24T13:11:24.926426+00:00",
+      "repeat": 0,
+      "mode": "tls13-x25519",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 28,
+      "result": "ip=188.114.96.3 code=000 tcp=0.084327 tls=0.369347 first=0.000000 total=17.001685 verify=0",
+      "error": "curl: (28) Operation timed out after 17001 milliseconds with 0 bytes received\n"
+    },
+    {
+      "utc": "2026-10-24T13:11:08.012049+00:00",
+      "repeat": 0,
+      "mode": "tls13-mlkem",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 59,
+      "result": "ip=188.114.96.3 code=000 tcp=0.083055 tls=0.000000 first=0.000000 total=0.085321 verify=1",
+      "error": "curl: (59) failed setting curves list: 'X25519MLKEM768'\n"
+    },
+    {
+      "utc": "2026-10-24T13:11:08.797121+00:00",
+      "repeat": 0,
+      "mode": "tls12",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.073608 tls=0.416180 first=0.859888 total=0.860000 verify=0",
+      "error": ""
+    },
+    {
+      "utc": "2026-10-24T13:11:08.734279+00:00",
+      "repeat": 1,
+      "mode": "default",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.085193 tls=0.350042 first=0.797142 total=0.797271 verify=0",
+      "error": ""
+    },
+    {
+      "utc": "2026-10-24T13:11:08.764116+00:00",
+      "repeat": 1,
+      "mode": "tls13-x25519",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.087933 tls=0.344685 first=0.819300 total=0.819387 verify=0",
+      "error": ""
+    },
+    {
+      "utc": "2026-10-24T13:11:08.039853+00:00",
+      "repeat": 1,
+      "mode": "tls13-mlkem",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 59,
+      "result": "ip=188.114.96.3 code=000 tcp=0.088169 tls=0.000000 first=0.000000 total=0.090734 verify=1",
+      "error": "curl: (59) failed setting curves list: 'X25519MLKEM768'\n"
+    },
+    {
+      "utc": "2026-10-24T13:11:08.841985+00:00",
+      "repeat": 1,
+      "mode": "tls12",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.084473 tls=0.436359 first=0.887596 total=0.887687 verify=0",
+      "error": ""
+    },
+    {
+      "utc": "2026-10-24T13:11:08.751016+00:00",
+      "repeat": 2,
+      "mode": "default",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.074604 tls=0.269631 first=0.695427 total=0.695537 verify=0",
+      "error": ""
+    },
+    {
+      "utc": "2026-10-24T13:11:25.079815+00:00",
+      "repeat": 2,
+      "mode": "tls13-x25519",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 28,
+      "result": "ip=188.114.96.3 code=000 tcp=0.085989 tls=0.254688 first=0.000000 total=17.001672 verify=0",
+      "error": "curl: (28) Operation timed out after 17001 milliseconds with 0 bytes received\n"
+    },
+    {
+      "utc": "2026-10-24T13:11:08.830018+00:00",
+      "repeat": 2,
+      "mode": "tls13-mlkem",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 59,
+      "result": "ip=188.114.96.3 code=000 tcp=0.084720 tls=0.000000 first=0.000000 total=0.087082 verify=1",
+      "error": "curl: (59) failed setting curves list: 'X25519MLKEM768'\n"
+    },
+    {
+      "utc": "2026-10-24T13:11:09.477344+00:00",
+      "repeat": 2,
+      "mode": "tls12",
+      "host": "bomish.ir",
+      "path": "/api/v1/health",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.080228 tls=0.301593 first=0.714689 total=0.714927 verify=0",
+      "error": ""
+    },
+    {
+      "utc": "2026-10-24T13:11:25.777546+00:00",
+      "repeat": 0,
+      "mode": "tls13-x25519",
+      "host": "bomish.ir",
+      "path": "/",
+      "exit": 28,
+      "result": "ip=188.114.96.3 code=200 tcp=0.077357 tls=0.224070 first=0.329077 total=17.001902 verify=0",
+      "error": "curl: (28) Operation timed out after 17001 milliseconds with 57516 bytes received\n"
+    },
+    {
+      "utc": "2026-10-24T13:11:09.095202+00:00",
+      "repeat": 0,
+      "mode": "default",
+      "host": "www.cloudflare.com",
+      "path": "/cdn-cgi/trace",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.074180 tls=0.207893 first=0.287201 total=0.287324 verify=0",
+      "error": ""
+    },
+    {
+      "utc": "2026-10-24T13:11:09.236859+00:00",
+      "repeat": 0,
+      "mode": "tls12",
+      "host": "www.cloudflare.com",
+      "path": "/cdn-cgi/trace",
+      "exit": 0,
+      "result": "ip=188.114.96.3 code=200 tcp=0.083440 tls=0.307770 first=0.396786 total=0.396924 verify=0",
+      "error": ""
+    }
+  ],
+  "tunnel-comparison": [
+    {
+      "utc": "2026-10-24T13:11:38.999067+00:00",
+      "mode": "default",
+      "exit": 0,
+      "err": "",
+      "response_status_lines": [
+        "HTTP/2 200 "
+      ],
+      "ray_ids": [
+        "a4f93a841a789177-FRA"
+      ],
+      "trace_fields": {
+        "colo": "FRA",
+        "http": "http/2",
+        "loc": "IR",
+        "tls": "TLSv1.3",
+        "sni": "plaintext",
+        "warp": "off",
+        "kex": "X25519MLKEM768"
+      },
+      "metrics": "code=200 tls=0.268852 first=0.442817 total=0.442865"
+    },
+    {
+      "utc": "2026-10-24T13:11:39.043419+00:00",
+      "mode": "tls13-x25519",
+      "exit": 0,
+      "err": "",
+      "response_status_lines": [
+        "HTTP/2 200 "
+      ],
+      "ray_ids": [
+        "a4f93a845cdbdbf6-FRA"
+      ],
+      "trace_fields": {
+        "colo": "FRA",
+        "http": "http/2",
+        "loc": "IR",
+        "tls": "TLSv1.3",
+        "sni": "plaintext",
+        "warp": "off",
+        "kex": "X25519"
+      },
+      "metrics": "code=200 tls=0.315285 first=0.487120 total=0.487166"
+    },
+    {
+      "utc": "2026-10-24T13:11:39.083357+00:00",
+      "mode": "tls13-mlkem",
+      "exit": 0,
+      "err": "",
+      "response_status_lines": [
+        "HTTP/2 200 "
+      ],
+      "ray_ids": [
+        "a4f93a849c468f1a-FRA"
+      ],
+      "trace_fields": {
+        "colo": "FRA",
+        "http": "http/2",
+        "loc": "IR",
+        "tls": "TLSv1.3",
+        "sni": "plaintext",
+        "warp": "off",
+        "kex": "X25519MLKEM768"
+      },
+      "metrics": "code=200 tls=0.362065 first=0.490930 total=0.526909"
+    },
+    {
+      "utc": "2026-10-24T13:11:39.179079+00:00",
+      "mode": "tls12",
+      "exit": 0,
+      "err": "",
+      "response_status_lines": [
+        "HTTP/2 200 "
+      ],
+      "ray_ids": [
+        "a4f93a855ca9d2cf-FRA"
+      ],
+      "trace_fields": {
+        "colo": "FRA",
+        "http": "http/2",
+        "loc": "IR",
+        "tls": "TLSv1.2",
+        "sni": "plaintext",
+        "warp": "off",
+        "kex": "X25519"
+      },
+      "metrics": "code=200 tls=0.487113 first=0.622380 total=0.622443"
+    }
+  ],
+  "tunnel-home": [
+    {
+      "utc": "2026-10-24T13:12:24.158540+00:00",
+      "mode": "default-home",
+      "exit": 0,
+      "err": "",
+      "response_status_lines": [
+        "HTTP/2 103 ",
+        "HTTP/2 200 "
+      ],
+      "ray_ids": [
+        "a4f93b9c0d79db0e-FRA"
+      ],
+      "trace_fields": {},
+      "metrics": "code=200 tls=0.262894 first=0.444993 total=0.814165"
+    },
+    {
+      "utc": "2026-10-24T13:12:43.346713+00:00",
+      "mode": "compressed-home",
+      "exit": 28,
+      "err": "curl: (28) Operation timed out after 20001 milliseconds with 0 bytes received\n",
+      "response_status_lines": [],
+      "ray_ids": [],
+      "trace_fields": {},
+      "metrics": "code=000 tls=0.317481 first=0.000000 total=20.001547"
+    },
+    {
+      "utc": "2026-10-24T13:12:24.158419+00:00",
+      "mode": "classical-home",
+      "exit": 0,
+      "err": "",
+      "response_status_lines": [
+        "HTTP/2 103 ",
+        "HTTP/2 200 "
+      ],
+      "ray_ids": [
+        "a4f93b9c1a91d378-FRA"
+      ],
+      "trace_fields": {},
+      "metrics": "code=200 tls=0.298894 first=0.496755 total=0.814218"
+    }
+  ],
+  "tcp_evidence": "2026-10-24T13:15:20.500628+00:00\nState Recv-Q Send-Q Local Address:Port  Peer Address:Port\nESTAB 0      261    <hotspot-client>:18999 188.114.96.3:443\n\t cubic wscale:13,10 rto:756 backoff:1 rtt:128.806/43.064 ato:40 mss:1388 pmtu:1500 rcvmss:1356 advmss:1448 cwnd:1 ssthresh:7 bytes_sent:2139 bytes_retrans:309 bytes_acked:1570 bytes_received:3742 segs_out:11 segs_in:7 data_segs_out:7 data_segs_in:4 send 86207bps lastsnd:75 lastrcv:725 lastack:725 pacing_rate 1724136bps delivery_rate 154016bps delivered:3 app_limited busy:867ms unacked:1 retrans:1/2 lost:1 rcv_space:14480 rcv_ssthresh:64088 minrtt:124.098 snd_wnd:131072 rcv_wnd:62464 rehash:1\n\nState Recv-Q Send-Q Local Address:Port  Peer Address:Port\nESTAB 0      261    <hotspot-client>:18999 188.114.96.3:443\n\t cubic wscale:13,10 rto:3024 backoff:3 rtt:128.806/43.064 ato:40 mss:1388 pmtu:1500 rcvmss:1356 advmss:1448 cwnd:1 ssthresh:7 bytes_sent:2661 bytes_retrans:831 bytes_acked:1570 bytes_received:3742 segs_out:13 segs_in:7 data_segs_out:9 data_segs_in:4 send 86207bps lastsnd:1727 lastrcv:4729 lastack:4729 pacing_rate 1724136bps delivery_rate 154016bps delivered:3 app_limited busy:4871ms unacked:1 retrans:1/4 lost:1 rcv_space:14480 rcv_ssthresh:64088 minrtt:124.098 snd_wnd:131072 rcv_wnd:62464 rehash:3\n\ncode=000 tcp=0.124344 tls=0.275257 total=15.275075\ncurl: (56) OpenSSL SSL_read: OpenSSL/3.6.5: error:0A000126:SSL routines::unexpected eof while reading, errno 0\n"
+}

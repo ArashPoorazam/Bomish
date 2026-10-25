@@ -1,10 +1,12 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"bomish/internal/domain"
+	"bomish/internal/httpx"
 )
 
 // Accept precisely the displayed quote without contacting the carrier or extending expiry.
@@ -25,12 +27,12 @@ func (a *App) acceptPostalQuote(w http.ResponseWriter, r *http.Request, c domain
 	raw, _ = json.Marshal(s)
 	tag, err := a.Pool.Exec(r.Context(), "UPDATE shipping_quotes SET snapshot=$1 WHERE id=$2 AND user_id=$3 AND order_id IS NULL AND expires_at>now()", raw, in.AcceptedQuoteID, current(r).UserID)
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	if tag.RowsAffected() != 1 {
 		shippingError(w, 409, "quote_expired", "استعلام منقضی شده؛ دوباره محاسبه کنید")
 		return
 	}
-	write(w, 200, s.Totals)
+	httpx.JSON(w, 200, s.Totals)
 }

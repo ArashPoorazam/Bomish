@@ -1,9 +1,10 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"context"
 	"testing"
+
+	"bomish/internal/domain"
 )
 
 type chartResponse struct {

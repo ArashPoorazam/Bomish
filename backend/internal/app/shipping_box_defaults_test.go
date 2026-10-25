@@ -1,8 +1,9 @@
 package app
 
 import (
-	"bomish/internal/packing"
 	"testing"
+
+	"bomish/internal/packing"
 )
 
 func TestBoxDefaultsDeriveExistingCartons(t *testing.T) {

@@ -1,8 +1,9 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"fmt"
+
+	"bomish/internal/domain"
 )
 
 // Demo prices are illustrative toman amounts, not live merchant quotations.

@@ -1,11 +1,13 @@
 package app
 
 import (
-	"bomish/internal/domain"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
+
+	"bomish/internal/domain"
+	"bomish/internal/httpx"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -23,7 +25,7 @@ func (a *App) productPackaging(w http.ResponseWriter, r *http.Request) {
 		) linked)::int
 		FROM product_packaging packaging ORDER BY packaging.content->>'name',packaging.id`)
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	defer rows.Close()
@@ -35,42 +37,42 @@ func (a *App) productPackaging(w http.ResponseWriter, r *http.Request) {
 			err = json.Unmarshal(raw, &item.ProductPackaging)
 		}
 		if err != nil {
-			a.dbError(w, err)
+			httpx.DatabaseError(w, err)
 			return
 		}
 		items = append(items, item)
 	}
 	if err = rows.Err(); err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
-	write(w, 200, items)
+	httpx.JSON(w, 200, items)
 }
 
 func (a *App) saveProductPackaging(w http.ResponseWriter, r *http.Request) {
 	var item domain.ProductPackaging
-	if !decode(w, r, &item) {
+	if !httpx.Decode(w, r, &item) {
 		return
 	}
 	item.ID = r.PathValue("id")
 	item.Name = strings.TrimSpace(item.Name)
 	if err := item.Validate(); err != nil {
-		fail(w, 400, err.Error())
+		httpx.Error(w, 400, err.Error())
 		return
 	}
 	tx, err := a.Pool.Begin(r.Context())
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	defer tx.Rollback(r.Context())
 	if _, err = tx.Exec(r.Context(), "SELECT pg_advisory_xact_lock(hashtextextended('product-packaging-sync',0))"); err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	var exists bool
 	if err = tx.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM product_packaging WHERE id=$1)", item.ID).Scan(&exists); err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	permission := "packaging.create"
@@ -90,7 +92,7 @@ func (a *App) saveProductPackaging(w http.ResponseWriter, r *http.Request) {
 		updated, err = syncProductPackaging(r, tx, item)
 	}
 	if errors.Is(err, errPackagingUpdate) {
-		fail(w, 422, err.Error())
+		httpx.Error(w, 422, err.Error())
 		return
 	}
 	if err == nil {
@@ -100,10 +102,10 @@ func (a *App) saveProductPackaging(w http.ResponseWriter, r *http.Request) {
 		err = tx.Commit(r.Context())
 	}
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
-	write(w, 200, productPackagingEntry{ProductPackaging: item, UsedByProducts: updated})
+	httpx.JSON(w, 200, productPackagingEntry{ProductPackaging: item, UsedByProducts: updated})
 }
 
 func resolveProductPackaging(r *http.Request, tx pgx.Tx, product *domain.Product) (string, error) {

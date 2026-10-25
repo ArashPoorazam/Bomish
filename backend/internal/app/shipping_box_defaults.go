@@ -1,10 +1,11 @@
 package app
 
 import (
-	"bomish/internal/packing"
 	"fmt"
 	"os"
 	"strconv"
+
+	"bomish/internal/packing"
 )
 
 type boxDefaults struct {

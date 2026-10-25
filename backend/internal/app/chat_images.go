@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"strings"
+
+	"bomish/internal/httpx"
+	"bomish/internal/orderquery"
 )
 
 const chatImageLimit = 5 << 20
@@ -12,35 +16,35 @@ const chatImageLimit = 5 << 20
 // Pictures are stored with the message and served only after checking thread access.
 func decodeChat(w http.ResponseWriter, r *http.Request, v any) ([]byte, bool) {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-		return nil, decode(w, r, v)
+		return nil, httpx.Decode(w, r, v)
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, chatImageLimit+(64<<10))
 	if err := r.ParseMultipartForm(chatImageLimit); err != nil {
-		fail(w, 400, "حداکثر حجم تصویر ۵ مگابایت است")
+		httpx.Error(w, 400, "حداکثر حجم تصویر ۵ مگابایت است")
 		return nil, false
 	}
 	defer r.MultipartForm.RemoveAll()
 	d := json.NewDecoder(strings.NewReader(r.FormValue("payload")))
 	d.DisallowUnknownFields()
 	if err := d.Decode(v); err != nil {
-		fail(w, 400, "اطلاعات ارسالی معتبر نیست")
+		httpx.Error(w, 400, "اطلاعات ارسالی معتبر نیست")
 		return nil, false
 	}
 	file, _, err := r.FormFile("image")
 	if err != nil {
-		fail(w, 400, "تصویر انتخاب نشده است")
+		httpx.Error(w, 400, "تصویر انتخاب نشده است")
 		return nil, false
 	}
 	defer file.Close()
 	data, err := io.ReadAll(io.LimitReader(file, chatImageLimit+1))
 	if err != nil || len(data) == 0 || len(data) > chatImageLimit {
-		fail(w, 400, "حداکثر حجم تصویر ۵ مگابایت است")
+		httpx.Error(w, 400, "حداکثر حجم تصویر ۵ مگابایت است")
 		return nil, false
 	}
 	switch http.DetectContentType(data) {
 	case "image/jpeg", "image/png", "image/webp":
 	default:
-		fail(w, 400, "فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود")
+		httpx.Error(w, 400, "فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود")
 		return nil, false
 	}
 	return data, true
@@ -56,7 +60,7 @@ func (a *App) messageImage(w http.ResponseWriter, r *http.Request, staff bool) {
 	var data []byte
 	err := a.Pool.QueryRow(r.Context(), `SELECT image FROM request_messages WHERE request_id=$1 AND id::text=$2 AND image IS NOT NULL`, r.PathValue("id"), r.PathValue("message")).Scan(&data)
 	if err != nil {
-		fail(w, 404, "تصویر پیدا نشد")
+		httpx.Error(w, 404, "تصویر پیدا نشد")
 		return
 	}
 	w.Header().Set("Content-Type", http.DetectContentType(data))
@@ -68,19 +72,19 @@ func (a *App) messageImage(w http.ResponseWriter, r *http.Request, staff bool) {
 func (a *App) requestOrders(w http.ResponseWriter, r *http.Request) {
 	var owner string
 	if err := a.Pool.QueryRow(r.Context(), `SELECT user_id FROM customer_requests WHERE id=$1`, r.PathValue("id")).Scan(&owner); err != nil {
-		fail(w, 404, "مشتری پیدا نشد")
+		httpx.Error(w, 404, "مشتری پیدا نشد")
 		return
 	}
-	page, size := pageArgs(r)
-	orders, err := loadOrderPage(r.Context(), a.Pool, owner, "", "", "", size, (page-1)*size, "", "")
+	page, size := httpx.PageArgs(r)
+	orders, err := orderquery.Load(r.Context(), a.Pool, orderquery.Filter{CustomerID: owner, Limit: size, Offset: (page - 1) * size, TrackingTemplate: os.Getenv("POST_TRACKING_URL_TEMPLATE")})
 	if err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
 	var total int64
 	if err = a.Pool.QueryRow(r.Context(), `SELECT count(*) FROM orders WHERE user_id=$1`, owner).Scan(&total); err != nil {
-		a.dbError(w, err)
+		httpx.DatabaseError(w, err)
 		return
 	}
-	listResponse(w, r, orders, total)
+	httpx.List(w, r, orders, total)
 }

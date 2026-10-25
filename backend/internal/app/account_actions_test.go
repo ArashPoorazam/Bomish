@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"testing"
+
+	"bomish/internal/security"
 )
 
 func TestCustomerCancelOrder(t *testing.T) {
@@ -80,7 +82,7 @@ func TestCustomerCancelAssignedCourier(t *testing.T) {
 	id, _, _ := quoteAndCheckout(t, c, addr, "")
 	d := prepareShipping(t, c, owner, id)
 	owner.ok(t, "POST", "/staff/orders/"+id+"/dispatch-quote", map[string]any{"version": d.Version}, &d)
-	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()}, &d)
+	owner.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()}, &d)
 	if err := a.ProcessShipments(context.Background()); err != nil {
 		t.Fatal(err)
 	}

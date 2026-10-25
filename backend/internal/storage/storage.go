@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"path/filepath"
 )
@@ -20,4 +21,10 @@ func (l Local) Put(_ context.Context, key string, data []byte, _ string) (string
 		return "", e
 	}
 	return "/uploads/" + filepath.Base(key), nil
+}
+
+// Handler serves the same root used by Put; the application never reads a
+// second global path when deciding where uploaded media should come from.
+func (l Local) Handler() http.Handler {
+	return http.StripPrefix("/uploads/", http.FileServer(http.Dir(l.Root)))
 }

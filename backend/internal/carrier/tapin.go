@@ -1,7 +1,6 @@
 package carrier
 
 import (
-	"bomish/internal/packing"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -11,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"bomish/internal/packing"
 )
 
 // Tapin quotes only the shop flow. Authentication, currency and total field must be

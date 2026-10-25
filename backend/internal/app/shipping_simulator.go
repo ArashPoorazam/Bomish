@@ -1,9 +1,10 @@
 package app
 
 import (
-	"bomish/internal/carrier"
 	"context"
 	"time"
+
+	"bomish/internal/carrier"
 )
 
 // Simulation uses dedicated durable rows, never a provider endpoint. Scenario controls

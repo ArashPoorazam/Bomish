@@ -3,11 +3,11 @@ package app
 import (
 	"bytes"
 	"context"
-	"net/http/httptest"
-	"net/netip"
 	"strings"
 	"testing"
 	"time"
+
+	"bomish/internal/security"
 )
 
 func passwordStaff(t *testing.T, a *App, role string) *client {
@@ -25,7 +25,7 @@ func TestOmnisireRequiresSeparateOwnerVerification(t *testing.T) {
 	a := setup(t)
 	editor := passwordStaff(t, a, "editor")
 	editor.ok(t, "GET", "/staff/products", nil, nil)
-	if code, _ := editor.call("POST", "/omnisire/unlock", map[string]string{"code": TOTP(DemoTOTP, time.Now().Unix()/30)}); code != 403 {
+	if code, _ := editor.call("POST", "/omnisire/unlock", map[string]string{"code": security.TOTP(DemoTOTP, time.Now().Unix()/30)}); code != 403 {
 		t.Fatalf("staff unlock: %d", code)
 	}
 	owner := passwordStaff(t, a, "owner")
@@ -44,7 +44,7 @@ func TestOmnisireRequiresSeparateOwnerVerification(t *testing.T) {
 			oldCookie = c.Value
 		}
 	}
-	code := TOTP(DemoTOTP, time.Now().Unix()/30)
+	code := security.TOTP(DemoTOTP, time.Now().Unix()/30)
 	owner.ok(t, "POST", "/omnisire/unlock", map[string]string{"code": code}, nil)
 	owner.ok(t, "GET", "/omnisire/summary", nil, nil)
 	for _, c := range owner.cookies {
@@ -67,8 +67,8 @@ func TestProductionBootstrapAndRecovery(t *testing.T) {
 	a.Dev = false
 	ctx := context.Background()
 	// Use the existing fixture owner to verify bootstrap cannot overwrite it.
-	secret := NewOwnerSecret()
-	code := TOTP(secret, time.Now().Unix()/30)
+	secret := security.NewTOTPSecret()
+	code := security.TOTP(secret, time.Now().Unix()/30)
 	if err := a.BootstrapOwner(ctx, "Owner", "new-owner", "unique-long-password", secret, code, false); err == nil {
 		t.Fatal("duplicate owner accepted")
 	}
@@ -82,15 +82,15 @@ func TestProductionBootstrapAndRecovery(t *testing.T) {
 	if stored == secret || !strings.HasPrefix(stored, "v1:") {
 		t.Fatal("plaintext secret")
 	}
-	decoded, err := a.openTOTP(stored)
+	decoded, err := security.OpenTOTP(a.TOTPKey, a.Dev, stored)
 	if err != nil || decoded != secret {
 		t.Fatal("encryption roundtrip", err)
 	}
 	a.TOTPKey = bytes.Repeat([]byte{8}, 32)
-	if _, err = a.openTOTP(stored); err == nil {
+	if _, err = security.OpenTOTP(a.TOTPKey, a.Dev, stored); err == nil {
 		t.Fatal("wrong key accepted")
 	}
-	if _, err = a.openTOTP(DemoTOTP); err == nil {
+	if _, err = security.OpenTOTP(a.TOTPKey, a.Dev, DemoTOTP); err == nil {
 		t.Fatal("production accepted plaintext")
 	}
 }
@@ -115,21 +115,6 @@ func TestCatalogModeAndBaseCategories(t *testing.T) {
 		}
 	}
 }
-func TestTrustedProxyChain(t *testing.T) {
-	a := &App{TrustedProxies: []netip.Prefix{netip.MustParsePrefix("172.30.0.0/24"), netip.MustParsePrefix("203.0.113.0/24")}}
-	for _, test := range []struct{ peer, forwarded, want string }{
-		{"198.51.100.4:5555", "1.2.3.4", "198.51.100.4"},
-		{"172.30.0.2:5555", "1.2.3.4, 198.51.100.4, 203.0.113.4", "198.51.100.4"},
-		{"172.30.0.2:5555", "invalid", "172.30.0.2"},
-	} {
-		r := httptest.NewRequest("GET", "/", nil)
-		r.RemoteAddr = test.peer
-		r.Header.Set("X-Forwarded-For", test.forwarded)
-		if got := a.clientIP(r); got != test.want {
-			t.Fatalf("got %s want %s", got, test.want)
-		}
-	}
-}
 
 func TestFirstOwnerBootstrap(t *testing.T) {
 	a := setup(t)
@@ -139,15 +124,15 @@ func TestFirstOwnerBootstrap(t *testing.T) {
 	if _, err := a.Pool.Exec(ctx, "TRUNCATE staff CASCADE"); err != nil {
 		t.Fatal(err)
 	}
-	secret := NewOwnerSecret()
-	if err := a.BootstrapOwner(ctx, "مالک", "merchant", "private-password-123", secret, TOTP(secret, time.Now().Unix()/30), false); err != nil {
+	secret := security.NewTOTPSecret()
+	if err := a.BootstrapOwner(ctx, "مالک", "merchant", "private-password-123", secret, security.TOTP(secret, time.Now().Unix()/30), false); err != nil {
 		t.Fatal(err)
 	}
 	var role string
 	if err := a.Pool.QueryRow(ctx, "SELECT role FROM staff WHERE username='merchant'").Scan(&role); err != nil || role != "owner" {
 		t.Fatal(role, err)
 	}
-	if err := a.BootstrapOwner(ctx, "مالک", "another", "private-password-123", secret, TOTP(secret, time.Now().Unix()/30), false); err == nil {
+	if err := a.BootstrapOwner(ctx, "مالک", "another", "private-password-123", secret, security.TOTP(secret, time.Now().Unix()/30), false); err == nil {
 		t.Fatal("second bootstrap succeeded")
 	}
 }

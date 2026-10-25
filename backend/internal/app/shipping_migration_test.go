@@ -1,10 +1,11 @@
 package app
 
 import (
-	"bomish/internal/domain"
-	"bomish/migrations"
 	"context"
 	"testing"
+
+	"bomish/internal/domain"
+	"bomish/migrations"
 )
 
 func TestShippingCatalogRepairMigration(t *testing.T) {

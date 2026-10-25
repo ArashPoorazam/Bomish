@@ -1,15 +1,10 @@
 package app
 
 import (
-	"bomish/internal/db"
-	"bomish/internal/domain"
-	"bomish/internal/storage"
-	"bomish/migrations"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,6 +12,14 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"bomish/internal/db"
+	"bomish/internal/domain"
+	"bomish/internal/security"
+	"bomish/internal/storage"
+	"bomish/migrations"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type client struct {
@@ -91,7 +94,7 @@ func (c *client) staff(t *testing.T, role string) {
 	c.csrf = s.CSRF
 	c.ok(t, "POST", "/staff/login", map[string]string{"username": role, "password": "Bomish-demo-2026!"}, nil)
 	if role == "owner" {
-		c.ok(t, "POST", "/omnisire/unlock", map[string]string{"code": TOTP(DemoTOTP, time.Now().Unix()/30)}, nil)
+		c.ok(t, "POST", "/omnisire/unlock", map[string]string{"code": security.TOTP(DemoTOTP, time.Now().Unix()/30)}, nil)
 	}
 }
 func packAllItems(t *testing.T, staff *client, id string) {
@@ -120,10 +123,23 @@ func setupCatalog(t *testing.T, legacy bool) *App {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if _, e = base.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public"); e != nil {
+	// Migrations and package tests can start concurrently on a fresh database.
+	// Serialize extension installation with the migration runner's advisory lock.
+	tx, e := base.Begin(ctx)
+	if e != nil {
 		t.Fatal(e)
 	}
-	schema := "test_" + token()[:16]
+	defer tx.Rollback(ctx)
+	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(7234109)"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = tx.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public"); e != nil {
+		t.Fatal(e)
+	}
+	if e = tx.Commit(ctx); e != nil {
+		t.Fatal(e)
+	}
+	schema := "test_" + security.Token()[:16]
 	if _, e = base.Exec(ctx, "CREATE SCHEMA "+schema); e != nil {
 		t.Fatal(e)
 	}
@@ -146,7 +162,8 @@ func setupCatalog(t *testing.T, legacy bool) *App {
 			}
 		}
 	}
-	a := &App{Pool: pool, Queries: db.New(pool), Dev: true, Origin: "http://bomish.test", Uploads: storage.Local{Root: t.TempDir()}}
+	uploads := storage.Local{Root: t.TempDir()}
+	a := &App{Pool: pool, Queries: db.New(pool), Dev: true, Origin: "http://bomish.test", Uploads: uploads, UploadHandler: uploads.Handler()}
 	if !legacy {
 		if e = a.Seed(ctx); e != nil {
 			t.Fatal(e)
@@ -271,7 +288,7 @@ func TestStoreIntegration(t *testing.T) {
 		if code, _ := c.call("POST", "/auth/request", map[string]string{"phone": phone}); code != 429 {
 			t.Fatal("resend not limited", code)
 		}
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			if code, _ := c.call("POST", "/auth/verify", map[string]string{"phone": phone, "code": "invalid"}); code != 400 {
 				t.Fatal(code)
 			}
@@ -328,7 +345,7 @@ func TestStoreIntegration(t *testing.T) {
 		if retry["orderId"] != id {
 			t.Fatal("duplicate order")
 		}
-		for i := 0; i < 2; i++ {
+		for range 2 {
 			c.ok(t, "POST", "/orders/"+id+"/simulate", map[string]bool{"success": true}, nil)
 		}
 		var count int

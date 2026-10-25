@@ -1,8 +1,6 @@
 package app
 
 import (
-	"bomish/internal/domain"
-	"bomish/internal/packing"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +9,11 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"bomish/internal/database"
+	"bomish/internal/domain"
+	"bomish/internal/httpx"
+	"bomish/internal/packing"
 )
 
 type locality struct {
@@ -53,9 +56,9 @@ type providerHealth struct {
 }
 
 func shippingError(w http.ResponseWriter, status int, code, msg string) {
-	write(w, status, map[string]string{"code": code, "error": msg})
+	httpx.JSON(w, status, map[string]string{"code": code, "error": msg})
 }
-func readShippingConfig(ctx context.Context, q querier, lock bool) (calculatedConfig, error) {
+func readShippingConfig(ctx context.Context, q database.Querier, lock bool) (calculatedConfig, error) {
 	var c calculatedConfig
 	var raw []byte
 	suffix := ""
@@ -140,7 +143,7 @@ func (a *App) savedShippingHealth(ctx context.Context, c calculatedConfig) (map[
 	}
 	return out, rows.Err()
 }
-func catalogMeasurementIssues(ctx context.Context, q querier) ([]map[string]any, error) {
+func catalogMeasurementIssues(ctx context.Context, q database.Querier) ([]map[string]any, error) {
 	rows, e := q.Query(ctx, "SELECT id,name,content FROM products WHERE status='published' AND NOT coalesce((content->>'outOfStock')::boolean,false)")
 	if e != nil {
 		return nil, e
@@ -166,7 +169,7 @@ func catalogMeasurementIssues(ctx context.Context, q querier) ([]map[string]any,
 	}
 	return out, rows.Err()
 }
-func (a *App) shippingReadiness(ctx context.Context, q querier, c calculatedConfig) ([]readinessIssue, error) {
+func (a *App) shippingReadiness(ctx context.Context, q database.Querier, c calculatedConfig) ([]readinessIssue, error) {
 	out := []readinessIssue{}
 	if c.Origin.Validate() != nil || !c.Origin.PinConfirmed || c.Origin.Latitude == nil {
 		out = append(out, readinessIssue{"origin", "merchant", "origin", "نشانی و موقعیت تأییدشده مبدأ را کامل کنید"})
@@ -229,7 +232,7 @@ func findLocality(c calculatedConfig, a domain.Address) (locality, bool) {
 func (a *App) localities(w http.ResponseWriter, r *http.Request) {
 	c, e := readShippingConfig(r.Context(), a.Pool, false)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	out := []locality{}
@@ -241,7 +244,7 @@ func (a *App) localities(w http.ResponseWriter, r *http.Request) {
 			out = append(out, l)
 		}
 	}
-	write(w, 200, out)
+	httpx.JSON(w, 200, out)
 }
 func validateConfig(c calculatedConfig) error {
 
@@ -288,13 +291,13 @@ func validateConfig(c calculatedConfig) error {
 func (a *App) checkShippingProvider(w http.ResponseWriter, r *http.Request) {
 	c, e := readShippingConfig(r.Context(), a.Pool, false)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	name := r.PathValue("provider")
 	h, ok := a.shippingHealth(c)[name]
 	if !ok {
-		fail(w, 404, "ارائه‌دهنده پیدا نشد")
+		httpx.Error(w, 404, "ارائه‌دهنده پیدا نشد")
 		return
 	}
 	if h.State == "ready" {
@@ -303,10 +306,10 @@ func (a *App) checkShippingProvider(w http.ResponseWriter, r *http.Request) {
 		h.Error = "پیکربندی حساب زنده تأیید نشده؛ هیچ ارسال یا خریدی انجام نشد"
 	}
 	if e = auditHealth(r, a, h, name, c.Version); e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	write(w, 200, h)
+	httpx.JSON(w, 200, h)
 }
 func auditHealth(r *http.Request, a *App, h providerHealth, name string, version int64) error {
 	raw, _ := json.Marshal(struct {

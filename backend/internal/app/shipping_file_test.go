@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"bomish/internal/security"
 )
 
 func TestShippingFileParsing(t *testing.T) {
@@ -63,7 +65,7 @@ func TestShippingFileImportPreservesMerchantSettingsAndVersions(t *testing.T) {
 	if code, _ := owner.call("PUT", "/staff/shipping", before); code != 409 {
 		t.Fatal("stale browser draft accepted", code)
 	}
-	body := map[string]any{"address": address, "shippingQuoteId": quote.ShippingQuoteID, "expectedTotalRials": quote.TotalRials, "idempotencyKey": token()}
+	body := map[string]any{"address": address, "shippingQuoteId": quote.ShippingQuoteID, "expectedTotalRials": quote.TotalRials, "idempotencyKey": security.Token()}
 	if code, _ := customer.call("POST", "/checkout", body); code != 409 {
 		t.Fatal("old quote accepted", code)
 	}

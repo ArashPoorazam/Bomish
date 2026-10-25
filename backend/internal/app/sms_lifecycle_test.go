@@ -1,12 +1,14 @@
 package app
 
 import (
-	"bomish/internal/domain"
-	"bomish/internal/packing"
-	"bomish/migrations"
 	"context"
 	"net/http"
 	"testing"
+
+	"bomish/internal/domain"
+	"bomish/internal/packing"
+	"bomish/internal/security"
+	"bomish/migrations"
 )
 
 func TestSMSSnappMilestones(t *testing.T) {
@@ -43,7 +45,7 @@ func TestSMSSnappMilestones(t *testing.T) {
 	staff.ok(t, "POST", "/staff/orders/"+id+"/ready", map[string]any{"version": d.Version}, &d)
 	process(2) // Reconfirming packing never duplicates the notification.
 	staff.ok(t, "POST", "/staff/orders/"+id+"/dispatch-quote", map[string]any{"version": d.Version}, &d)
-	staff.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": token()}, &d)
+	staff.ok(t, "POST", "/staff/orders/"+id+"/shipments", map[string]any{"version": d.Version, "dispatchQuoteId": d.Review.ID, "idempotencyKey": security.Token()}, &d)
 	if err := a.ProcessShipments(ctx); err != nil {
 		t.Fatal(err)
 	}

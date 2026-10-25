@@ -1,14 +1,15 @@
 package app
 
 import (
-	"bomish/internal/domain"
-	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"github.com/jackc/pgx/v5"
 	"net/http"
-	"time"
+
+	"bomish/internal/domain"
+	"bomish/internal/httpx"
+	"bomish/internal/security"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type quoteResult struct {
@@ -33,21 +34,22 @@ func (a *App) quote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in shippingQuoteInput
-	if !decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) {
 		return
 	}
 	c, e := loadCart(r.Context(), a.Pool, current(r).Hash)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	cfg, e := readShippingConfig(r.Context(), a.Pool, false)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	a.calculatedQuote(w, r, c, in, cfg)
 }
+
 func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 	if !requireCustomer(w, r) {
 		return
@@ -60,22 +62,22 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		ExpectedTotalRials int64          `json:"expectedTotalRials"`
 		IdempotencyKey     string         `json:"idempotencyKey"`
 	}
-	if !decode(w, r, &in) {
+	if !httpx.Decode(w, r, &in) {
 		return
 	}
 	in.Address.Phone = domain.Phone(in.Address.Phone)
 	in.Address.PostalCode = domain.Normalize(in.Address.PostalCode)
 	if e := in.Address.Validate(); e != nil {
-		fail(w, 400, e.Error())
+		httpx.Error(w, 400, e.Error())
 		return
 	}
 	if len(in.IdempotencyKey) < 16 || len(in.IdempotencyKey) > 100 {
-		fail(w, 400, "شناسه درخواست معتبر نیست")
+		httpx.Error(w, 400, "شناسه درخواست معتبر نیست")
 		return
 	}
 	tx, e := a.Pool.Begin(r.Context())
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	defer tx.Rollback(r.Context())
@@ -83,45 +85,45 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 	// Serialize checkout requests for this user, including retries from different tabs.
 	_, e = tx.Exec(r.Context(), "SELECT id FROM users WHERE id=$1 FOR UPDATE", s.UserID)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	var existing string
 	e = tx.QueryRow(r.Context(), "SELECT id FROM orders WHERE user_id=$1 AND idempotency_key=$2", s.UserID, in.IdempotencyKey).Scan(&existing)
 	if e == nil {
-		write(w, 200, map[string]string{"orderId": existing})
+		httpx.JSON(w, 200, map[string]string{"orderId": existing})
 		return
 	}
 	if !errors.Is(e, pgx.ErrNoRows) {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	// Coordinate with cart mutations so the purchased snapshot cannot change while checking product availability.
 	_, e = tx.Exec(r.Context(), "SELECT token_hash FROM sessions WHERE token_hash=$1 FOR UPDATE", s.Hash)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	c, e := loadCart(r.Context(), tx, s.Hash)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	cfg, e := readShippingConfig(r.Context(), tx, true)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 	for _, item := range c.Items {
 		_, e = tx.Exec(r.Context(), "SELECT p.id FROM products p WHERE p.id=$1 FOR UPDATE OF p", item.Product.ID)
 		if e != nil {
-			a.dbError(w, e)
+			httpx.DatabaseError(w, e)
 			return
 		}
 	}
 	c, e = loadCart(r.Context(), tx, s.Hash)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 
@@ -138,18 +140,18 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		e = applyDiscount(r.Context(), tx, &v, in.DiscountCode, s.UserID, true)
 	}
 	if e != nil {
-		fail(w, 409, e.Error())
+		httpx.Error(w, 409, e.Error())
 		return
 	}
 	if v.TotalRials != in.ExpectedTotalRials {
-		fail(w, 409, "قیمت تغییر کرده است؛ جمع سفارش را دوباره بررسی کنید")
+		httpx.Error(w, 409, "قیمت تغییر کرده است؛ جمع سفارش را دوباره بررسی کنید")
 		return
 	}
-	id := token()
+	id := security.Token()
 	address, _ := json.Marshal(in.Address)
 	_, e = tx.Exec(r.Context(), `INSERT INTO orders(id,user_id,idempotency_key,status,address,subtotal_rials,shipping_rials,total_rials,reservation_expires_at,discount_code,discount_rials) VALUES($1,$2,$3,'pending',$4,$5,$6,$7,now()+interval '15 minutes',nullif($8,''),$9)`, id, s.UserID, in.IdempotencyKey, address, v.SubtotalRials, v.ShippingRials, v.TotalRials, v.DiscountCode, v.DiscountRials)
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 
@@ -160,269 +162,24 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		_, e = tx.Exec(r.Context(), "UPDATE shipping_quotes SET order_id=$1 WHERE id=$2", id, in.ShippingQuoteID)
 	}
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
 
 	for _, item := range c.Items {
 		_, e = tx.Exec(r.Context(), "INSERT INTO order_items(order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)", id, item.Product.ID, item.Product.Name, item.Grams, item.Product.PackagePrice(item.Package), item.TotalRials, item.Package.ID, item.Package.Label(), item.Quantity)
 		if e != nil {
-			a.dbError(w, e)
+			httpx.DatabaseError(w, e)
 			return
 		}
 	}
-	_, e = tx.Exec(r.Context(), "INSERT INTO payment_attempts(id,order_id,provider) VALUES($1,$2,'simulator')", token(), id)
+	_, e = tx.Exec(r.Context(), "INSERT INTO payment_attempts(id,order_id,provider) VALUES($1,$2,'simulator')", security.Token(), id)
 	if e == nil {
 		e = tx.Commit(r.Context())
 	}
 	if e != nil {
-		a.dbError(w, e)
+		httpx.DatabaseError(w, e)
 		return
 	}
-	write(w, 201, map[string]string{"orderId": id})
-}
-func loadOrders(ctx context.Context, q querier, user string, ids ...string) ([]domain.Order, error) {
-	id := ""
-	if len(ids) > 0 {
-		id = ids[0]
-	}
-	return loadOrderPage(ctx, q, user, id, "", "", 100, 0)
-}
-func loadOrderPage(ctx context.Context, q querier, user, id, status, search string, limit, offset int, deliveryFilters ...string) ([]domain.Order, error) {
-	provider, attention := "", ""
-	if len(deliveryFilters) > 0 {
-		provider = deliveryFilters[0]
-	}
-	if len(deliveryFilters) > 1 {
-		attention = deliveryFilters[1]
-	}
-	orderBy := "created_at DESC,id"
-	if user == "" && id == "" {
-		// Prioritize staff work before pagination, without changing customer history.
-		orderBy = `CASE
- WHEN status IN ('paid','packing','review') OR (status='shipped' AND EXISTS (
- SELECT 1 FROM order_shipping ds WHERE ds.order_id=orders.id AND ds.delivery_status IN ('failed','returning','unknown')
- )) THEN 0
- WHEN status='pending' THEN 1
- WHEN status='shipped' THEN 2
- ELSE 3 END,created_at DESC,id`
-	}
-	rows, e := q.Query(ctx, `SELECT id,status,address,subtotal_rials,shipping_rials,total_rials,tracking,created_at,coalesce(discount_code,''),discount_rials FROM orders WHERE ($1='' OR user_id=$1) AND ($2='' OR id=$2) AND ($3='' OR status=$3 OR ($3='active' AND status IN ('paid','packing','shipped','review'))) AND ($4='' OR id||' '||address::text||' '||tracking ILIKE '%'||$4||'%') `+deliveryFilterSQL(7, 8)+` ORDER BY `+orderBy+` LIMIT $5 OFFSET $6`, user, id, status, search, limit, offset, provider, attention)
-	if e != nil {
-		return nil, e
-	}
-	out := []domain.Order{}
-	indexes := map[string]int{}
-	ids := []string{}
-	for rows.Next() {
-		var v domain.Order
-		var raw []byte
-		var date time.Time
-		if e = rows.Scan(&v.ID, &v.Status, &raw, &v.SubtotalRials, &v.ShippingRials, &v.TotalRials, &v.Tracking, &date, &v.DiscountCode, &v.DiscountRials); e != nil {
-			rows.Close()
-			return nil, e
-		}
-		_ = json.Unmarshal(raw, &v.Address)
-		v.CreatedAt = date.Format(time.RFC3339)
-		v.Items = []domain.OrderItem{}
-		v.Events = []domain.OrderEvent{}
-		indexes[v.ID] = len(out)
-		ids = append(ids, v.ID)
-		out = append(out, v)
-	}
-	e = rows.Err()
-	rows.Close()
-	if e != nil {
-		return nil, e
-	}
-	if len(ids) == 0 {
-		return out, nil
-	}
-	items, e := q.Query(ctx, `SELECT order_id,product_id,name,grams,price_rials,total_rials,package_id,package_label,quantity,packed FROM order_items WHERE order_id=ANY($1::text[]) ORDER BY product_id,package_id`, ids)
-	if e != nil {
-		return nil, e
-	}
-	for items.Next() {
-		var order string
-		var it domain.OrderItem
-		if e = items.Scan(&order, &it.ProductID, &it.Name, &it.Grams, &it.PriceRials, &it.TotalRials, &it.PackageID, &it.PackageLabel, &it.Quantity, &it.Packed); e != nil {
-			items.Close()
-			return nil, e
-		}
-		i := indexes[order]
-		out[i].Items = append(out[i].Items, it)
-	}
-	e = items.Err()
-	items.Close()
-	if e != nil {
-		return nil, e
-	}
-	events, e := q.Query(ctx, "SELECT order_id,status,created_at FROM order_events WHERE order_id=ANY($1::text[]) ORDER BY created_at", ids)
-	if e != nil {
-		return nil, e
-	}
-	defer events.Close()
-	for events.Next() {
-		var id string
-		var v domain.OrderEvent
-		var t time.Time
-		if e = events.Scan(&id, &v.Status, &t); e != nil {
-			return nil, e
-		}
-		v.CreatedAt = t.Format(time.RFC3339)
-		i := indexes[id]
-		out[i].Events = append(out[i].Events, v)
-	}
-	if e = events.Err(); e != nil {
-		return nil, e
-	}
-	events.Close()
-	for i := range out {
-		if e = attachDelivery(ctx, q, &out[i]); e != nil {
-			return nil, e
-		}
-	}
-	return out, nil
-}
-func (a *App) orders(w http.ResponseWriter, r *http.Request) {
-	if !requireCustomer(w, r) {
-		return
-	}
-	v, e := loadOrders(r.Context(), a.Pool, current(r).UserID)
-	if e != nil {
-		a.dbError(w, e)
-		return
-	}
-	write(w, 200, v)
-}
-func (a *App) simulatePayment(w http.ResponseWriter, r *http.Request) {
-	if !a.Dev {
-		fail(w, 404, "یافت نشد")
-		return
-	}
-	if !requireCustomer(w, r) {
-		return
-	}
-	var in struct {
-		Success bool `json:"success"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	status, e := a.settle(r.Context(), r.PathValue("id"), current(r).UserID, in.Success)
-	if e != nil {
-		fail(w, 409, e.Error())
-		return
-	}
-	write(w, 200, map[string]string{"status": status})
-}
-func (a *App) settle(ctx context.Context, id, user string, success bool) (string, error) {
-	tx, e := a.Pool.Begin(ctx)
-	if e != nil {
-		return "", e
-	}
-	defer tx.Rollback(ctx)
-	var status, discountCode string
-	var expires time.Time
-	e = tx.QueryRow(ctx, "SELECT status,reservation_expires_at,coalesce(discount_code,'') FROM orders WHERE id=$1 AND user_id=$2 FOR UPDATE", id, user).Scan(&status, &expires, &discountCode)
-	if e != nil {
-		return "", errors.New("سفارش پیدا نشد")
-	}
-	if status != "pending" && status != "expired" {
-		return status, nil
-	}
-	var paymentStatus string
-	e = tx.QueryRow(ctx, "SELECT status FROM payment_attempts WHERE order_id=$1 FOR UPDATE", id).Scan(&paymentStatus)
-	if e != nil {
-		return "", e
-	}
-	if paymentStatus != "pending" {
-		return status, nil
-	}
-	available := true
-	if success && status == "expired" {
-		capacity, err := reclaimDiscount(ctx, tx, discountCode, user)
-		if err != nil {
-			return "", err
-		}
-		available = available && capacity
-	}
-	final := "cancelled"
-	if success {
-		final = "paid"
-		if !available {
-			final = "review"
-		}
-	}
-	if final == "paid" {
-		_, e = tx.Exec(ctx, `DELETE FROM carts c USING order_items oi,sessions s WHERE oi.order_id=$1 AND c.product_id=oi.product_id AND c.package_id=oi.package_id AND c.quantity=oi.quantity AND c.session_hash=s.token_hash AND s.user_id=$2`, id, user)
-		if e != nil {
-			return "", e
-		}
-		if e = queueOrderSMS(ctx, tx, id, final); e != nil {
-			return "", e
-		}
-	}
-	paidAt := time.Now()
-	if final == "paid" {
-		if _, e = tx.Exec(ctx, "UPDATE orders SET paid_at=$2 WHERE id=$1", id, paidAt); e != nil {
-			return "", e
-		}
-		if e = creditCommission(ctx, tx, id, user, paidAt); e != nil {
-			return "", e
-		}
-	}
-	if e = auditDetail(ctx, tx, "", "order."+final, id, map[string]string{"before": status, "after": final}); e != nil {
-		return "", e
-	}
-	_, e = tx.Exec(ctx, "UPDATE orders SET status=$1 WHERE id=$2", final, id)
-	if e == nil {
-		ps := "failed"
-		if success {
-			ps = "verified"
-		}
-		_, e = tx.Exec(ctx, "UPDATE payment_attempts SET status=$1,reference=$2 WHERE order_id=$3", ps, "sim-"+id, id)
-	}
-	if e == nil {
-		e = tx.Commit(ctx)
-	}
-	return final, e
-}
-func (a *App) ExpireReservations(ctx context.Context) error {
-	tx, e := a.Pool.Begin(ctx)
-	if e != nil {
-		return e
-	}
-	defer tx.Rollback(ctx)
-	rows, e := tx.Query(ctx, "SELECT id FROM orders WHERE status='pending' AND reservation_expires_at<now() ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 100")
-	if e != nil {
-		return e
-	}
-	ids := []string{}
-	for rows.Next() {
-		var id string
-		if e = rows.Scan(&id); e != nil {
-			rows.Close()
-			return e
-		}
-		ids = append(ids, id)
-	}
-	e = rows.Err()
-	rows.Close()
-	if e != nil {
-		return e
-	}
-	for _, id := range ids {
-		_, e = tx.Exec(ctx, "UPDATE orders SET status='expired' WHERE id=$1", id)
-		if e == nil {
-			e = auditDetail(ctx, tx, "", "order.expired", id, map[string]string{"before": "pending", "after": "expired"})
-		}
-		if e != nil {
-			return e
-		}
-	}
-	if e = tx.Commit(ctx); e != nil {
-		return fmt.Errorf("expiry: %w", e)
-	}
-	return nil
+	httpx.JSON(w, 201, map[string]string{"orderId": id})
 }

@@ -4,9 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"os"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestFreshMigrationsAndCategoryPreservation(t *testing.T) {
@@ -20,6 +21,21 @@ func TestFreshMigrationsAndCategoryPreservation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer base.Close()
+	tx, err := base.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(7234109)"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public"); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+
 	id := make([]byte, 8)
 	if _, err = rand.Read(id); err != nil {
 		t.Fatal(err)
