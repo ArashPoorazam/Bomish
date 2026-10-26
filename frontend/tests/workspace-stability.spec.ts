@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import type { components } from "@/lib/api-types";
 const session = {
   csrf: "test",
   role: "owner",
@@ -52,6 +53,13 @@ async function mockWorkspace(page: Page) {
       "/staff/notifications": { orders: 0, custom: 0, support: 0 },
       "/staff/products": paged(products),
       "/staff/orders": paged(orders),
+      "/omnisire/events": {
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 25,
+        summary: { actors: 0, unattributed: 0, review: 0 },
+      } satisfies components["schemas"]["AuditEventPage"],
       "/staff/sales": url.searchParams.has("part")
         ? paged([])
         : {
@@ -104,6 +112,10 @@ test("Omnisire preserves sidebar position when opening account", async ({
   await page.setViewportSize({ width: 1440, height: 520 });
   await mockWorkspace(page);
   await page.goto("/omnisire/events");
+  // Wait for the audit response to render before testing sidebar navigation.
+  await expect(
+    page.getByRole("heading", { name: "No matching events", exact: true }),
+  ).toBeVisible();
   const sidebar = page.locator(".omni-sidebar");
   const account = sidebar.getByRole("link", {
     name: "اطلاعات حساب",
