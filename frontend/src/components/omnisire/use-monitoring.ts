@@ -41,7 +41,9 @@ export function useMonitoring() {
         }
       } catch {
         if (!disposed && controller === request)
-          setError("ارتباط با سرور برقرار نشد. وضعیت فعلی قابل تأیید نیست.");
+          setError(
+            "Unable to reach the server. Current health cannot be verified.",
+          );
       } finally {
         clearTimeout(timeout);
         if (!disposed && controller === request) {

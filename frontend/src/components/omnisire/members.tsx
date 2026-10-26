@@ -22,7 +22,7 @@ import {
   type PageData,
 } from "./shared";
 import { SalesContent } from "./sales";
-import { EventsContent } from "./events";
+import { EventsContent } from "./member-events";
 const empty = {
   fullName: "",
   username: "",

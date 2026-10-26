@@ -20,6 +20,7 @@ type App struct {
 	monitorOnce      sync.Once
 	startedAt        time.Time
 	requestMetrics   httpx.RequestMetrics
+	resourceMetrics  resourceMetrics
 	ShippingProvider carrier.Courier
 	Pool             *pgxpool.Pool
 	Queries          *db.Queries

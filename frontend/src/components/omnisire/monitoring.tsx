@@ -1,67 +1,60 @@
 "use client";
 
 import {
-  Activity,
-  ArrowUpLeft,
+  ArrowUpRight,
   Check,
   Clock3,
   Database,
-  HardDrive,
   MemoryStick,
   RefreshCw,
   Server,
   TriangleAlert,
 } from "lucide-react";
 import Link from "next/link";
-import { fa } from "@/lib/format";
-import { Workspace, stamp } from "./shared";
-import { decimal, bytes, duration } from "./monitoring-format";
+import { Workspace } from "./shared";
+import {
+  decimal,
+  bytes,
+  duration,
+  stamp,
+  utilization,
+} from "./monitoring-format";
 import { MonitoringTraffic } from "./monitoring-traffic";
+import { MonitoringResources } from "./monitoring-resources";
 import { useMonitoring } from "./use-monitoring";
 
 export function ServerMonitoring() {
   return (
     <Workspace
       owner
-      title="پایش سرور"
-      description="وضعیت سرویس‌ها، منابع و ترافیک سرور در یک نگاه."
+      title="Server"
+      contentLanguage="en"
+      description="Resources, availability, and API performance."
     >
       <MonitoringContent />
     </Workspace>
   );
 }
-
 function MonitoringContent() {
   const { data, error, loading, paused, setPaused, refresh, stale } =
     useMonitoring();
   const attention = data?.status === "attention";
   const uncertain = stale || !!error;
   const StatusIcon = uncertain || attention ? TriangleAlert : Check;
-  const total =
-    data?.traffic.reduce((sum, bucket) => sum + bucket.requests, 0) || 0;
-  const errors =
-    data?.traffic.reduce((sum, bucket) => sum + bucket.errors, 0) || 0;
-  const average =
-    total && data
-      ? data.traffic.reduce(
-          (sum, bucket) => sum + bucket.averageMs * bucket.requests,
-          0,
-        ) / total
-      : null;
-  const diskFree = data?.disk
-    ? (data.disk.availableBytes / data.disk.totalBytes) * 100
-    : null;
-
+  const diskUsed = utilization(data?.disk);
   return (
     <div className="server-monitor">
       <div className="monitor-toolbar">
         <div className="monitor-live">
           <span
-            className={`monitor-dot ${paused || uncertain ? "is-muted" : ""}`}
+            className={`monitor-dot ${paused || uncertain || !data ? "is-muted" : ""}`}
           />
-          {paused
-            ? "به‌روزرسانی خودکار متوقف است"
-            : "به‌روزرسانی خودکار هر ۱۵ ثانیه"}
+          {paused ? "Auto-refresh paused" : "Auto-refresh every 15 seconds"}
+          {data && (
+            <span className="monitor-last-update">
+              Updated {stamp(data.checkedAt)} · Tehran
+            </span>
+          )}
         </div>
         <div className="monitor-controls">
           <label>
@@ -69,51 +62,53 @@ function MonitoringContent() {
               type="checkbox"
               checked={!paused}
               onChange={(event) => setPaused(!event.target.checked)}
-            />{" "}
-            خودکار
+            />
+            Auto-refresh
           </label>
           <button
             className="button secondary"
             onClick={refresh}
             disabled={loading}
           >
-            <RefreshCw size={16} />
-            {loading ? "در حال دریافت…" : "به‌روزرسانی"}
+            <RefreshCw
+              size={15}
+              className={loading ? "monitor-spinning" : undefined}
+            />
+            {loading ? "Refreshing…" : "Refresh"}
           </button>
         </div>
       </div>
       <section
         className={`monitor-health ${uncertain || attention ? "needs-attention" : ""}`}
-        aria-label="خلاصه وضعیت سرور"
+        aria-label="Server health summary"
       >
         <div className="monitor-health-icon">
-          {!data && !error ? <Server size={28} /> : <StatusIcon size={28} />}
+          {!data && !error ? <Server size={22} /> : <StatusIcon size={22} />}
         </div>
         <div className="monitor-health-copy">
-          <span className="monitor-eyebrow">وضعیت سرور</span>
+          <span className="monitor-eyebrow">SERVICE STATUS</span>
           <h2 aria-live="polite">
             {uncertain
-              ? "وضعیت فعلی نامشخص است"
+              ? "Current health is unknown"
               : !data
-                ? "در حال بررسی سرور…"
+                ? "Checking your server…"
                 : attention
-                  ? "نیاز به بررسی"
-                  : "سرویس‌های بررسی‌شده در دسترس‌اند"}
+                  ? "Needs attention"
+                  : "Monitored services are online"}
           </h2>
           <p>
             {uncertain
-              ? "برای تأیید وضعیت، دوباره تلاش کنید. اطلاعات قبلی، در صورت وجود، در پایین نمایش داده می‌شود."
-              : "بررسی سرویس API و پایگاه داده همین نمونه از برنامه."}
+              ? "Refresh to verify current health. Previous readings are retained below."
+              : "API and database availability for this instance."}
           </p>
         </div>
         {data && (
-          <div className="monitor-environment">
+          <div className="monitor-health-meta">
+            <span className="monitor-environment">{data.environment}</span>
             <span>
-              {data.environment === "production" ? "محیط اصلی" : "محیط توسعه"}
+              <Clock3 size={14} /> Uptime{" "}
+              <strong>{duration(data.uptimeSeconds)}</strong>
             </span>
-            <small>
-              {data.catalogOnly ? "حالت کاتالوگ" : "فروش آنلاین فعال"}
-            </small>
           </div>
         )}
       </section>
@@ -122,171 +117,102 @@ function MonitoringContent() {
           {error}
         </p>
       )}
-      {!data && !error && (
+      {!data && (
         <div className="monitor-placeholder" role="status">
-          در حال دریافت اطلاعات پایش…
-        </div>
-      )}
-      {!data && error && (
-        <div className="monitor-placeholder">
-          داده‌ای برای نمایش دریافت نشده است. با دکمه «به‌روزرسانی» دوباره تلاش
-          کنید.
+          {error
+            ? "No measurements received. Select Refresh to try again."
+            : "Loading server measurements…"}
         </div>
       )}
       {data && (
         <>
-          <div className="monitor-updated">
-            {stale ? "آخرین اطلاعات ثبت‌شده" : "آخرین بررسی"}:{" "}
-            <time dateTime={data.checkedAt}>{stamp(data.checkedAt)}</time>
-            {paused && " · دریافت خودکار خاموش"}
-          </div>
-          <div className="monitor-metrics">
-            <Metric
-              Icon={Clock3}
-              label="زمان فعالیت API"
-              value={duration(data.uptimeSeconds)}
-              hint="از آخرین راه‌اندازی برنامه"
-            />
-            <Metric
-              Icon={Activity}
-              label="میانگین زمان پاسخ API"
-              value={average === null ? "—" : `${decimal(average)} میلی‌ثانیه`}
-              hint={
-                total
-                  ? "زمان پردازش درخواست‌ها در سرور"
-                  : "هنوز درخواستی ثبت نشده است"
-              }
-            />
-            <Metric
-              Icon={MemoryStick}
-              label="حافظه مصرفی برنامه"
-              value={bytes(data.runtime.heapBytes)}
-              hint="حافظه زنده Go؛ نه کل RAM سرور"
-            />
-            <Metric
-              Icon={HardDrive}
-              label="فضای آزاد فایل‌ها"
-              value={data.disk ? bytes(data.disk.availableBytes) : "نامشخص"}
-              hint={
-                diskFree === null
-                  ? "اندازه‌گیری این فضای ذخیره‌سازی در دسترس نیست"
-                  : `${decimal(diskFree)}٪ از فضای فایل‌سیستم بارگذاری‌ها آزاد است`
-              }
-              warning={diskFree !== null && diskFree < 15}
-            />
-          </div>
+          <MonitoringResources data={data} stale={uncertain} />
+          <MonitoringTraffic data={data} />
           <div className="monitor-columns">
             <section className="monitor-panel">
               <div className="monitor-panel-heading">
-                <h2>سلامت سرویس‌ها</h2>
+                <h2>Service checks</h2>
                 <Server size={18} />
               </div>
               <Service
-                name="سرویس API"
-                detail="پاسخ موفق به درخواست پایش"
-                status={stale ? "unknown" : "healthy"}
+                name="API"
+                detail="Monitoring endpoint reachable"
+                status={uncertain ? "unknown" : "healthy"}
               />
               <Service
-                name="پایگاه داده"
+                name="PostgreSQL"
                 detail={
                   data.database.status === "healthy"
-                    ? `زمان اتصال: ${decimal(data.database.latencyMs)} میلی‌ثانیه`
-                    : "اتصال پایگاه داده برقرار نشد"
+                    ? `${decimal(data.database.latencyMs)} ms connection latency`
+                    : "Database connection failed"
                 }
-                status={stale ? "unknown" : data.database.status}
+                status={uncertain ? "unknown" : data.database.status}
               />
               <Service
-                name="فضای ذخیره‌سازی فایل‌ها"
+                name="File storage"
                 detail={
-                  diskFree === null
-                    ? "اطلاعات ظرفیت در دسترس نیست"
-                    : "هشدار در صورت کمتر از ۱۵٪ فضای آزاد"
+                  data.disk
+                    ? `${bytes(data.disk.availableBytes)} available on uploads filesystem`
+                    : "Storage capacity unavailable"
                 }
                 status={
-                  stale || diskFree === null
+                  uncertain || diskUsed === null
                     ? "unknown"
-                    : diskFree < 15
+                    : diskUsed > 85
                       ? "attention"
                       : "healthy"
                 }
               />
               <p className="monitor-note">
-                این بررسی شامل درگاه پرداخت، پیامک و سرویس‌های ارسال نیست.
+                Payment, SMS, and delivery providers are outside these checks.
               </p>
             </section>
             <section className="monitor-panel">
               <div className="monitor-panel-heading">
-                <h2>اتصال‌های پایگاه داده</h2>
+                <h2>Runtime & database</h2>
                 <Database size={18} />
               </div>
-              <div className="monitor-pool">
-                <strong>
-                  {fa(data.database.activeConnections)}
-                  <small> / {fa(data.database.maxConnections)}</small>
-                </strong>
-                <span>اتصال در حال استفاده</span>
-              </div>
-              <meter
-                min={0}
-                max={data.database.maxConnections}
-                value={data.database.activeConnections}
-                aria-label="اتصال‌های فعال پایگاه داده"
-              />
-              <div className="monitor-pool-legend">
-                <span>
-                  آماده استفاده <b>{fa(data.database.idleConnections)}</b>
-                </span>
-                <span>
-                  سقف اتصال‌ها <b>{fa(data.database.maxConnections)}</b>
-                </span>
-              </div>
+              <dl className="monitor-runtime">
+                <div>
+                  <dt>Go runtime</dt>
+                  <dd>{data.runtime.version}</dd>
+                </div>
+                <div>
+                  <dt>Operating system</dt>
+                  <dd>
+                    {data.runtime.os} / {data.runtime.arch}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Go heap</dt>
+                  <dd>{bytes(data.runtime.heapBytes)}</dd>
+                </div>
+                <div>
+                  <dt>Go reserved memory</dt>
+                  <dd>{bytes(data.runtime.reservedBytes)}</dd>
+                </div>
+                <div>
+                  <dt>Goroutines</dt>
+                  <dd>{data.runtime.goroutines}</dd>
+                </div>
+                <div>
+                  <dt>Idle DB connections</dt>
+                  <dd>{data.database.idleConnections}</dd>
+                </div>
+              </dl>
               <p className="monitor-note">
-                ظرفیت اتصال این نمونه از API به پایگاه داده.
+                <MemoryStick size={13} /> Go memory is separate from system RAM
+                usage. Started {stamp(data.startedAt)} (Tehran).
               </p>
             </section>
           </div>
-          <MonitoringTraffic data={data} total={total} errors={errors} />
-          <section className="monitor-panel">
-            <div className="monitor-panel-heading">
-              <h2>مشخصات اجرای برنامه</h2>
-              <MemoryStick size={18} />
-            </div>
-            <dl className="monitor-runtime">
-              <div>
-                <dt>محیط اجرا</dt>
-                <dd dir="ltr">{data.runtime.version}</dd>
-              </div>
-              <div>
-                <dt>سیستم‌عامل / معماری</dt>
-                <dd dir="ltr">
-                  {data.runtime.os} / {data.runtime.arch}
-                </dd>
-              </div>
-              <div>
-                <dt>پردازنده‌های قابل مشاهده</dt>
-                <dd>{fa(data.runtime.cpuCount)}</dd>
-              </div>
-              <div>
-                <dt>وظایف هم‌زمان Go</dt>
-                <dd>{fa(data.runtime.goroutines)}</dd>
-              </div>
-              <div>
-                <dt>حافظه رزروشده Go</dt>
-                <dd>{bytes(data.runtime.reservedBytes)}</dd>
-              </div>
-              <div>
-                <dt>شروع فعالیت</dt>
-                <dd>{stamp(data.startedAt)}</dd>
-              </div>
-            </dl>
-          </section>
           <footer className="monitor-footer">
             <p>
-              آمار مربوط به همین نمونه از API است و با راه‌اندازی مجدد از نو ثبت
-              می‌شود. این صفحه جایگزین پایش مستقل قطعی سرور نیست.
+              Measurements belong to this API instance. Independent uptime
+              monitoring is needed to detect a complete outage.
             </p>
             <Link href="/omnisire/events">
-              رویدادهای مدیریتی <ArrowUpLeft size={16} />
+              Admin events <ArrowUpRight size={15} />
             </Link>
           </footer>
         </>
@@ -294,32 +220,6 @@ function MonitoringContent() {
     </div>
   );
 }
-
-function Metric({
-  Icon,
-  label,
-  value,
-  hint,
-  warning = false,
-}: {
-  Icon: typeof Clock3;
-  label: string;
-  value: string;
-  hint: string;
-  warning?: boolean;
-}) {
-  return (
-    <article className={`monitor-metric ${warning ? "metric-warning" : ""}`}>
-      <div>
-        <span>{label}</span>
-        <Icon size={19} />
-      </div>
-      <strong>{value}</strong>
-      <p>{hint}</p>
-    </article>
-  );
-}
-
 function Service({
   name,
   detail,
@@ -331,12 +231,12 @@ function Service({
 }) {
   const label =
     status === "healthy"
-      ? "سالم"
+      ? "Healthy"
       : status === "unknown"
-        ? "نامشخص"
+        ? "Unknown"
         : status === "attention"
-          ? "فضای کم"
-          : "قطع ارتباط";
+          ? "Low space"
+          : "Unavailable";
   return (
     <div className="monitor-service">
       <div>

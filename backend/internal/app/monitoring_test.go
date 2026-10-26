@@ -30,10 +30,14 @@ func TestMonitoringOwnerAndVerification(t *testing.T) {
 		Runtime struct {
 			Heap uint64 `json:"heapBytes"`
 		} `json:"runtime"`
-		Traffic []any `json:"traffic"`
+		Traffic   []any            `json:"traffic"`
+		Resources []resourceSample `json:"resources"`
 	}
 	if code != 200 || json.Unmarshal(raw, &snapshot) != nil || snapshot.Database.Status != "healthy" || snapshot.Database.Max == 0 || snapshot.Runtime.Heap == 0 || len(snapshot.Traffic) == 0 {
 		t.Fatalf("invalid snapshot: %d %s", code, raw)
+	}
+	if len(snapshot.Resources) != 1 || snapshot.Resources[0].At.IsZero() || snapshot.Resources[0].ConnectionsPercent == nil {
+		t.Fatalf("missing resource sample: %s", raw)
 	}
 	_, err := a.Pool.Exec(context.Background(), "UPDATE sessions SET omnisire_verified=false WHERE token_hash=$1", security.Hash(owner.cookies[0].Value))
 	if err != nil {

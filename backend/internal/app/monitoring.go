@@ -16,6 +16,8 @@ type diskStatus struct {
 }
 
 func (a *App) monitoring(w http.ResponseWriter, r *http.Request) {
+	_ = a.SampleResources(r.Context())
+	history := a.resourceHistory()
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 	pingStarted := time.Now()
@@ -56,6 +58,6 @@ func (a *App) monitoring(w http.ResponseWriter, r *http.Request) {
 		"catalogOnly": a.CatalogOnly,
 		"database":    map[string]any{"status": databaseStatus, "latencyMs": latency, "activeConnections": stat.AcquiredConns(), "idleConnections": stat.IdleConns(), "maxConnections": stat.MaxConns()},
 		"runtime":     map[string]any{"version": runtime.Version(), "os": runtime.GOOS, "arch": runtime.GOARCH, "cpuCount": runtime.NumCPU(), "goroutines": runtime.NumGoroutine(), "heapBytes": memory.HeapAlloc, "reservedBytes": memory.Sys},
-		"disk":        disk, "traffic": traffic,
+		"disk":        disk, "traffic": traffic, "resources": history,
 	})
 }

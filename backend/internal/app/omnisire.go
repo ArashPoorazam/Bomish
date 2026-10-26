@@ -2,8 +2,6 @@ package app
 
 import (
 	"net/http"
-	"strings"
-	"time"
 
 	"bomish/internal/database"
 	"bomish/internal/httpx"
@@ -43,17 +41,4 @@ func (a *App) summary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, 200, out[0])
-}
-
-func (a *App) listEvents(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	from, to := reporting.Dates(r.URL.Query())
-	if q.Get("from") == "" {
-		from = time.Unix(0, 0)
-	}
-	sort := "a.created_at DESC,a.id DESC"
-	if q.Get("sort") == "oldest" {
-		sort = "a.created_at,a.id"
-	}
-	a.paged(w, r, `SELECT a.id,a.action,a.entity_id AS "entityId",a.detail,a.created_at AS "createdAt",coalesce(nullif(s.full_name,''),nullif(s.username,''),'سیستم') AS "actorName",coalesce(a.staff_id,'') AS "staffId" FROM audit_events a LEFT JOIN staff s ON s.id=a.staff_id WHERE a.created_at >= $1 AND a.created_at < $2 AND ($3='' OR a.staff_id=$3) AND ($4='' OR a.action=$4) AND ($5='' OR a.entity_id=$5) AND ($6='' OR a.action||' '||a.entity_id ILIKE '%'||$6||'%' OR s.full_name||' '||s.username ILIKE '%'||$6||'%')`, []any{from, to, q.Get("actor"), q.Get("action"), q.Get("entity"), strings.TrimSpace(q.Get("q"))}, sort)
 }

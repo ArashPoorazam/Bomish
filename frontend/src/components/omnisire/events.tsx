@@ -1,237 +1,408 @@
 "use client";
+
 import { useState } from "react";
-import Link from "next/link";
 import {
-  Workspace,
-  Panel,
-  Feedback,
-  Pager,
-  useLoad,
-  stamp,
-  type PageData,
-} from "./shared";
-export const actionLabels: Record<string, string> = {
-  "auth.customer_login": "ورود مشتری",
-  "auth.login": "ورود همکار",
-  "auth.failed": "ورود ناموفق",
-  "auth.logout": "خروج",
-  "staff.create": "ایجاد همکار",
-  "staff.update": "ویرایش دسترسی و مشخصات",
-  "staff.archive": "بایگانی همکار",
-  "staff.credentials": "بازیابی اطلاعات ورود",
-  "product.draft": "ذخیره پیش‌نویس محصول",
-  "product.publish": "انتشار محصول",
-  "product.archive": "بایگانی محصول",
-  "product.availability": "تغییر وضعیت فروش",
-  "article.save": "ذخیره مقاله",
-  "category.save": "ذخیره دسته‌بندی",
-  "category.delete": "حذف دسته‌بندی",
-  "pricing.adjust": "تغییر قیمت",
-  "pricing.discount": "تغییر تخفیف",
-  "discount.create": "ایجاد کد تخفیف",
-  "discount.update": "تغییر کد تخفیف",
-  "shipping.update": "تنظیم ارسال",
-  "order.paid": "پرداخت موفق سفارش",
-  "order.cancelled": "پرداخت ناموفق / لغو",
-  "order.expired": "پایان مهلت پرداخت",
-  "order.review": "سفارش نیازمند بررسی",
-  "order.packing": "بسته‌بندی سفارش",
-  "order.shipped": "ارسال سفارش",
-  "order.received": "تحویل سفارش",
-  "referral.signup": "عضویت با لینک معرفی",
-  "commission.earned": "ثبت کمیسیون",
-  "commission.refund": "اصلاح کمیسیون استرداد",
-  "payment.recorded": "ثبت پرداخت همکار",
-  "payment.reversed": "اصلاح پرداخت همکار",
-  "export.requested": "درخواست خروجی اکسل",
-  "export.ready": "آماده شدن خروجی اکسل",
+  Activity,
+  ArrowDownUp,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  FileText,
+  History,
+  Package,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  TriangleAlert,
+  Users,
+  Wallet,
+  Workflow,
+} from "lucide-react";
+import { Workspace, useLoad } from "./shared";
+import {
+  actorName,
+  categories,
+  count,
+  dateWindow,
+  emptyFilters,
+  eventDate,
+  eventTime,
+  eventTitle,
+  type AuditPage,
+  type EventFilters,
+} from "./event-model";
+import { EventFilterForm } from "./event-filters";
+import { EventDetails } from "./event-details";
+
+const categoryIcons = {
+  access: ShieldCheck,
+  catalog: Package,
+  orders: Workflow,
+  finance: Wallet,
+  other: FileText,
 };
-export function EventsContent({ actor = "" }: { actor?: string }) {
-  const [q, setQ] = useState(""),
-    [action, setAction] = useState(""),
-    [entity, setEntity] = useState(""),
-    [staff, setStaff] = useState(actor),
-    [from, setFrom] = useState(""),
-    [to, setTo] = useState(""),
-    [sort, setSort] = useState("newest"),
-    [page, setPage] = useState(1);
-  const params = new URLSearchParams({
-    q,
-    action,
-    entity,
-    actor: staff,
-    from,
-    to,
-    sort,
-    page: String(page),
-  });
-  const { data, error, loading } = useLoad<PageData>(
-    "/omnisire/events?" + params,
-  );
-  return (
-    <Panel title="تاریخچه رویدادها">
-      <div className="omni-filters">
-        <label>
-          جستجو
-          <input
-            type="search"
-            placeholder="نام همکار یا شناسه"
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setPage(1);
-            }}
-          />
-        </label>
-        <label>
-          نوع رویداد
-          <select
-            value={action}
-            onChange={(e) => {
-              setAction(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">همه رویدادها</option>
-            {Object.entries(actionLabels).map(([a, l]) => (
-              <option value={a} key={a}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          از تاریخ
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => {
-              setFrom(e.target.value);
-              setPage(1);
-            }}
-          />
-        </label>
-        <label>
-          تا تاریخ
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => {
-              setTo(e.target.value);
-              setPage(1);
-            }}
-          />
-        </label>
-        <label>
-          مرتب‌سازی
-          <select
-            value={sort}
-            onChange={(e) => {
-              setSort(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="newest">جدیدترین</option>
-            <option value="oldest">قدیمی‌ترین</option>
-          </select>
-        </label>
-        <label>
-          شناسه مورد
-          <input
-            value={entity}
-            onChange={(e) => {
-              setEntity(e.target.value);
-              setPage(1);
-            }}
-          />
-        </label>
-        {!actor && (
-          <label>
-            شناسه همکار
-            <input
-              value={staff}
-              onChange={(e) => {
-                setStaff(e.target.value);
-                setPage(1);
-              }}
-            />
-          </label>
-        )}
-      </div>
-      <Feedback error={error} loading={loading} />
-      <div className="omni-event-list">
-        {data?.items.map((e) => (
-          <article key={String(e.id)} className="omni-event">
-            <span className="omni-event-dot" />
-            <div>
-              <div className="between">
-                <strong>
-                  {actionLabels[String(e.action)] || String(e.action)}
-                </strong>
-                <time>{stamp(e.createdAt)}</time>
-              </div>
-              <p>
-                {String(e.actorName || "سیستم")} ·{" "}
-                <span dir="ltr">{String(e.entityId)}</span>
-              </p>
-              <details>
-                <summary>جزئیات رویداد</summary>
-                <pre dir="ltr">{JSON.stringify(e.detail, null, 2)}</pre>
-                {String(e.action).startsWith("staff.") && (
-                  <Link
-                    className="text-link"
-                    href={`/omnisire/members/${e.entityId}`}
-                  >
-                    پرونده همکار
-                  </Link>
-                )}
-                {/^(order|product|inventory|article)\./.test(
-                  String(e.action),
-                ) && (
-                  <Link
-                    className="text-link"
-                    href={
-                      "/staff?" +
-                      new URLSearchParams({
-                        section: String(e.action).startsWith("order.")
-                          ? "orders"
-                          : String(e.action).startsWith("article.")
-                            ? "articles"
-                            : "products",
-                        q: String(e.entityId),
-                      })
-                    }
-                  >
-                    مشاهده رکورد مرتبط
-                  </Link>
-                )}
-                {Boolean(e.staffId) && (
-                  <Link
-                    className="text-link"
-                    href={`/omnisire/members/${e.staffId}`}
-                  >
-                    مشاهده انجام‌دهنده
-                  </Link>
-                )}
-              </details>
-            </div>
-          </article>
-        ))}
-        {data && !data.items.length && (
-          <p className="omni-empty">رویدادی در این بازه پیدا نشد.</p>
-        )}
-      </div>
-      <Pager data={data} page={page} onPage={setPage} />
-    </Panel>
-  );
-}
 export function EventsPage() {
   return (
-    <Workspace owner title="رویدادها">
-      <p className="omni-intro">
-        تاریخچه تصمیم‌ها و فعالیت‌ها؛ هر تغییر با زمان و انجام‌دهنده مشخص.
-      </p>
-      <EventsContent />
+    <Workspace
+      owner
+      title="Activity log"
+      contentLanguage="en"
+      description="Follow every recorded action. Know what changed, when, and who was involved."
+    >
+      <AuditLog />
     </Workspace>
+  );
+}
+function AuditLog() {
+  const [filters, setFilters] = useState<EventFilters>(() => ({
+    ...emptyFilters,
+    ...dateWindow(7),
+  }));
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [sort, setSort] = useState("newest");
+  const [revision, setRevision] = useState(0);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const params = new URLSearchParams({
+    ...filters,
+    review: String(filters.review),
+    page: String(page),
+    pageSize: String(pageSize),
+    sort,
+  });
+  const { data, loading, error } = useLoad<AuditPage>(
+    `/omnisire/events?${params}`,
+    revision,
+  );
+  const selectedIndex =
+    data?.items.findIndex((event) => event.id === selectedId) ?? -1;
+  const selected = selectedIndex >= 0 ? data!.items[selectedIndex] : null;
+  const apply = (next: EventFilters) => {
+    setFilters(next);
+    setPage(1);
+    setSelectedId(null);
+  };
+  const changePage = (next: number) => {
+    setPage(next);
+    setSelectedId(null);
+  };
+  const lastPage = data
+    ? Math.max(1, Math.ceil(data.total / data.pageSize))
+    : 1;
+  const currentPage = data?.page ?? page;
+  return (
+    <div className="audit-log">
+      <div className="audit-intro">
+        <div>
+          <span className="audit-eyebrow">WORKSPACE AUDIT TRAIL</span>
+          <p>
+            <History size={15} />
+            Recorded activity across your workspace
+          </p>
+        </div>
+        <button
+          type="button"
+          className="audit-refresh"
+          onClick={() => setRevision((n) => n + 1)}
+          disabled={loading}
+        >
+          <RefreshCw size={15} />
+          {loading ? "Loading…" : "Refresh"}
+        </button>
+      </div>
+      <div
+        className="audit-stats"
+        aria-label="Summary of all matching events"
+        aria-busy={loading}
+      >
+        {[
+          {
+            label: "Matching events",
+            value: data?.total,
+            Icon: Activity,
+            hint: "Across the filtered period",
+          },
+          {
+            label: "Team members",
+            value: data?.summary.actors,
+            Icon: Users,
+            hint: "Distinct attributed actors",
+          },
+          {
+            label: "Unattributed events",
+            value: data?.summary.unattributed,
+            Icon: Workflow,
+            hint: "System, customer, or unknown actor",
+          },
+          {
+            label: "Review signals",
+            value: data?.summary.review,
+            Icon: TriangleAlert,
+            hint: "Failed authentication or order review",
+          },
+        ].map(({ label, value, Icon, hint }) => (
+          <article
+            key={label}
+            className={`audit-stat ${label === "Review signals" && !!value ? "has-signals" : ""}`}
+          >
+            <div>
+              <span>{label}</span>
+              <Icon size={17} />
+            </div>
+            <strong>{value === undefined ? "—" : count(value)}</strong>
+            <p>{hint}</p>
+          </article>
+        ))}
+      </div>
+      <section className="audit-explorer" aria-label="Event explorer">
+        <div className="audit-categories" aria-label="Event categories">
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              aria-pressed={filters.category === category.id}
+              onClick={() =>
+                apply({ ...filters, category: category.id, action: "" })
+              }
+            >
+              {category.label}
+            </button>
+          ))}
+        </div>
+        <EventFilterForm
+          key={JSON.stringify(filters)}
+          filters={filters}
+          onApply={apply}
+        />
+        <div className="audit-results-toolbar">
+          <div>
+            <h2>Event stream</h2>
+            <span aria-live="polite">
+              {loading
+                ? "Updating results…"
+                : data
+                  ? `${count(data.total)} matching ${data.total === 1 ? "event" : "events"}`
+                  : "Results unavailable"}
+            </span>
+          </div>
+          <div className="audit-result-controls">
+            <label className="audit-review-toggle">
+              <input
+                type="checkbox"
+                checked={filters.review}
+                onChange={(e) =>
+                  apply({ ...filters, review: e.target.checked })
+                }
+              />
+              Review signals only
+            </label>
+            <label className="audit-sort">
+              <ArrowDownUp size={14} />
+              <span className="sr-only">Sort events</span>
+              <select
+                aria-label="Sort events"
+                value={sort}
+                onChange={(e) => {
+                  setSort(e.target.value);
+                  setPage(1);
+                  setSelectedId(null);
+                }}
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        {error && (
+          <div className="audit-error" role="alert">
+            <TriangleAlert size={18} />
+            <div>
+              <strong>Could not load activity</strong>
+              <p>
+                {data
+                  ? "Previously loaded results are shown. Refresh to try again."
+                  : "Check your connection and try again."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRevision((n) => n + 1)}
+              disabled={loading}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {loading && !data && (
+          <div className="audit-loading" role="status">
+            <RefreshCw size={20} />
+            Loading recorded activity…
+          </div>
+        )}
+        {data && !data.items.length && (
+          <div className="audit-empty">
+            <Search size={28} />
+            <h3>No matching events</h3>
+            <p>
+              Try a wider date window or remove a filter to see more activity.
+            </p>
+            <button type="button" onClick={() => apply(emptyFilters)}>
+              Show all events
+            </button>
+          </div>
+        )}
+        {!!data?.items.length && (
+          <>
+            <div className="audit-list-columns" aria-hidden="true">
+              <span>Event / related entity</span>
+              <span>Actor</span>
+              <span>Time · Tehran</span>
+              <span />
+            </div>
+            <ol className="audit-event-list">
+              {data.items.map((event, index) => {
+                const Icon = categoryIcons[event.category] ?? FileText;
+                const newDate =
+                  index === 0 ||
+                  eventDate(data.items[index - 1].createdAt) !==
+                    eventDate(event.createdAt);
+                return (
+                  <li key={event.id}>
+                    {newDate && (
+                      <div className="audit-day">
+                        <Clock3 size={12} />
+                        <span>{eventDate(event.createdAt)}</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className={`audit-event-row ${event.reviewSignal ? "has-signal" : ""}`}
+                      onClick={() => setSelectedId(event.id)}
+                      aria-label={`View event ${event.id}: ${eventTitle(event.action)}`}
+                    >
+                      <span className="audit-event-main">
+                        <span
+                          className={`audit-event-icon tone-${event.category}`}
+                        >
+                          <Icon size={18} />
+                        </span>
+                        <span className="audit-event-copy">
+                          <strong>
+                            {eventTitle(event.action)}
+                            {event.reviewSignal && (
+                              <span
+                                className="audit-review-dot"
+                                title="Review signal"
+                              />
+                            )}
+                          </strong>
+                          <span>
+                            <code>{event.action}</code>
+                            {event.entityId && (
+                              <>
+                                <i>·</i>
+                                <bdi>{event.entityId}</bdi>
+                              </>
+                            )}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="audit-event-actor">
+                        <span className="audit-avatar" aria-hidden="true">
+                          {event.staffId ? (
+                            actorName(event).slice(0, 1).toLocaleUpperCase()
+                          ) : (
+                            <Workflow size={13} />
+                          )}
+                        </span>
+                        <bdi>{actorName(event)}</bdi>
+                      </span>
+                      <span className="audit-event-time">
+                        <time dateTime={event.createdAt}>
+                          {eventTime(event.createdAt)}
+                        </time>
+                        <small>#{event.id}</small>
+                      </span>
+                      <ChevronRight size={15} className="audit-row-arrow" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </>
+        )}
+        <div className="audit-pagination">
+          <span>
+            {data?.total
+              ? `${count((currentPage - 1) * data.pageSize + 1)}–${count(Math.min(currentPage * data.pageSize, data.total))} of ${count(data.total)} events`
+              : "0 events"}
+          </span>
+          <div>
+            <label>
+              Rows
+              <select
+                aria-label="Events per page"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                  setSelectedId(null);
+                }}
+              >
+                {[25, 50, 100].map((n) => (
+                  <option key={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              aria-label="Previous page"
+              disabled={loading || currentPage <= 1}
+              onClick={() => changePage(currentPage - 1)}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span>
+              Page {currentPage} of {lastPage}
+            </span>
+            <button
+              type="button"
+              aria-label="Next page"
+              disabled={loading || currentPage >= lastPage}
+              onClick={() => changePage(currentPage + 1)}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </section>
+      <footer className="audit-footer">
+        <ShieldCheck size={15} />
+        <p>
+          Read-only audit history. Summary counts cover all matching events.
+          Review signals identify specific recorded actions, not unresolved
+          incidents.
+        </p>
+        <span>
+          Select an event for details <ArrowRight size={13} />
+        </span>
+      </footer>
+      <EventDetails
+        event={selected}
+        onClose={() => setSelectedId(null)}
+        previous={
+          selectedIndex > 0
+            ? () => setSelectedId(data!.items[selectedIndex - 1].id)
+            : null
+        }
+        next={
+          data && selectedIndex >= 0 && selectedIndex < data.items.length - 1
+            ? () => setSelectedId(data.items[selectedIndex + 1].id)
+            : null
+        }
+      />
+    </div>
   );
 }

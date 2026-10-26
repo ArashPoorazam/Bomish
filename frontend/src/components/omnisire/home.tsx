@@ -53,7 +53,7 @@ export function OmnisireHome() {
         {[
           {
             href: "monitoring",
-            label: "پایش سرور",
+            label: "سرور",
             text: "سلامت سرویس‌ها، منابع و ترافیک سرور.",
             Icon: Server,
           },

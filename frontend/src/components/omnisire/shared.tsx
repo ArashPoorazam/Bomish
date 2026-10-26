@@ -112,6 +112,7 @@ export function Workspace({
   actions,
   titleDetail,
   description,
+  contentLanguage,
 }: {
   children: ReactNode;
   owner?: boolean;
@@ -123,6 +124,7 @@ export function Workspace({
   actions?: ReactNode;
   titleDetail?: ReactNode;
   description?: string;
+  contentLanguage?: "en";
 }) {
   const { user, refresh, sessionError } = useStore();
   const path = usePathname();
@@ -275,7 +277,11 @@ export function Workspace({
           </button>
         </div>
       </aside>
-      <div className="omni-main">
+      <div
+        className="omni-main"
+        lang={contentLanguage}
+        dir={contentLanguage === "en" ? "ltr" : undefined}
+      >
         <div
           className={`omni-content ${activeSection === "shipping" ? "omni-content-shipping" : ""}`}
         >

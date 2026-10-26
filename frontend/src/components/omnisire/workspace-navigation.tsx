@@ -61,7 +61,7 @@ const managementLinks = [
   {
     id: "monitoring",
     href: "/omnisire/monitoring",
-    label: "پایش سرور",
+    label: "سرور",
     Icon: Server,
   },
 ];

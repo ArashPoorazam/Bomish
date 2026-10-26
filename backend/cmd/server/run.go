@@ -134,6 +134,8 @@ func run(ctx context.Context, args []string) error {
 			server.Job{Name: "sms", Interval: 5 * time.Second, Run: a.ProcessSMS},
 		)
 	}
+	_ = a.SampleResources(ctx)
+	jobs = append(jobs, server.Job{Name: "resource-monitoring", Interval: 15 * time.Second, Run: a.SampleResources})
 	srv := &http.Server{Handler: a.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 	slog.Info("Bomish API ready", "address", listener.Addr().String())
 	return server.Serve(ctx, srv, listener, jobs...)

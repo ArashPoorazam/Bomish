@@ -3818,15 +3818,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** /omnisire/events */
+        /** Search the owner audit log */
         get: {
             parameters: {
                 query?: {
                     q?: string;
                     sort?: string;
-                    direction?: string;
                     page?: number;
                     pageSize?: number;
+                    actor?: string;
+                    action?: string;
+                    entity?: string;
+                    from?: string;
+                    to?: string;
+                    category?: "access" | "catalog" | "orders" | "finance" | "other";
+                    review?: boolean;
                 };
                 header?: never;
                 path?: never;
@@ -3840,8 +3846,15 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PagedResult"];
+                        "application/json": components["schemas"]["AuditEventPage"];
                     };
+                };
+                /** @description Invalid date range or filter */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Access denied */
                 403: {
@@ -8329,6 +8342,10 @@ export interface components {
             createdAt: string;
             actorName: string;
             staffId: string;
+            /** @enum {string} */
+            category: "access" | "catalog" | "orders" | "finance" | "other";
+            /** @description Failed staff login, failed Omnisire unlock, or order.review; not a general severity classification. */
+            reviewSignal: boolean;
         };
         ExportRequest: {
             section: string;
@@ -8735,6 +8752,33 @@ export interface components {
                 errors: number;
                 averageMs: number;
             }[];
+            /** @description Up to 30 minutes of system-visible resource samples, collected every 15 seconds. Resets on API restart. CPU and RAM reflect /proc, not container quotas. Null measurements are unavailable. */
+            resources?: {
+                /** Format: date-time */
+                at: string;
+                cpuPercent: number | null;
+                memory: {
+                    totalBytes: number;
+                    availableBytes: number;
+                } | null;
+                disk: {
+                    totalBytes: number;
+                    availableBytes: number;
+                } | null;
+                connectionsPercent: number | null;
+            }[];
+        };
+        AuditEventPage: {
+            items: components["schemas"]["AuditEvent"][];
+            total: number;
+            page: number;
+            pageSize: number;
+            /** @description Counts over the full filtered result, not just this page. Unattributed events have no staff actor. */
+            summary: {
+                actors: number;
+                unattributed: number;
+                review: number;
+            };
         };
     };
     responses: never;

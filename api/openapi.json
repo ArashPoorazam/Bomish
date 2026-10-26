@@ -1591,10 +1591,17 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": ["ok", "product"],
+                  "required": [
+                    "ok",
+                    "product"
+                  ],
                   "properties": {
-                    "ok": { "type": "boolean" },
-                    "product": { "$ref": "#/components/schemas/Product" }
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "product": {
+                      "$ref": "#/components/schemas/Product"
+                    }
                   }
                 }
               }
@@ -3370,20 +3377,23 @@
     },
     "/omnisire/events": {
       "get": {
-        "summary": "/omnisire/events",
+        "summary": "Search the owner audit log",
         "responses": {
           "200": {
             "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PagedResult"
+                  "$ref": "#/components/schemas/AuditEventPage"
                 }
               }
             }
           },
           "403": {
             "description": "Access denied"
+          },
+          "400": {
+            "description": "Invalid date range or filter"
           }
         },
         "parameters": [
@@ -3403,13 +3413,6 @@
           },
           {
             "in": "query",
-            "name": "direction",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
             "name": "page",
             "schema": {
               "type": "integer",
@@ -3423,6 +3426,64 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entity",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "access",
+                "catalog",
+                "orders",
+                "finance",
+                "other"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "review",
+            "schema": {
+              "type": "boolean"
             }
           }
         ]
@@ -9062,6 +9123,20 @@
           },
           "staffId": {
             "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "access",
+              "catalog",
+              "orders",
+              "finance",
+              "other"
+            ]
+          },
+          "reviewSignal": {
+            "type": "boolean",
+            "description": "Failed staff login, failed Omnisire unlock, or order.review; not a general severity classification."
           }
         },
         "required": [
@@ -9071,7 +9146,9 @@
           "detail",
           "createdAt",
           "actorName",
-          "staffId"
+          "staffId",
+          "category",
+          "reviewSignal"
         ],
         "additionalProperties": false
       },
@@ -10632,6 +10709,113 @@
                 "averageMs": {
                   "type": "number"
                 }
+              }
+            }
+          },
+          "resources": {
+            "type": "array",
+            "description": "Up to 30 minutes of system-visible resource samples, collected every 15 seconds. Resets on API restart. CPU and RAM reflect /proc, not container quotas. Null measurements are unavailable.",
+            "items": {
+              "type": "object",
+              "required": [
+                "at",
+                "cpuPercent",
+                "memory",
+                "disk",
+                "connectionsPercent"
+              ],
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "cpuPercent": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "memory": {
+                  "type": "object",
+                  "nullable": true,
+                  "required": [
+                    "totalBytes",
+                    "availableBytes"
+                  ],
+                  "properties": {
+                    "totalBytes": {
+                      "type": "integer"
+                    },
+                    "availableBytes": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "disk": {
+                  "type": "object",
+                  "required": [
+                    "totalBytes",
+                    "availableBytes"
+                  ],
+                  "properties": {
+                    "totalBytes": {
+                      "type": "integer"
+                    },
+                    "availableBytes": {
+                      "type": "integer"
+                    }
+                  },
+                  "nullable": true
+                },
+                "connectionsPercent": {
+                  "type": "number",
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "AuditEventPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize",
+          "summary"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEvent"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "summary": {
+            "type": "object",
+            "description": "Counts over the full filtered result, not just this page. Unattributed events have no staff actor.",
+            "required": [
+              "actors",
+              "unattributed",
+              "review"
+            ],
+            "properties": {
+              "actors": {
+                "type": "integer"
+              },
+              "unattributed": {
+                "type": "integer"
+              },
+              "review": {
+                "type": "integer"
               }
             }
           }
