@@ -250,7 +250,11 @@ test("homepage copy and conditional bestseller carousel navigation", async ({
     )
   ).json();
   await page.goto("/");
-  await expect(page.locator("main")).not.toContainText("انتخاب آزادانه وزن");
+  // Streaming can temporarily keep both the loading fallback and page in the DOM.
+  // Wait for visible page content before asserting that outdated copy is absent.
+  const main = page.getByRole("main");
+  await expect(main.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(main).not.toContainText("انتخاب آزادانه وزن");
   await expect(page.locator(".principle-card:visible").last()).toContainText(
     "درجه‌های مختلف یک محصول را با هم ترکیب نمی‌کنیم",
   );
