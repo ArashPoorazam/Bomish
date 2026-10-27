@@ -1,3 +1,4 @@
+import "@/app/product-packages.css";
 import type { Package, ProductPackaging } from "@/lib/types";
 import { fa } from "@/lib/format";
 import {

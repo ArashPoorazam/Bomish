@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { serverApi } from "@/lib/api";
+import { serverApi } from "@/lib/server-api";
 import type { Article } from "@/lib/types";
 export const metadata = { title: "مجله بومیش" };
 export default async function Blog() {

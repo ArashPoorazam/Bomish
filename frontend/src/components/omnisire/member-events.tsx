@@ -9,7 +9,7 @@ import {
   stamp,
   type PageData,
 } from "./shared";
-export const actionLabels: Record<string, string> = {
+const actionLabels: Record<string, string> = {
   "auth.customer_login": "ورود مشتری",
   "auth.login": "ورود همکار",
   "auth.failed": "ورود ناموفق",

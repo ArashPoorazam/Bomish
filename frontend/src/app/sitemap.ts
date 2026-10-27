@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { serverApi } from "@/lib/api";
+import { serverApi } from "@/lib/server-api";
 import type { Product, Article } from "@/lib/types";
 export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

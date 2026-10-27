@@ -3,8 +3,8 @@ import { useState } from "react";
 import { fa } from "@/lib/format";
 import type { ShippingConfig, ShippingBox, ShippingSize } from "@/lib/types";
 import { MeasurementNumber } from "./measurement-number";
-export const emptySize: ShippingSize = { lengthMm: 0, widthMm: 0, heightMm: 0 };
-export function SizeFields({
+const emptySize: ShippingSize = { lengthMm: 0, widthMm: 0, heightMm: 0 };
+function SizeFields({
   value,
   onChange,
   label,

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useStore } from "@/components/store-provider";
 import { api } from "@/lib/api";
 import { hasStaffPermission } from "@/lib/staff-permissions";
@@ -12,18 +13,53 @@ import {
   Pager,
   type PageData,
 } from "@/components/omnisire/shared";
-import { CatalogManager, CategoryManager } from "./catalog-manager";
-import { ArticleManager } from "./article-manager";
-import { PriceManager } from "./price-manager";
 import {
   sectionLabels,
   sectionPermission,
 } from "../omnisire/workspace-navigation";
-import { StaffRequests } from "../requests/staff-requests";
-import { HomeManagement } from "./home-management";
 import { PermissionFields } from "./permissions";
-import { OrderManager } from "./order-manager";
-import { PackagingManager } from "./packaging-manager";
+function SectionLoading() {
+  return (
+    <p className="loading" role="status">
+      در حال دریافت بخش…
+    </p>
+  );
+}
+
+const CatalogManager = dynamic(
+  () => import("./catalog-manager").then((module) => module.CatalogManager),
+  { loading: SectionLoading },
+);
+const CategoryManager = dynamic(
+  () => import("./catalog-manager").then((module) => module.CategoryManager),
+  { loading: SectionLoading },
+);
+const ArticleManager = dynamic(
+  () => import("./article-manager").then((module) => module.ArticleManager),
+  { loading: SectionLoading },
+);
+const PriceManager = dynamic(
+  () => import("./price-manager").then((module) => module.PriceManager),
+  { loading: SectionLoading },
+);
+const StaffRequests = dynamic(
+  () =>
+    import("../requests/staff-requests").then((module) => module.StaffRequests),
+  { loading: SectionLoading },
+);
+const HomeManagement = dynamic(
+  () => import("./home-management").then((module) => module.HomeManagement),
+  { loading: SectionLoading },
+);
+const OrderManager = dynamic(
+  () => import("./order-manager").then((module) => module.OrderManager),
+  { loading: SectionLoading },
+);
+const PackagingManager = dynamic(
+  () => import("./packaging-manager").then((module) => module.PackagingManager),
+  { loading: SectionLoading },
+);
+
 function sectionFilters(section: string, q = ""): Record<string, string> {
   return {
     ...(q ? { q } : {}),

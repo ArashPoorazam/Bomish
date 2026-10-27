@@ -1,4 +1,5 @@
 "use client";
+import "@/app/shipping.css";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { ShippingConfig } from "@/lib/types";

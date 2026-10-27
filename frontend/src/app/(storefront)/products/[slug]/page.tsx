@@ -3,7 +3,7 @@ import { ProductEvent } from "@/components/product-event";
 import { inStock } from "@/lib/format";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { serverApi } from "@/lib/api";
+import { serverApi } from "@/lib/server-api";
 import type { Product, Article } from "@/lib/types";
 import { ProductPurchase } from "@/components/product-purchase";
 import { ProductGallery } from "@/components/product-gallery";

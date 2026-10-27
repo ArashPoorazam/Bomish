@@ -2,7 +2,7 @@ import Link from "next/link";
 import { X } from "lucide-react";
 import { ProductEvent } from "@/components/product-event";
 import { CatalogFilters, CatalogSort } from "@/components/catalog-controls";
-import { serverApi } from "@/lib/api";
+import { serverApi } from "@/lib/server-api";
 import type { Product, Category } from "@/lib/types";
 import { ProductCard } from "@/components/product-card";
 import { fa } from "@/lib/format";

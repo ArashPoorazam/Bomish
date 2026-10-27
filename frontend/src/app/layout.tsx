@@ -1,19 +1,10 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import localFont from "next/font/local";
-import { StoreProvider } from "@/components/store-provider";
-import { WorkspaceFrame } from "@/components/workspace-frame";
 
-import "leaflet/dist/leaflet.css";
 import "./globals.css";
-import "./storefront.css";
-import "./home-enhancements.css";
 import "./auth.css";
 import "./requests.css";
-import "./home-management.css";
-import "./shipping.css";
-import "./workspace.css";
-import "./packaging.css";
 const vazir = localFont({
   src: "../../public/fonts/Vazirmatn.woff2",
   variable: "--font-vazir",
@@ -42,9 +33,7 @@ export default function RootLayout({
         <a className="skip-link" href="#main">
           رفتن به محتوای اصلی
         </a>
-        <StoreProvider>
-          <WorkspaceFrame>{children}</WorkspaceFrame>
-        </StoreProvider>
+        {children}
       </body>
     </html>
   );

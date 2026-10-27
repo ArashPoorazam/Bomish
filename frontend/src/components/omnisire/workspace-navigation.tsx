@@ -30,7 +30,7 @@ export const sectionLabels: Record<string, string> = {
   suggestions: "مدیریت خانه",
   sales: "فروش من",
 };
-export const reportSections = [
+const reportSections = [
   ["overview", "نمای کلی فروش"],
   ["products", "عملکرد محصولات"],
   ["packages", "فروش بسته‌ها"],

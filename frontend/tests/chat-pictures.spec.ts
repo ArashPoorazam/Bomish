@@ -45,45 +45,44 @@ for (const staff of [false, true]) {
         ];
         return route.fulfill({ json: staff ? { items, total: 1 } : items });
       }
-      if (path.endsWith("/orders"))
-        return route.fulfill({
-          json: {
+      if (path.endsWith("/orders")) {
+        const items = [
+          {
+            id: "customer-order-complete",
+            status: "received",
+            createdAt: "2026-10-01T10:00:00Z",
+            tracking: "",
+            address: {
+              recipient: "مریم احمدی",
+              phone: "09120000000",
+              city: "تهران",
+              province: "تهران",
+              street: "خیابان بهار",
+              postalCode: "1234567890",
+            },
             items: [
               {
-                id: "customer-order-complete",
-                status: "received",
-                createdAt: "2026-10-01T10:00:00Z",
-                tracking: "",
-                address: {
-                  recipient: "مریم احمدی",
-                  phone: "09120000000",
-                  city: "تهران",
-                  province: "تهران",
-                  street: "خیابان بهار",
-                  postalCode: "1234567890",
-                },
-                items: [
-                  {
-                    productId: "spice",
-                    packageId: "small",
-                    name: "زردچوبه",
-                    quantity: 1,
-                    grams: 100,
-                    priceRials: 100000,
-                    totalRials: 100000,
-                    packed: true,
-                  },
-                ],
-                subtotalRials: 100000,
-                shippingRials: 0,
-                discountRials: 0,
+                productId: "spice",
+                packageId: "small",
+                name: "زردچوبه",
+                quantity: 1,
+                grams: 100,
+                priceRials: 100000,
                 totalRials: 100000,
-                events: [],
+                packed: true,
               },
             ],
-            total: 1,
+            subtotalRials: 100000,
+            shippingRials: 0,
+            discountRials: 0,
+            totalRials: 100000,
+            events: [],
           },
+        ];
+        return route.fulfill({
+          json: staff ? { items, total: items.length } : items,
         });
+      }
       return route.fulfill({ json: [] });
     });
     await page.goto(staff ? "/staff?section=support" : "/account");

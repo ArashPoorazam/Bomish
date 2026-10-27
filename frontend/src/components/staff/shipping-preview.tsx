@@ -6,7 +6,7 @@ import { ShippingLocalities, PinConfirmation } from "../shipping-address";
 import { providerName } from "@/lib/shipping";
 import { AddressMap } from "../address-map";
 import { ParcelView } from "./shipping-parcel";
-export const blankShippingAddress: Address = {
+const blankShippingAddress: Address = {
   id: "",
   recipient: "",
   phone: "",

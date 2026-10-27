@@ -87,7 +87,7 @@ export type Filters = {
   customerName: string;
   selected: Selection[];
 };
-export function isoDay(date: Date) {
+function isoDay(date: Date) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tehran",
     year: "numeric",

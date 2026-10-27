@@ -55,7 +55,7 @@ function memberOverrides(member?: Member): Record<string, boolean> {
   }
   return { ...overrides, ...member?.permissionOverrides };
 }
-export const formatCard = (s: string) =>
+const formatCard = (s: string) =>
   digits(s)
     .replace(/\D/g, "")
     .slice(0, 16)

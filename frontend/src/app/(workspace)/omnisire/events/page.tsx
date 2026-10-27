@@ -1,5 +1,5 @@
 import { EventsPage } from "@/components/omnisire/events";
-import "../../events.css";
+import "@/app/events.css";
 export default function Page() {
   return <EventsPage />;
 }

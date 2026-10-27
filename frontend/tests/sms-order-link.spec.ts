@@ -1,4 +1,4 @@
-import { prepareCommerce, payCart, completePostal } from "./commerce-fixture";
+import { prepareCommerce, payCart } from "./commerce-fixture";
 import { test, expect, type Page } from "@playwright/test";
 
 async function loginAtLink(page: Page, phone: string) {

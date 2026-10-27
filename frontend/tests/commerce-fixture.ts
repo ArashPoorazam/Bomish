@@ -10,7 +10,7 @@ import type {
   ShippingConfig,
 } from "../src/lib/types";
 
-export const commerceAddress = {
+const commerceAddress = {
   recipient: "خریدار آزمایشی",
   phone: "09121234567",
   province: "البرز",

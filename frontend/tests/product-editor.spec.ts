@@ -700,9 +700,7 @@ test("supplementary content previews only in the final step and reflects edits",
   const section = preview.locator("section").filter({
     has: page.getByRole("heading", { name: "راهنمای دم کردن", exact: true }),
   });
-  await expect(section.locator('[data-streamdown="strong"]')).toHaveText(
-    "آب گرم",
-  );
+  await expect(section.locator("strong")).toHaveText("آب گرم");
   await expect(section.getByRole("listitem")).toHaveText("پنج دقیقه صبر کنید");
   await expect(
     preview.getByRole("heading", { name: "بخش خالی", exact: true }),
@@ -726,6 +724,6 @@ test("supplementary content previews only in the final step and reflects edits",
     .click();
   await expect(section).toContainText("متن تازه");
   await expect(
-    preview.locator('[data-streamdown="strong"]').filter({ hasText: "آب گرم" }),
+    preview.locator("strong").filter({ hasText: "آب گرم" }),
   ).toHaveCount(0);
 });

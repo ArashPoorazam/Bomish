@@ -12,8 +12,6 @@ export const date = (s: string) =>
     dateStyle: "medium",
     timeZone: "Asia/Tehran",
   }).format(new Date(s));
-export const total = (price: number, grams: number) =>
-  Number(((BigInt(price) * BigInt(grams) + 5000n) / 10000n) * 10n);
 export const statuses: Record<string, string> = {
   draft: "پیش‌نویس",
   published: "منتشر شده",
@@ -46,7 +44,7 @@ export const packagePrice = (
           10000,
       )
     : pack.priceRials;
-export function priceBounds(p: import("./types").Product) {
+function priceBounds(p: import("./types").Product) {
   const prices = (p.packages || []).map((x) => packagePrice(p, x));
   return prices.length ? [Math.min(...prices), Math.max(...prices)] : [0, 0];
 }

@@ -1,4 +1,5 @@
 "use client";
+import "@/app/home-management.css";
 import { useEffect, useState } from "react";
 import { HomeSlidesEditor } from "./home-slides";
 import { SuggestionsEditor } from "./suggestions";

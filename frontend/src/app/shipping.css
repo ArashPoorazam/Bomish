@@ -177,12 +177,6 @@
   }
 }
 
-@media (max-width: 640px) {
-  .product-steps {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 /* Store shipping setup: everyday operations first, technical details on demand. */
 .shipping-settings {
   --shipping-line: #dbe2d4;
@@ -275,16 +269,6 @@
   border-radius: 14px;
   min-width: 0;
 }
-.product-packaging-fields {
-  margin-block: 24px;
-  padding-block-start: 24px;
-  border-top: 1px solid #dbe2d4;
-  gap: 16px;
-  min-width: 0;
-}
-.product-packaging-fields p {
-  margin: 0;
-}
 .shipping-section summary {
   cursor: pointer;
   min-height: 44px;
@@ -305,21 +289,17 @@
   color: #4e6255;
   font-size: 0.85rem;
 }
-.shipping-settings :is(button, input:not([type="checkbox"]), select),
-.product-package :is(button, input:not([type="checkbox"]), select) {
+.shipping-settings :is(button, input:not([type="checkbox"]), select) {
   min-height: 44px;
 }
-.shipping-settings .check-label,
-.product-package .check-label {
+.shipping-settings .check-label {
   min-height: 44px;
 }
-.shipping-settings :is(a, button, input, select, summary):focus-visible,
-.product-package :is(button, input, select, summary):focus-visible {
+.shipping-settings :is(a, button, input, select, summary):focus-visible {
   outline: 3px solid #38664d;
   outline-offset: 3px;
 }
-.shipping-settings :is(fieldset, .form-grid > *, input, select),
-.product-package :is(fieldset, .form-grid > *, input, select) {
+.shipping-settings :is(fieldset, .form-grid > *, input, select) {
   min-width: 0;
   max-width: 100%;
 }
@@ -348,29 +328,9 @@
     flex-direction: column;
     align-items: stretch;
   }
-  .product-steps {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   .shipping-box-diagram {
     grid-template-columns: auto 80px auto;
     gap: 8px;
-  }
-}
-.product-package .package-dimension-fields {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.package-dimension-fields > label:last-child {
-  grid-column: 1 / -1;
-}
-@media (max-width: 640px) {
-  .product-package .package-selling-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .package-selling-fields > .package-price-field {
-    grid-column: 1 / -1;
-  }
-  .package-dimension-fields > label:not(:last-child) {
-    font-size: 0.8rem;
   }
 }
 

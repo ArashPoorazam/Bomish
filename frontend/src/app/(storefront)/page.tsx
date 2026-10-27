@@ -1,3 +1,4 @@
+import "@/app/home-enhancements.css";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -10,7 +11,7 @@ import {
   Headset,
   Handshake,
 } from "lucide-react";
-import { serverApi } from "@/lib/api";
+import { serverApi } from "@/lib/server-api";
 import type { Product, Article, HomeSlide } from "@/lib/types";
 import { ProductRail } from "@/components/product-rail";
 import { HomeSlideshow } from "@/components/home-slideshow";

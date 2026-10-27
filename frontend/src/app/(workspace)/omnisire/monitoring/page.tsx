@@ -1,5 +1,5 @@
 import { ServerMonitoring } from "@/components/omnisire/monitoring";
-import "../../monitoring.css";
+import "@/app/monitoring.css";
 
 export default function Page() {
   return <ServerMonitoring />;

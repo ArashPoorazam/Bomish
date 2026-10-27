@@ -1,4 +1,5 @@
 "use client";
+import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
 import type { Map as LeafletMap, CircleMarker } from "leaflet";

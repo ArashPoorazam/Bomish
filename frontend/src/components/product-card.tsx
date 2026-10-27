@@ -3,7 +3,7 @@ import { ProductClickLink } from "./product-click-link";
 import { ArrowUpLeft } from "lucide-react";
 import type { Product } from "@/lib/types";
 import { priceRange, inStock, fa } from "@/lib/format";
-export function ProductImage({
+function ProductImage({
   product,
   priority = false,
 }: {

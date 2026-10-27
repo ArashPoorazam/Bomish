@@ -1,7 +1,7 @@
 export default function Loading() {
   return (
-    <div role="status" className="loading">
+    <main id="main" role="status" className="loading">
       در حال آماده‌سازی…
-    </div>
+    </main>
   );
 }

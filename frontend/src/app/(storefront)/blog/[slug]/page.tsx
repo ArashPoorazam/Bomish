@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { serverApi } from "@/lib/api";
+import { serverApi } from "@/lib/server-api";
 import type { Article, Product } from "@/lib/types";
 import { RichText } from "@/components/rich-text";
 import { ProductCard } from "@/components/product-card";

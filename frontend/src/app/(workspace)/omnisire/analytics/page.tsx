@@ -1,4 +1,4 @@
-import "../../analytics.css";
+import "@/app/analytics.css";
 import { AnalyticsPage } from "@/components/omnisire/analytics";
 export default async function Page({
   searchParams,

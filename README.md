@@ -38,7 +38,7 @@ Offline mode reuses the last selected copy, including local changes, and prints 
 
 Press Ctrl+C to stop the application processes; the development database stays running. Data lives in the ignored `.data/` folder. These options apply to the native launcher; Docker Compose remains a separate local environment. Alternatively, use the manual setup below.
 
-Requirements: Go 1.27.3+, Node 26, PostgreSQL 18 with `pg_trgm`, a security-patched Python 3.10+ with `tarfile` extraction filters, Bash and `flock`. Production refresh also needs OpenSSH and PostgreSQL 18 client tools (`pg_restore`). Optionally install sqlc 1.31+.
+Requirements: Go 1.27.3+, Node 26.12.1+ (26.x), PostgreSQL 18 with `pg_trgm`, a security-patched Python 3.10+ with `tarfile` extraction filters, Bash and `flock`. Production refresh also needs OpenSSH and PostgreSQL 18 client tools (`pg_restore`). Optionally install sqlc 1.31+.
 
 The app uses TypeScript 7. API type generation runs in the isolated `frontend/tools/api-types` package with TypeScript 5 because `openapi-typescript` still requires its JavaScript compiler API. `npm run api:generate` installs the generator from its own lockfile and regenerates the contract; the app's compiler remains TypeScript 7.
 

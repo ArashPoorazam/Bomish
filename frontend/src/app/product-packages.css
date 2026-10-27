@@ -1,0 +1,37 @@
+.product-packaging-fields {
+  margin-block: 24px;
+  padding-block-start: 24px;
+  border-top: 1px solid #dbe2d4;
+  gap: 16px;
+  min-width: 0;
+}
+.product-packaging-fields p {
+  margin: 0;
+}
+.product-package :is(button, input:not([type="checkbox"]), select) {
+  min-height: 44px;
+}
+.product-package .check-label {
+  min-height: 44px;
+}
+.product-package :is(button, input, select, summary):focus-visible {
+  outline: 3px solid #38664d;
+  outline-offset: 3px;
+}
+.product-package :is(fieldset, .form-grid > *, input, select) {
+  min-width: 0;
+  max-width: 100%;
+}
+@media (max-width: 640px) {
+  .product-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .product-package .package-selling-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .package-selling-fields > .package-price-field {
+    grid-column: 1 / -1;
+  }
+}

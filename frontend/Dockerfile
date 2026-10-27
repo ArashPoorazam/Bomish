@@ -1,11 +1,11 @@
-FROM node:26-alpine AS build
+FROM node:26.12.1-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
 ENV API_URL=http://api:8080 NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
-FROM node:26-alpine
+FROM node:26.12.1-alpine
 # The standalone server only needs Node; omit unused package managers and their dependencies.
 RUN rm -rf /usr/local/lib/node_modules/npm /opt/yarn-* \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg

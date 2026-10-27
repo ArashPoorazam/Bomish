@@ -83,7 +83,7 @@ The owner-only `/omnisire/analytics` workspace includes daily sales, product cli
 
 Recommendations rank available products by matching category first, then popularity (paid package counts weighted by 10 plus recorded product visits), with a deterministic name tie-breaker. There is no manual recommendation picker.
 
-Articles and long product sections use Streamdown for incremental Markdown rendering, including lists, tables, links, emphasis and code. Raw HTML is skipped, unsafe URL schemes are filtered, and inline Markdown images are disabled; use the existing uploaded article/product images.
+Articles and long product sections use server-rendered `react-markdown` with `remark-gfm`, including lists, tables, links, emphasis, code, task lists and footnotes. Staff previews reuse the same renderer in their optional editor bundles. Raw HTML is skipped, unsafe URL schemes are filtered, and inline Markdown images are disabled; use the existing uploaded article/product images.
 
 Real payment integration and production activation remain outside this change. The existing development-only startup gate remains in place.
 

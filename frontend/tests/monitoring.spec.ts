@@ -220,14 +220,25 @@ test("verified owner sees real server measurements", async ({ page }) => {
   );
   await page.goto("/staff");
   await loginStaff(page, "owner");
+  const snapshot = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/omnisire/monitoring"),
+  );
   await page.goto("/omnisire/monitoring");
-  await expect(
-    page.getByRole("heading", { name: "Monitored services are online" }),
-  ).toBeVisible();
-  const response = await page.request.get("/api/v1/omnisire/monitoring");
+  const response = await snapshot;
   expect(response.ok()).toBe(true);
   expect(response.headers()["cache-control"]).toBe("no-store");
   const data: Snapshot = await response.json();
+  // Earlier journeys deliberately exercise error responses. The health banner
+  // must reflect the sampled API status, including its error-rate warning.
+  await expect(
+    page.getByRole("heading", {
+      name:
+        data.status === "attention"
+          ? "Needs attention"
+          : "Monitored services are online",
+      exact: true,
+    }),
+  ).toBeVisible();
   expect(data.database.status).toBe("healthy");
   expect(data.runtime.heapBytes).toBeGreaterThan(0);
   expect(data.traffic.length).toBeGreaterThan(0);

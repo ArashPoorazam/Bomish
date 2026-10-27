@@ -1,28 +1,12 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowUp, ImagePlus, Leaf, UserRound, X } from "lucide-react";
+import { ArrowUp, ImagePlus, X } from "lucide-react";
+
+import { ChatAvatar } from "./chat-avatar";
+export { ChatAvatar } from "./chat-avatar";
 
 export type ChatDraft = { body: string; key: string; image?: File };
 export const emptyDraft: ChatDraft = { body: "", key: "" };
-
-export function ChatAvatar({
-  support = false,
-  seed = "",
-}: {
-  support?: boolean;
-  seed?: string;
-}) {
-  const tone =
-    Array.from(seed).reduce((sum, char) => sum + char.charCodeAt(0), 0) % 3;
-  return (
-    <span
-      aria-hidden="true"
-      className={`chat-avatar ${support ? "is-support" : `customer-tone-${tone}`}`}
-    >
-      {support ? <Leaf size={19} /> : <UserRound size={18} />}
-    </span>
-  );
-}
 
 export function WelcomeMessage() {
   return (
