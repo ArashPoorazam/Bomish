@@ -1,4 +1,4 @@
-FROM postgres:18-alpine
+FROM postgres:19-alpine
 # Apply security fixes to inherited packages as well as newly installed tools.
 RUN apk upgrade --no-cache \
     && apk add --no-cache restic ca-certificates util-linux
